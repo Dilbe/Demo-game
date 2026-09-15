@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Demo Game</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Demo Game</h1>
+
+  <nav id="tabs">
+    <button class="tab-button" data-tab="fight-tab">Fight</button>
+    <button class="tab-button" data-tab="character-tab">Character</button>
+  </nav>
+
+  <section id="fight-tab" class="tab-panel">
+    <div class="combatant" id="monster">
+      <h2>Monster</h2>
+      <p>HP: <span id="monster-hp">5</span> / 5</p>
+      <button id="monster-attack-indicator" class="cooldown-button" disabled>
+        <span class="cooldown-fill" id="monster-cooldown-fill"></span>
+        <span class="cooldown-label">Attack</span>
+      </button>
+    </div>
+
+    <div class="combatant" id="player">
+      <h2>Player</h2>
+      <p>HP: <span id="player-hp">10</span> / <span id="player-max-hp">10</span></p>
+    </div>
+
+    <button id="start-button">Start</button>
+
+    <button id="attack-button" class="cooldown-button" hidden>
+      <span class="cooldown-fill" id="player-cooldown-fill"></span>
+      <span class="cooldown-label">Attack</span>
+    </button>
+
+    <p id="result-message" hidden></p>
+    <button id="restart-button" hidden>Restart</button>
+  </section>
+
+  <section id="character-tab" class="tab-panel" hidden>
+    <p>XP: <span id="xp-total">0</span></p>
+
+    <div class="stat-row">
+      <span class="stat-name">Max HP</span>
+      <span class="stat-level">Lvl 0</span>
+      <button class="upgrade-button" data-stat="maxHp">Upgrade (5 XP)</button>
+    </div>
+
+    <div class="stat-row">
+      <span class="stat-name">Attack Damage</span>
+      <span class="stat-level">Lvl 0</span>
+      <button class="upgrade-button" data-stat="attackDamage">Upgrade (5 XP)</button>
+    </div>
+
+    <div class="stat-row">
+      <span class="stat-name">Attack Speed</span>
+      <span class="stat-level">Lvl 0</span>
+      <button class="upgrade-button" data-stat="attackSpeed">Upgrade (5 XP)</button>
+    </div>
+
+    <button id="reset-character-button">Reset Character</button>
+  </section>
+
+  <script src="game.js"></script>
+</body>
+</html>

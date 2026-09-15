@@ -1,0 +1,83 @@
+body {
+  font-family: sans-serif;
+  text-align: center;
+  margin-top: 3rem;
+}
+
+.combatant {
+  margin: 1.5rem auto;
+}
+
+.cooldown-button {
+  position: relative;
+  overflow: hidden;
+  font-size: 1.2rem;
+  width: 80px;
+  height: 80px;
+  padding: 0;
+}
+
+.cooldown-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.cooldown-label {
+  position: relative;
+}
+
+#result-message {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-top: 2rem;
+}
+
+#restart-button,
+#start-button {
+  font-size: 1rem;
+  padding: 0.5rem 1.5rem;
+}
+
+#tabs {
+  margin-bottom: 1.5rem;
+}
+
+.tab-button {
+  font-size: 1rem;
+  padding: 0.5rem 1.5rem;
+  cursor: pointer;
+}
+
+.tab-button.active {
+  font-weight: bold;
+  background: #ddd;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.75rem auto;
+}
+
+.stat-name {
+  width: 8rem;
+  text-align: right;
+}
+
+.stat-level {
+  width: 3.5rem;
+  text-align: left;
+}
+
+#reset-character-button {
+  margin-top: 1.5rem;
+  font-size: 1rem;
+  padding: 0.5rem 1.5rem;
+}
