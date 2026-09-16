@@ -93,19 +93,36 @@ Picking up two of the ideas originally parked in "out of scope for v1": rewards 
 The whole point of this milestone is to try the full pipeline once — design to code to a real URL — not to add game features.
 
 - **Where:** GitHub Pages, since the project is already 100% static with no build step (per Tech decision #1/#4).
-- **How:** repo Settings → Pages → Deploy from a branch → `main`, root folder. No workflow file, no code changes needed — the existing `index.html`/`style.css`/`game.js` at the repo root are already servable as-is.
-- **Note:** enabling Pages is a repo-admin setting change, not something doable via a commit/PR — it's a manual one-time toggle for the repo owner.
+- **How:** deployed via a GitHub Actions workflow rather than the no-code "Deploy from a branch" toggle — see the CI/CD section below. Slightly more setup for a project this small, but that's the point: it's the learning target, and it mirrors an Azure DevOps-style release pipeline instead of a plain static hand-off.
+- **Note:** enabling Pages itself (picking "GitHub Actions" as the source) is a repo-admin setting change, not something doable via a commit/PR — it's a manual one-time toggle for the repo owner.
 - **Custom domain:** `mygame.dilbe.eu`, via a subdomain CNAME record pointing at `dilbe.github.io` — chosen over the apex `dilbe.eu` domain so the existing email (MX) setup on the apex is never touched. A `CNAME` file at the repo root (containing `mygame.dilbe.eu`) tells GitHub Pages which domain to serve.
 
 ### Publishing milestones
 
 1. Merge the current playable version into `main`.
 2. Make the repo public — Settings → General → Danger Zone → Change repository visibility. (Currently private; GitHub Pages is free for public repos but needs a paid plan on a private one, and nothing in this repo is sensitive.)
-3. Enable GitHub Pages on `main` (root folder) in repo settings.
+3. Enable GitHub Pages in repo settings with source set to "GitHub Actions" (rather than "Deploy from a branch" — see CI/CD section for the workflow that does the actual deploying).
 4. Confirm the published URL (`dilbe.github.io/Demo-game`) loads and is playable, same as local.
 5. At the DNS provider for `dilbe.eu`: add a CNAME record, name `mygame`, value `dilbe.github.io`.
 6. In GitHub Pages settings, set the custom domain to `mygame.dilbe.eu` and wait for GitHub to verify DNS + provision HTTPS.
 7. Confirm `https://mygame.dilbe.eu` loads and is playable.
+
+## CI/CD (learning GitHub Actions)
+
+Not really necessary for a project this size — the point is to learn how GitHub's equivalent of Azure DevOps Pipelines works, end to end: a PR check that gates merges into `main`, and a release-style pipeline that publishes on push to `main`.
+
+- **CI (PR check):** a workflow that runs on every pull request into `main`, executing a small test suite. Combined with a branch protection rule on `main` requiring that check to pass — the GitHub equivalent of an Azure DevOps build-validation branch policy. (The branch protection rule itself is another repo-admin setting, like enabling Pages.)
+- **Tests:** genuinely not much to test in a plain HTML page, so the plan is to pull a couple of existing formulas out of `game.js` into small named functions — the XP-cost-per-level rule, the damage calculation — and write real (if small) tests against those with Node's **built-in test runner** (`node --test` + `assert`, no dependencies, no config needed). This also naturally grows once the v3 data-object refactor (stats/skills as config objects) lands — those become easy, obvious things to test.
+- **CD (release pipeline):** a separate workflow, triggered on push to `main`, that deploys to GitHub Pages using the official actions (`actions/checkout`, `actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`) — this is the actual "publish to a service" pipeline, and replaces the plain "Deploy from a branch" Pages mode.
+
+### CI/CD milestones
+
+1. Extract 1–2 pure functions from `game.js` (e.g. XP cost for a stat level, attack damage calculation) so there's something concrete and meaningful to test.
+2. Add a minimal test file using Node's built-in test runner (`node --test`), with a handful of cases covering the extracted functions.
+3. Add `.github/workflows/ci.yml` — runs on pull requests into `main`, executing `node --test`.
+4. Turn on branch protection for `main` requiring the CI check to pass before merging (manual Settings step).
+5. Add `.github/workflows/deploy.yml` — runs on push to `main`, builds and deploys to GitHub Pages via the official Pages actions.
+6. Confirm the loop end to end: open a PR with a deliberately failing test, see the check fail and block merge; fix it, merge, and see the deploy workflow publish automatically.
 
 ## v3 scope — skills & always-on health
 
