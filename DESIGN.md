@@ -95,12 +95,16 @@ The whole point of this milestone is to try the full pipeline once — design to
 - **Where:** GitHub Pages, since the project is already 100% static with no build step (per Tech decision #1/#4).
 - **How:** repo Settings → Pages → Deploy from a branch → `main`, root folder. No workflow file, no code changes needed — the existing `index.html`/`style.css`/`game.js` at the repo root are already servable as-is.
 - **Note:** enabling Pages is a repo-admin setting change, not something doable via a commit/PR — it's a manual one-time toggle for the repo owner.
+- **Custom domain:** `mygame.dilbe.eu`, via a subdomain CNAME record pointing at `dilbe.github.io` — chosen over the apex `dilbe.eu` domain so the existing email (MX) setup on the apex is never touched. A `CNAME` file at the repo root (containing `mygame.dilbe.eu`) tells GitHub Pages which domain to serve.
 
 ### Publishing milestones
 
 1. Merge the current playable version into `main`.
 2. Enable GitHub Pages on `main` (root folder) in repo settings.
-3. Confirm the published URL loads and is playable, same as local.
+3. Confirm the published URL (`dilbe.github.io/Demo-game`) loads and is playable, same as local.
+4. At the DNS provider for `dilbe.eu`: add a CNAME record, name `mygame`, value `dilbe.github.io`.
+5. In GitHub Pages settings, set the custom domain to `mygame.dilbe.eu` and wait for GitHub to verify DNS + provision HTTPS.
+6. Confirm `https://mygame.dilbe.eu` loads and is playable.
 
 ## v3 scope — skills & always-on health
 
