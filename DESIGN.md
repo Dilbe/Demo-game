@@ -156,10 +156,14 @@ Picking up the remaining ideas: a Skills tab with unlockable/slottable active sk
 4. Health Regen stat — upgradeable, increases the passive regen rate from milestone 3.
 5. Skills tab shell — new tab, navigable, empty/placeholder content for now.
 6. Define skills as data — Basic Attack (migrated from the hardcoded attack button), Strong Attack, Heal, and Auto Attack, each unlockable with XP using the milestone-1 data-object pattern.
-7. Skill Slots stat + loadout UI — stat sets max active skills; add/remove unlocked skills to/from the action bar.
-8. Skill Points stat + per-skill cost — spendable budget stat; each skill has a skill-point cost while slotted, capped by this stat.
-9. Wire the Fight tab to the equipped skill bar — replace the hardcoded Attack button with buttons generated from the current loadout; Auto Attack triggers itself on cooldown instead of waiting for a click.
+7. Wire the Fight tab to your unlocked skills — replace the hardcoded Attack button with buttons generated from every unlocked skill; Auto Attack triggers itself on cooldown instead of waiting for a click. Skills are also usable with number keys, bound to position in the bar (1 for the first, 2 for the second) so the binding stays correct however the bar is filled.
+8. Skill Slots stat + loadout UI — stat sets max active skills; add/remove unlocked skills to/from the action bar, narrowing the fight bar from "everything unlocked" to the equipped subset.
+9. Skill Points stat + per-skill cost — spendable budget stat; each skill has a skill-point cost while slotted, capped by this stat.
 10. Move Attack Damage and Attack Speed off the Character tab — replace the two global stats with a per-skill Damage and Speed upgrade track on the Skills tab, funded by XP the same way the old stats were.
+
+**Note on ordering:** wiring the fight to skills was originally milestone 9, after the slot and skill-point systems. It moved ahead of them because those two build machinery with no visible effect until the fight actually uses skills — three milestones of invisible work. Doing it first means a skill does something the moment it is bought, and slots and skill points then become constraints on something already playable. The cost of the swap is that milestone 7 wires the fight to *unlocked* skills and milestone 8 narrows that to the equipped ones.
+
+**Dormant stats:** from milestone 7 until milestone 10, Attack Damage and Attack Speed are still buyable but no longer affect anything, because skills carry their own damage and cooldowns. Milestone 10 is what gives them meaning again as per-skill upgrade tracks.
 
 ## v4 scope — monster selection & multi-monster fights
 
