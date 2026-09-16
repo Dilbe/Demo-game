@@ -2,9 +2,9 @@ const STATS = {
   maxHp: {
     label: 'Max HP',
     base: 20,
-    perLevel: 2,
+    perLevel: 5,
     baseCost: 5,
-    costGrowth: 1,
+    costGrowth: 1.4,
     value(level) {
       return this.base + level * this.perLevel;
     },
@@ -15,7 +15,7 @@ const STATS = {
     base: 1,
     perLevel: 1,
     baseCost: 5,
-    costGrowth: 1,
+    costGrowth: 1.5,
     value(level) {
       return this.base + level * this.perLevel;
     },
@@ -26,7 +26,7 @@ const STATS = {
     base: 2,
     perLevel: 0.2,
     baseCost: 5,
-    costGrowth: 1,
+    costGrowth: 1.5,
     // Divides rather than subtracts, so the cooldown shrinks with diminishing
     // returns and never reaches zero — which is why it needs no floor.
     value(level) {
