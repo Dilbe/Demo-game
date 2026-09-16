@@ -14,7 +14,6 @@ const resetCharacterButton = document.getElementById('reset-character-button');
 const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
 const INITIAL_MONSTER_HP = 5;
 
-const UPGRADE_COST_XP = 5;
 const XP_PER_KILL = 1;
 
 const SAVE_KEY = 'demo-game-save';
@@ -43,10 +42,11 @@ resetCharacterButton.addEventListener('click', resetCharacter);
 
 upgradeButtons.forEach((button) => {
   button.addEventListener('click', () => {
-    if (xp < UPGRADE_COST_XP) return;
-
-    xp -= UPGRADE_COST_XP;
     const stat = button.dataset.stat;
+    const cost = statCost(stat, stats[stat]);
+    if (xp < cost) return;
+
+    xp -= cost;
     stats[stat] += 1;
     updateStatLevelLabels();
 
@@ -57,12 +57,12 @@ upgradeButtons.forEach((button) => {
 
 function startCooldown() {
   attackButton.disabled = true;
-  const cooldownSeconds = attackCooldownSeconds(stats.attackSpeed);
+  const cooldownSeconds = statValue('attackSpeed', stats.attackSpeed);
   animateCooldownFill(playerCooldownFillEl, cooldownSeconds);
 
   clearTimeout(cooldownTimeout);
   cooldownTimeout = setTimeout(() => {
-    monsterHp = Math.max(0, monsterHp - attackDamage(stats.attackDamage));
+    monsterHp = Math.max(0, monsterHp - statValue('attackDamage', stats.attackDamage));
     monsterHpEl.textContent = monsterHp;
 
     if (monsterHp <= 0) {
@@ -100,7 +100,7 @@ function endGame(message) {
 
 function startGame() {
   monsterHp = INITIAL_MONSTER_HP;
-  playerHp = playerMaxHp(stats.maxHp);
+  playerHp = statValue('maxHp', stats.maxHp);
   monsterHpEl.textContent = monsterHp;
   playerHpEl.textContent = playerHp;
   playerMaxHpEl.textContent = playerHp;
@@ -127,7 +127,10 @@ function beginFight() {
 function updateXpDisplay() {
   xpTotalEl.textContent = xp;
   upgradeButtons.forEach((button) => {
-    button.disabled = xp < UPGRADE_COST_XP;
+    const stat = button.dataset.stat;
+    const cost = statCost(stat, stats[stat]);
+    button.textContent = `Upgrade (${cost} XP)`;
+    button.disabled = xp < cost;
   });
 }
 
