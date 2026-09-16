@@ -128,3 +128,23 @@ Picking up the remaining ideas: a Skills tab with unlockable/slottable active sk
 7. Skill Slots stat + loadout UI — stat sets max active skills; add/remove unlocked skills to/from the action bar.
 8. Skill Points stat + per-skill cost — spendable budget stat; each skill has a skill-point cost while slotted, capped by this stat.
 9. Wire the Fight tab to the equipped skill bar — replace the hardcoded Attack button with buttons generated from the current loadout.
+
+## v4 scope — monster selection & multi-monster fights
+
+Instead of always fighting the same fixed monster, the player picks an opponent (or two) before starting. Reuses the same data-object pattern from v3 milestone 1, applied to monsters instead of stats.
+
+- **Monster template:** a monster becomes a data object (name, max HP, attack damage, attack cooldown) instead of hardcoded values — same reasoning as the stat/skill data-object pattern.
+- **Three monsters:** Small (today's existing stats, unchanged), Medium, and Big — Medium/Big just need higher numbers for now, exact balance isn't the point yet.
+- **Selection before a fight:** the Fight tab requires picking a monster before Start becomes available, instead of jumping straight into a fixed fight.
+- **Two-easy-monsters option:** alongside picking one monster, a second choice lets the player fight two Small monsters at once. This is the one multi-monster case for now — a stepping stone so more multi-monster combinations are easy to add later once the underlying support exists.
+- **Targeting:** once more than one monster can be in a fight, the player needs a way to pick which monster their attack hits.
+
+### v4 milestones
+
+1. Monster data objects — define Small/Medium/Big as data (name, max HP, attack damage, attack cooldown), with Small matching today's existing monster exactly.
+2. Monster selection screen — before Start, the player picks one monster (Small/Medium/Big); the chosen monster's stats drive the fight.
+3. Two-easy-monsters option — add a selectable choice to fight two Small monsters instead of one; fight state supports a list of monsters instead of a single one.
+4. Multi-monster display — show HP and attack-cooldown indicators for each monster in the active fight.
+5. Target selection — when more than one monster is active, the player selects which one their attack button targets (e.g. click a monster to select it, then Attack hits that one).
+6. Multi-monster auto-attack — each active monster attacks the player on its own independent cooldown.
+7. Win condition update — a fight is won only once every active monster is defeated; losing still ends the fight immediately as before.
