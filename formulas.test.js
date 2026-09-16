@@ -2,10 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { STATS, statValue, statCost } = require('./formulas.js');
 
-test('maxHp starts at 10 and gains 2 per level', () => {
-  assert.strictEqual(statValue('maxHp', 0), 10);
-  assert.strictEqual(statValue('maxHp', 1), 12);
-  assert.strictEqual(statValue('maxHp', 5), 20);
+test('maxHp starts at 20 and gains 2 per level', () => {
+  assert.strictEqual(statValue('maxHp', 0), 20);
+  assert.strictEqual(statValue('maxHp', 1), 22);
+  assert.strictEqual(statValue('maxHp', 5), 30);
 });
 
 test('attackDamage starts at 1 and gains 1 per level', () => {

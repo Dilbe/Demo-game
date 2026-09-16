@@ -1,7 +1,7 @@
 const STATS = {
   maxHp: {
     label: 'Max HP',
-    base: 10,
+    base: 20,
     perLevel: 2,
     baseCost: 5,
     costGrowth: 1,
