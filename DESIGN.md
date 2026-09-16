@@ -163,7 +163,9 @@ Picking up the remaining ideas: a Skills tab with unlockable/slottable active sk
 
 **Note on ordering:** wiring the fight to skills was originally milestone 9, after the slot and skill-point systems. It moved ahead of them because those two build machinery with no visible effect until the fight actually uses skills — three milestones of invisible work. Doing it first means a skill does something the moment it is bought, and slots and skill points then become constraints on something already playable. The cost of the swap is that milestone 7 wires the fight to *unlocked* skills and milestone 8 narrows that to the equipped ones.
 
-**Dormant stats:** from milestone 7 until milestone 10, Attack Damage and Attack Speed are still buyable but no longer affect anything, because skills carry their own damage and cooldowns. Milestone 10 is what gives them meaning again as per-skill upgrade tracks.
+**Dormant stats:** from milestone 7 until milestone 10, Attack Damage and Attack Speed were still buyable but no longer affected anything, because skills carry their own damage and cooldowns. Milestone 10 removed them from the Character tab and replaced them with per-skill Damage/Healing and Speed tracks.
+
+**v3 status: done.** All 10 milestones complete. Stats and skills are both data objects with their own formulas and costs; the Character tab and the Skills tab are generated from that data, so adding either is a data entry rather than new markup and logic. Skills are unlocked with XP, equipped against two independent limits (Skill Slots for how many, Skill Points for how strong a combination), usable by click or number key, and each carries its own upgrade tracks.
 
 ## v4 scope — monster selection & multi-monster fights
 

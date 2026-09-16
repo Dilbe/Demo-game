@@ -14,45 +14,11 @@ const STATS = {
     },
   },
 
-  attackDamage: {
-    label: 'Attack Damage',
-    // Dormant until milestone 10 turns it into a per-skill upgrade — skills
-    // currently carry their own damage. Said plainly so it is not bought blind.
-    description: 'Damage per hit — unused',
-    base: 1,
-    perLevel: 1,
-    baseCost: 5,
-    costGrowth: 1.5,
-    value(level) {
-      return this.base + level * this.perLevel;
-    },
-    format(value) {
-      return `${value} dmg`;
-    },
-  },
-
-  attackSpeed: {
-    label: 'Attack Speed',
-    description: 'Attack cooldown — unused',
-    base: 2,
-    perLevel: 0.2,
-    baseCost: 5,
-    costGrowth: 1.5,
-    // Divides rather than subtracts, so the cooldown shrinks with diminishing
-    // returns and never reaches zero — which is why it needs no floor.
-    value(level) {
-      return this.base / (1 + level * this.perLevel);
-    },
-    format(value) {
-      return `${value.toFixed(1)}s`;
-    },
-  },
-
   healthRegen: {
     label: 'Health Regen',
     description: 'Seconds per healed HP',
-    // Seconds to regenerate 1 HP. Divides like attackSpeed, so higher levels
-    // mean less time per HP without the interval ever reaching zero.
+    // Seconds to regenerate 1 HP. Divides rather than subtracts, so higher
+    // levels mean less time per HP without the interval ever reaching zero.
     base: 60,
     perLevel: 0.25,
     baseCost: 5,
@@ -111,6 +77,10 @@ const SKILLS = {
     unlockCost: 0,
     pointCost: 1,
     auto: false,
+    powerPerLevel: 1,
+    speedPerLevel: 0.2,
+    upgradeBaseCost: 5,
+    upgradeCostGrowth: 1.5,
   },
 
   strongAttack: {
@@ -120,6 +90,10 @@ const SKILLS = {
     unlockCost: 15,
     pointCost: 2,
     auto: false,
+    powerPerLevel: 2,
+    speedPerLevel: 0.15,
+    upgradeBaseCost: 8,
+    upgradeCostGrowth: 1.5,
   },
 
   heal: {
@@ -129,6 +103,10 @@ const SKILLS = {
     unlockCost: 15,
     pointCost: 2,
     auto: false,
+    powerPerLevel: 2,
+    speedPerLevel: 0.15,
+    upgradeBaseCost: 8,
+    upgradeCostGrowth: 1.5,
   },
 
   autoAttack: {
@@ -139,16 +117,45 @@ const SKILLS = {
     // Costs the most to hold: it deals damage without being clicked.
     pointCost: 3,
     auto: true,
+    powerPerLevel: 1,
+    speedPerLevel: 0.1,
+    upgradeBaseCost: 10,
+    upgradeCostGrowth: 1.6,
   },
 };
 
 // Unlocked from the start, so a new player always has something to attack with.
 const STARTING_SKILLS = ['basicAttack'];
 
-function describeSkill(skillId) {
+// A skill's two upgrade tracks. Power is damage, or healing for a healing
+// skill; speed divides the cooldown the way Health Regen divides its interval,
+// so it shrinks with diminishing returns and never reaches zero.
+function skillPower(skillId, level) {
   const skill = SKILLS[skillId];
-  const effect = skill.healing ? `Heals ${skill.healing}` : `${skill.damage} damage`;
-  return `${effect}, ${skill.cooldown}s cooldown${skill.auto ? ', automatic' : ''}`;
+  const base = skill.healing ?? skill.damage;
+  return base + level * skill.powerPerLevel;
+}
+
+function skillCooldown(skillId, level) {
+  const skill = SKILLS[skillId];
+  return skill.cooldown / (1 + level * skill.speedPerLevel);
+}
+
+function skillUpgradeCost(skillId, level) {
+  const skill = SKILLS[skillId];
+  return Math.round(skill.upgradeBaseCost * Math.pow(skill.upgradeCostGrowth, level));
+}
+
+function powerLabel(skillId) {
+  return SKILLS[skillId].healing ? 'Healing' : 'Damage';
+}
+
+function describeSkill(skillId, levels = { power: 0, speed: 0 }) {
+  const skill = SKILLS[skillId];
+  const power = skillPower(skillId, levels.power);
+  const effect = skill.healing ? `Heals ${power}` : `${power} damage`;
+  const cooldown = skillCooldown(skillId, levels.speed).toFixed(1);
+  return `${effect}, ${cooldown}s cooldown${skill.auto ? ', automatic' : ''}`;
 }
 
 function statValue(statId, level) {
@@ -162,5 +169,9 @@ function statCost(statId, level) {
 
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
-  module.exports = { STATS, SKILLS, STARTING_SKILLS, statValue, statCost, describeSkill };
+  module.exports = {
+    STATS, SKILLS, STARTING_SKILLS,
+    statValue, statCost,
+    skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
+  };
 }

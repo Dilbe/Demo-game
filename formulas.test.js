@@ -1,6 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { STATS, SKILLS, STARTING_SKILLS, statValue, statCost, describeSkill } = require('./formulas.js');
+const {
+  STATS, SKILLS, STARTING_SKILLS,
+  statValue, statCost,
+  skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
+} = require('./formulas.js');
 
 // --- Formula maths -----------------------------------------------------
 // Exercised on a temporary fixture stat, so rebalancing the real stats
@@ -64,23 +68,47 @@ test('skillSlots grows by whole slots and always allows at least one skill', () 
   }
 });
 
-test('upgrading maxHp and attackDamage always increases them', () => {
-  for (const statId of ['maxHp', 'attackDamage']) {
+test('upgrading maxHp always increases it', () => {
+  for (let level = 0; level < 10; level += 1) {
+    assert.ok(statValue('maxHp', level + 1) > statValue('maxHp', level), `maxHp did not increase at level ${level + 1}`);
+  }
+});
+
+test('healthRegen shortens its interval but never reaches zero', () => {
+  for (let level = 0; level < 10; level += 1) {
+    assert.ok(statValue('healthRegen', level + 1) < statValue('healthRegen', level), `did not shorten at level ${level + 1}`);
+  }
+  for (const level of [0, 1, 10, 100, 1000]) {
+    assert.ok(statValue('healthRegen', level) > 0, `level ${level} produced a non-positive interval`);
+  }
+});
+
+test('every skill gets stronger and faster as its tracks level up', () => {
+  for (const skillId of Object.keys(SKILLS)) {
     for (let level = 0; level < 10; level += 1) {
-      assert.ok(statValue(statId, level + 1) > statValue(statId, level), `${statId} did not increase at level ${level + 1}`);
+      assert.ok(skillPower(skillId, level + 1) > skillPower(skillId, level), `${skillId} power did not grow at level ${level + 1}`);
+      assert.ok(skillCooldown(skillId, level + 1) < skillCooldown(skillId, level), `${skillId} cooldown did not shorten at level ${level + 1}`);
+    }
+    for (const level of [0, 1, 10, 100, 1000]) {
+      assert.ok(skillCooldown(skillId, level) > 0, `${skillId} at level ${level} has a non-positive cooldown`);
     }
   }
 });
 
-test('attackSpeed and healthRegen shorten their interval but never reach zero', () => {
-  for (const statId of ['attackSpeed', 'healthRegen']) {
+test('skill upgrades never get cheaper and cost whole XP', () => {
+  for (const skillId of Object.keys(SKILLS)) {
     for (let level = 0; level < 10; level += 1) {
-      assert.ok(statValue(statId, level + 1) < statValue(statId, level), `${statId} did not shorten at level ${level + 1}`);
-    }
-    for (const level of [0, 1, 10, 100, 1000]) {
-      assert.ok(statValue(statId, level) > 0, `${statId} at level ${level} produced a non-positive interval`);
+      const cost = skillUpgradeCost(skillId, level);
+      assert.strictEqual(cost % 1, 0, `${skillId} level ${level} cost is fractional`);
+      assert.ok(skillUpgradeCost(skillId, level + 1) >= cost, `${skillId} got cheaper at level ${level + 1}`);
     }
   }
+});
+
+test('powerLabel says Healing for healing skills and Damage otherwise', () => {
+  assert.strictEqual(powerLabel('heal'), 'Healing');
+  assert.strictEqual(powerLabel('basicAttack'), 'Damage');
+  assert.strictEqual(powerLabel('autoAttack'), 'Damage');
 });
 
 test('every stat defines the full data-object shape', () => {
@@ -98,7 +126,7 @@ test('every stat defines the full data-object shape', () => {
 
 test('every skill defines the full data-object shape', () => {
   for (const [skillId, skill] of Object.entries(SKILLS)) {
-    for (const field of ['label', 'cooldown', 'unlockCost', 'pointCost', 'auto']) {
+    for (const field of ['label', 'cooldown', 'unlockCost', 'pointCost', 'auto', 'powerPerLevel', 'speedPerLevel', 'upgradeBaseCost', 'upgradeCostGrowth']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
     assert.ok(skill.pointCost > 0, `${skillId} costs no skill points to equip`);
@@ -136,10 +164,19 @@ test('every skill that must be bought costs something', () => {
 });
 
 test('describeSkill reports damage, healing and automatic skills', () => {
-  assert.match(describeSkill('basicAttack'), /1 damage, 2s cooldown/);
+  assert.match(describeSkill('basicAttack'), /1 damage, 2.0s cooldown/);
   assert.match(describeSkill('heal'), /^Heals 5/);
   assert.match(describeSkill('autoAttack'), /automatic$/);
   assert.doesNotMatch(describeSkill('strongAttack'), /automatic/);
+});
+
+test('describeSkill reflects upgrade levels', () => {
+  assert.match(describeSkill('basicAttack', { power: 3, speed: 0 }), /^4 damage/);
+  assert.match(describeSkill('heal', { power: 2, speed: 0 }), /^Heals 9/);
+
+  const base = describeSkill('basicAttack', { power: 0, speed: 0 });
+  const faster = describeSkill('basicAttack', { power: 0, speed: 4 });
+  assert.notStrictEqual(base, faster, 'speed levels did not change the description');
 });
 
 // --- Balance snapshot --------------------------------------------------
@@ -150,11 +187,15 @@ test('BALANCE SNAPSHOT: current tuning', () => {
   assert.strictEqual(statValue('maxHp', 0), 20);
   assert.strictEqual(statValue('maxHp', 1), 25);
 
-  assert.strictEqual(statValue('attackDamage', 0), 1);
-  assert.strictEqual(statValue('attackDamage', 1), 2);
+  assert.strictEqual(skillPower('basicAttack', 0), 1);
+  assert.strictEqual(skillPower('basicAttack', 3), 4);
+  assert.strictEqual(skillPower('heal', 0), 5);
 
-  assert.strictEqual(statValue('attackSpeed', 0), 2);
-  assert.strictEqual(statValue('attackSpeed', 5), 1);
+  assert.strictEqual(skillCooldown('basicAttack', 0), 2);
+  assert.strictEqual(skillCooldown('basicAttack', 5), 1);
+
+  assert.strictEqual(skillUpgradeCost('basicAttack', 0), 5);
+  assert.strictEqual(skillUpgradeCost('basicAttack', 1), 8);
 
   assert.strictEqual(statValue('healthRegen', 0), 60);
   assert.strictEqual(statValue('healthRegen', 1), 48);
@@ -168,5 +209,4 @@ test('BALANCE SNAPSHOT: current tuning', () => {
 
   assert.strictEqual(statCost('maxHp', 0), 5);
   assert.strictEqual(statCost('maxHp', 1), 7);
-  assert.strictEqual(statCost('attackDamage', 1), 8);
 });
