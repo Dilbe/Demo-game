@@ -11,17 +11,11 @@ const xpTotalEl = document.getElementById('xp-total');
 const upgradeButtons = document.querySelectorAll('.upgrade-button');
 const resetCharacterButton = document.getElementById('reset-character-button');
 
-const ATTACK_COOLDOWN_SECONDS = 2;
 const MIN_ATTACK_COOLDOWN_SECONDS = 0.5;
 const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
 const INITIAL_MONSTER_HP = 5;
-const INITIAL_PLAYER_HP = 10;
-const BASE_ATTACK_DAMAGE = 1;
 
 const UPGRADE_COST_XP = 5;
-const MAX_HP_PER_LEVEL = 2;
-const ATTACK_DAMAGE_PER_LEVEL = 1;
-const ATTACK_SPEED_PER_LEVEL = 0.2;
 const XP_PER_KILL = 1;
 
 const SAVE_KEY = 'demo-game-save';
@@ -33,18 +27,6 @@ let playerHp;
 let cooldownTimeout;
 let monsterAttackInterval;
 let xp = 0;
-
-function getPlayerMaxHp() {
-  return INITIAL_PLAYER_HP + stats.maxHp * MAX_HP_PER_LEVEL;
-}
-
-function getAttackDamage() {
-  return BASE_ATTACK_DAMAGE + stats.attackDamage * ATTACK_DAMAGE_PER_LEVEL;
-}
-
-function getAttackCooldownSeconds() {
-  return ATTACK_COOLDOWN_SECONDS / (1 + (stats.attackSpeed * ATTACK_SPEED_PER_LEVEL));
-}
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
 function animateCooldownFill(fillEl, durationSeconds) {
@@ -76,12 +58,12 @@ upgradeButtons.forEach((button) => {
 
 function startCooldown() {
   attackButton.disabled = true;
-  const cooldownSeconds = getAttackCooldownSeconds();
+  const cooldownSeconds = attackCooldownSeconds(stats.attackSpeed);
   animateCooldownFill(playerCooldownFillEl, cooldownSeconds);
 
   clearTimeout(cooldownTimeout);
   cooldownTimeout = setTimeout(() => {
-    monsterHp = Math.max(0, monsterHp - getAttackDamage());
+    monsterHp = Math.max(0, monsterHp - attackDamage(stats.attackDamage));
     monsterHpEl.textContent = monsterHp;
 
     if (monsterHp <= 0) {
@@ -119,7 +101,7 @@ function endGame(message) {
 
 function startGame() {
   monsterHp = INITIAL_MONSTER_HP;
-  playerHp = getPlayerMaxHp();
+  playerHp = playerMaxHp(stats.maxHp);
   monsterHpEl.textContent = monsterHp;
   playerHpEl.textContent = playerHp;
   playerMaxHpEl.textContent = playerHp;
