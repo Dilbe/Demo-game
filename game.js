@@ -10,6 +10,8 @@ const restartButton = document.getElementById('restart-button');
 const startButton = document.getElementById('start-button');
 const xpTotalEl = document.getElementById('xp-total');
 const skillsXpTotalEl = document.getElementById('skills-xp-total');
+const slotsUsedEl = document.getElementById('slots-used');
+const slotsTotalEl = document.getElementById('slots-total');
 const skillListEl = document.getElementById('skill-list');
 const upgradeButtons = document.querySelectorAll('.upgrade-button');
 const resetCharacterButton = document.getElementById('reset-character-button');
@@ -22,7 +24,7 @@ const REGEN_TICK_SECONDS = 1;
 
 const SAVE_KEY = 'demo-game-save';
 
-const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0, healthRegen: 0 };
+const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0, healthRegen: 0, skillSlots: 0 };
 
 let monsterHp;
 let playerHp = null;
@@ -31,6 +33,8 @@ const skillTimeouts = new Map();
 let monsterAttackInterval;
 let regenProgress = 0;
 let unlockedSkills = [...STARTING_SKILLS];
+// Order matters: it decides the order of the fight bar and therefore the hotkeys.
+let equippedSkills = [...STARTING_SKILLS];
 let xp = 0;
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
@@ -68,7 +72,7 @@ upgradeButtons.forEach((button) => {
 function renderSkillBar() {
   skillBarEl.replaceChildren();
 
-  unlockedSkills.forEach((skillId, index) => {
+  equippedSkills.forEach((skillId, index) => {
     const skill = SKILLS[skillId];
 
     const fill = document.createElement('span');
@@ -238,7 +242,7 @@ function beginFight() {
   startButton.hidden = true;
   skillBarEl.hidden = false;
 
-  for (const skillId of unlockedSkills) {
+  for (const skillId of equippedSkills) {
     if (SKILLS[skillId].auto) useSkill(skillId);
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
@@ -266,6 +270,12 @@ function unlockSkill(skillId) {
 
   xp -= cost;
   unlockedSkills.push(skillId);
+  // Equip straight away when there is room, so buying a skill does something
+  // visible rather than needing a second click to matter.
+  if (equippedSkills.length < statValue('skillSlots', stats.skillSlots)) {
+    equippedSkills.push(skillId);
+  }
+
   updateXpDisplay();
   // Rebuilding mid-fight would discard buttons with cooldowns already running,
   // so a skill bought during a fight joins the bar on the next one.
@@ -273,12 +283,32 @@ function unlockSkill(skillId) {
   saveProgress();
 }
 
+function toggleEquipped(skillId) {
+  const index = equippedSkills.indexOf(skillId);
+
+  if (index !== -1) {
+    equippedSkills.splice(index, 1);
+  } else {
+    if (equippedSkills.length >= statValue('skillSlots', stats.skillSlots)) return;
+    equippedSkills.push(skillId);
+  }
+
+  updateXpDisplay();
+  if (!fightActive) renderSkillBar();
+  saveProgress();
+}
+
 function renderSkills() {
   skillListEl.replaceChildren();
+
+  const slots = statValue('skillSlots', stats.skillSlots);
+  slotsUsedEl.textContent = equippedSkills.length;
+  slotsTotalEl.textContent = slots;
 
   for (const skillId of Object.keys(SKILLS)) {
     const skill = SKILLS[skillId];
     const unlocked = unlockedSkills.includes(skillId);
+    const equipped = equippedSkills.includes(skillId);
 
     const name = document.createElement('span');
     name.className = 'skill-name';
@@ -290,9 +320,17 @@ function renderSkills() {
 
     const action = document.createElement('button');
     action.className = 'unlock-button';
-    action.textContent = unlocked ? 'Unlocked' : `Unlock (${skill.unlockCost} XP)`;
-    action.disabled = unlocked || xp < skill.unlockCost;
-    if (!unlocked) action.addEventListener('click', () => unlockSkill(skillId));
+
+    if (unlocked) {
+      // Equipping is blocked only when the slots are full — unequipping always works.
+      action.textContent = equipped ? 'Unequip' : 'Equip';
+      action.disabled = !equipped && equippedSkills.length >= slots;
+      action.addEventListener('click', () => toggleEquipped(skillId));
+    } else {
+      action.textContent = `Unlock (${skill.unlockCost} XP)`;
+      action.disabled = xp < skill.unlockCost;
+      action.addEventListener('click', () => unlockSkill(skillId));
+    }
 
     const row = document.createElement('div');
     row.className = 'skill-row';
@@ -309,7 +347,7 @@ function updateStatLevelLabels() {
 }
 
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills }));
 }
 
 function loadProgress() {
@@ -321,6 +359,7 @@ function loadProgress() {
   Object.assign(stats, saved.stats);
   if (saved.hp !== undefined) playerHp = saved.hp;
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills;
+  if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
 
   updateStatLevelLabels();
 }

@@ -55,6 +55,15 @@ test('no stat ever gets cheaper as levels rise', () => {
   }
 });
 
+test('skillSlots grows by whole slots and always allows at least one skill', () => {
+  for (let level = 0; level < 10; level += 1) {
+    const slots = statValue('skillSlots', level);
+    assert.strictEqual(slots % 1, 0, `level ${level} gave a fractional slot count`);
+    assert.ok(slots >= 1, `level ${level} left no room for any skill`);
+    assert.ok(statValue('skillSlots', level + 1) > slots, `slots did not grow at level ${level + 1}`);
+  }
+});
+
 test('upgrading maxHp and attackDamage always increases them', () => {
   for (const statId of ['maxHp', 'attackDamage']) {
     for (let level = 0; level < 10; level += 1) {
@@ -133,6 +142,9 @@ test('BALANCE SNAPSHOT: current tuning', () => {
   assert.strictEqual(statValue('healthRegen', 0), 60);
   assert.strictEqual(statValue('healthRegen', 1), 48);
   assert.strictEqual(statValue('healthRegen', 4), 30);
+
+  assert.strictEqual(statValue('skillSlots', 0), 2);
+  assert.strictEqual(statValue('skillSlots', 2), 4);
 
   assert.strictEqual(statCost('maxHp', 0), 5);
   assert.strictEqual(statCost('maxHp', 1), 7);
