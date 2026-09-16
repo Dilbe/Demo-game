@@ -107,6 +107,8 @@ The whole point of this milestone is to try the full pipeline once — design to
 6. In GitHub Pages settings, set the custom domain to `mygame.dilbe.eu` and wait for GitHub to verify DNS + provision HTTPS.
 7. Confirm `https://mygame.dilbe.eu` loads and is playable.
 
+**Publishing status: milestones 1–4 done.** The game is live and playable at `dilbe.github.io/Demo-game`, deployed by the Actions pipeline. Milestones 5–7 (custom domain) are **blocked**: the DNS is managed at Hostnet and the account is locked out behind two-factor authentication after a phone change. Note that `*.dilbe.eu` has a wildcard record pointing at Hostnet's parking page, so `mygame.dilbe.eu` already resolves — but to Hostnet, not GitHub. An explicit `mygame` CNAME will override it without touching the apex or its MX records.
+
 ## CI/CD (learning GitHub Actions)
 
 Not really necessary for a project this size — the point is to learn how GitHub's equivalent of Azure DevOps Pipelines works, end to end: a PR check that gates merges into `main`, and a release-style pipeline that publishes on push to `main`.
@@ -126,6 +128,8 @@ Not really necessary for a project this size — the point is to learn how GitHu
    - Optional: **Do not allow bypassing the above settings** — without this, the repo owner can still push directly/merge without checks; check it only if the point is to enforce the process on yourself too, not just collaborators.
 5. Add `.github/workflows/deploy.yml` — runs on push to `main`, builds and deploys to GitHub Pages via the official Pages actions.
 6. Confirm the loop end to end: open a PR with a deliberately failing test, see the check fail and block merge; fix it, merge, and see the deploy workflow publish automatically.
+
+**CI/CD status: done.** All 6 milestones complete. The three balance formulas live in `formulas.js` (a plain `<script>` in the browser, `require`-able by Node via a guarded `module.exports`, so the no-build-tooling constraint holds), covered by `formulas.test.js` under `node --test`. `ci.yml` runs the suite on every PR into `main`; `deploy.yml` publishes to Pages on push to `main`. Enforcement is a **ruleset** named "tests" rather than classic branch protection — worth knowing, because the legacy `branches/main` API reports `protected` for classic rules only and looks empty even when a ruleset is active. It requires a PR (0 approvals, so a solo dev isn't deadlocked by being unable to approve their own PR), requires the `test` check, blocks force pushes and deletion, and has no bypass actors — so it applies to the repo owner too. Verified by opening a deliberately failing PR and confirming the merge was refused.
 
 ## v3 scope — skills & always-on health
 
