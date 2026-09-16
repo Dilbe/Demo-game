@@ -16,13 +16,14 @@ const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
 const INITIAL_MONSTER_HP = 5;
 
 const XP_PER_KILL = 1;
+const HP_REGEN_INTERVAL_SECONDS = 60;
 
 const SAVE_KEY = 'demo-game-save';
 
 const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0 };
 
 let monsterHp;
-let playerHp;
+let playerHp = null;
 let cooldownTimeout;
 let monsterAttackInterval;
 let xp = 0;
@@ -86,9 +87,21 @@ function updateHealthBar() {
   healthBarFillEl.style.width = `${(playerHp / maxHp) * 100}%`;
 }
 
+// Passive regen runs continuously, including during a fight and after a loss —
+// it is what makes HP recoverable now that fights no longer heal you.
+function regenTick() {
+  const maxHp = statValue('maxHp', stats.maxHp);
+  if (playerHp >= maxHp) return;
+
+  playerHp = Math.min(maxHp, playerHp + 1);
+  updateHealthBar();
+  saveProgress();
+}
+
 function monsterAttackTick() {
   playerHp = Math.max(0, playerHp - 1);
   updateHealthBar();
+  saveProgress();
 
   if (playerHp <= 0) {
     endGame('You lose...');
@@ -109,7 +122,6 @@ function endGame(message) {
 
 function startGame() {
   monsterHp = INITIAL_MONSTER_HP;
-  playerHp = statValue('maxHp', stats.maxHp);
   monsterHpEl.textContent = monsterHp;
   updateHealthBar();
 
@@ -150,7 +162,7 @@ function updateStatLevelLabels() {
 }
 
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp }));
 }
 
 function loadProgress() {
@@ -160,6 +172,7 @@ function loadProgress() {
   const saved = JSON.parse(raw);
   xp = saved.xp;
   Object.assign(stats, saved.stats);
+  if (saved.hp !== undefined) playerHp = saved.hp;
 
   updateStatLevelLabels();
 }
@@ -171,6 +184,7 @@ function resetCharacter() {
   stats.maxHp = 0;
   stats.attackDamage = 0;
   stats.attackSpeed = 0;
+  playerHp = statValue('maxHp', stats.maxHp);
 
   updateStatLevelLabels();
   updateXpDisplay();
@@ -179,8 +193,10 @@ function resetCharacter() {
 }
 
 loadProgress();
+if (playerHp === null) playerHp = statValue('maxHp', stats.maxHp);
 startGame();
 updateXpDisplay();
+setInterval(regenTick, HP_REGEN_INTERVAL_SECONDS * 1000);
 
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('.tab-panel');
