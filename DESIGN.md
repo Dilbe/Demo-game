@@ -107,7 +107,7 @@ The whole point of this milestone is to try the full pipeline once — design to
 6. In GitHub Pages settings, set the custom domain to `mygame.dilbe.eu` and wait for GitHub to verify DNS + provision HTTPS.
 7. Confirm `https://mygame.dilbe.eu` loads and is playable.
 
-**Publishing status: milestones 1–4 done.** The game is live and playable at `dilbe.github.io/Demo-game`, deployed by the Actions pipeline. Milestones 5–7 (custom domain) are **blocked**: the DNS is managed at Hostnet and the account is locked out behind two-factor authentication after a phone change. Note that `*.dilbe.eu` has a wildcard record pointing at Hostnet's parking page, so `mygame.dilbe.eu` already resolves — but to Hostnet, not GitHub. An explicit `mygame` CNAME will override it without touching the apex or its MX records.
+**Publishing status: milestones 1–4 done.** The game is live and playable at `dilbe.github.io/Demo-game`, deployed by the Actions pipeline. Milestones 5–7 (custom domain) are **blocked pending DNS access**. Note that `*.dilbe.eu` has a wildcard record pointing at the registrar's parking page, so `mygame.dilbe.eu` already resolves — but not to GitHub. An explicit `mygame` CNAME will override it without touching the apex or its MX records.
 
 ## CI/CD (learning GitHub Actions)
 
