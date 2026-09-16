@@ -8,6 +8,11 @@
 <body>
   <h1>Demo Game</h1>
 
+  <div id="health-bar">
+    <div id="health-bar-fill"></div>
+    <span id="health-bar-label">HP: <span id="player-hp">10</span> / <span id="player-max-hp">10</span></span>
+  </div>
+
   <nav id="tabs">
     <button class="tab-button" data-tab="fight-tab">Fight</button>
     <button class="tab-button" data-tab="character-tab">Character</button>
@@ -21,11 +26,6 @@
         <span class="cooldown-fill" id="monster-cooldown-fill"></span>
         <span class="cooldown-label">Attack</span>
       </button>
-    </div>
-
-    <div class="combatant" id="player">
-      <h2>Player</h2>
-      <p>HP: <span id="player-hp">10</span> / <span id="player-max-hp">10</span></p>
     </div>
 
     <button id="start-button">Start</button>

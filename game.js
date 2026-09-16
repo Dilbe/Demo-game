@@ -1,6 +1,7 @@
 const monsterHpEl = document.getElementById('monster-hp');
 const playerHpEl = document.getElementById('player-hp');
 const playerMaxHpEl = document.getElementById('player-max-hp');
+const healthBarFillEl = document.getElementById('health-bar-fill');
 const attackButton = document.getElementById('attack-button');
 const playerCooldownFillEl = document.getElementById('player-cooldown-fill');
 const monsterCooldownFillEl = document.getElementById('monster-cooldown-fill');
@@ -49,6 +50,7 @@ upgradeButtons.forEach((button) => {
     xp -= cost;
     stats[stat] += 1;
     updateStatLevelLabels();
+    updateHealthBar();
 
     updateXpDisplay();
     saveProgress();
@@ -77,9 +79,16 @@ function startCooldown() {
   }, cooldownSeconds * 1000);
 }
 
+function updateHealthBar() {
+  const maxHp = statValue('maxHp', stats.maxHp);
+  playerHpEl.textContent = playerHp;
+  playerMaxHpEl.textContent = maxHp;
+  healthBarFillEl.style.width = `${(playerHp / maxHp) * 100}%`;
+}
+
 function monsterAttackTick() {
   playerHp = Math.max(0, playerHp - 1);
-  playerHpEl.textContent = playerHp;
+  updateHealthBar();
 
   if (playerHp <= 0) {
     endGame('You lose...');
@@ -102,8 +111,7 @@ function startGame() {
   monsterHp = INITIAL_MONSTER_HP;
   playerHp = statValue('maxHp', stats.maxHp);
   monsterHpEl.textContent = monsterHp;
-  playerHpEl.textContent = playerHp;
-  playerMaxHpEl.textContent = playerHp;
+  updateHealthBar();
 
   resultMessageEl.hidden = true;
   restartButton.hidden = true;

@@ -8,6 +8,30 @@ body {
   margin: 1.5rem auto;
 }
 
+#health-bar {
+  position: relative;
+  width: 16rem;
+  height: 1.75rem;
+  margin: 0 auto 1.5rem;
+  border: 1px solid #999;
+  background: #eee;
+  overflow: hidden;
+}
+
+#health-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #5cb85c;
+  transition: width 0.2s linear;
+}
+
+#health-bar-label {
+  position: relative;
+  line-height: 1.75rem;
+}
+
 .cooldown-button {
   position: relative;
   overflow: hidden;
