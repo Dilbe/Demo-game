@@ -34,6 +34,19 @@ const STATS = {
     },
   },
 
+  skillSlots: {
+    label: 'Skill Slots',
+    // How many skills can be equipped at once. Starts at 2 so a new player has
+    // one empty slot, which advertises that unlocking a skill is worth doing.
+    base: 2,
+    perLevel: 1,
+    baseCost: 20,
+    costGrowth: 2,
+    value(level) {
+      return this.base + level * this.perLevel;
+    },
+  },
+
   healthRegen: {
     label: 'Health Regen',
     // Seconds to regenerate 1 HP. Divides like attackSpeed, so higher levels

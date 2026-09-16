@@ -65,11 +65,17 @@
       <button class="upgrade-button" data-stat="healthRegen">Upgrade (5 XP)</button>
     </div>
 
+    <div class="stat-row">
+      <span class="stat-name">Skill Slots</span>
+      <span class="stat-level">Lvl 0</span>
+      <button class="upgrade-button" data-stat="skillSlots">Upgrade (20 XP)</button>
+    </div>
+
     <button id="reset-character-button">Reset Character</button>
   </section>
 
   <section id="skills-tab" class="tab-panel" hidden>
-    <p>XP: <span id="skills-xp-total">0</span></p>
+    <p>XP: <span id="skills-xp-total">0</span> &middot; Slots: <span id="slots-used">0</span> / <span id="slots-total">2</span></p>
     <div id="skill-list"></div>
   </section>
 
