@@ -11,7 +11,6 @@ const xpTotalEl = document.getElementById('xp-total');
 const upgradeButtons = document.querySelectorAll('.upgrade-button');
 const resetCharacterButton = document.getElementById('reset-character-button');
 
-const MIN_ATTACK_COOLDOWN_SECONDS = 0.5;
 const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
 const INITIAL_MONSTER_HP = 5;
 
