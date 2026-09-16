@@ -16,16 +16,16 @@ const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
 const INITIAL_MONSTER_HP = 5;
 
 const XP_PER_KILL = 1;
-const HP_REGEN_INTERVAL_SECONDS = 60;
 
 const SAVE_KEY = 'demo-game-save';
 
-const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0 };
+const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0, healthRegen: 0 };
 
 let monsterHp;
 let playerHp = null;
 let cooldownTimeout;
 let monsterAttackInterval;
+let regenInterval;
 let xp = 0;
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
@@ -52,6 +52,7 @@ upgradeButtons.forEach((button) => {
     stats[stat] += 1;
     updateStatLevelLabels();
     updateHealthBar();
+    if (stat === 'healthRegen') scheduleRegen();
 
     updateXpDisplay();
     saveProgress();
@@ -85,6 +86,13 @@ function updateHealthBar() {
   playerHpEl.textContent = playerHp;
   playerMaxHpEl.textContent = maxHp;
   healthBarFillEl.style.width = `${(playerHp / maxHp) * 100}%`;
+}
+
+// Restarted whenever Health Regen changes, since the interval length is
+// derived from the stat rather than fixed.
+function scheduleRegen() {
+  clearInterval(regenInterval);
+  regenInterval = setInterval(regenTick, statValue('healthRegen', stats.healthRegen) * 1000);
 }
 
 // Passive regen runs continuously, including during a fight and after a loss —
@@ -181,13 +189,12 @@ function resetCharacter() {
   if (!confirm('Reset all XP and stats back to 0?')) return;
 
   xp = 0;
-  stats.maxHp = 0;
-  stats.attackDamage = 0;
-  stats.attackSpeed = 0;
+  for (const statId of Object.keys(stats)) stats[statId] = 0;
   playerHp = statValue('maxHp', stats.maxHp);
 
   updateStatLevelLabels();
   updateXpDisplay();
+  scheduleRegen();
   saveProgress();
   startGame();
 }
@@ -196,7 +203,7 @@ loadProgress();
 if (playerHp === null) playerHp = statValue('maxHp', stats.maxHp);
 startGame();
 updateXpDisplay();
-setInterval(regenTick, HP_REGEN_INTERVAL_SECONDS * 1000);
+scheduleRegen();
 
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('.tab-panel');
