@@ -12,6 +12,8 @@ const xpTotalEl = document.getElementById('xp-total');
 const skillsXpTotalEl = document.getElementById('skills-xp-total');
 const slotsUsedEl = document.getElementById('slots-used');
 const slotsTotalEl = document.getElementById('slots-total');
+const pointsUsedEl = document.getElementById('points-used');
+const pointsTotalEl = document.getElementById('points-total');
 const skillListEl = document.getElementById('skill-list');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
@@ -296,11 +298,9 @@ function unlockSkill(skillId) {
 
   xp -= cost;
   unlockedSkills.push(skillId);
-  // Equip straight away when there is room, so buying a skill does something
-  // visible rather than needing a second click to matter.
-  if (equippedSkills.length < statValue('skillSlots', stats.skillSlots)) {
-    equippedSkills.push(skillId);
-  }
+  // Equip straight away when it fits, so buying a skill does something visible
+  // rather than needing a second click to matter.
+  if (canEquip(skillId)) equippedSkills.push(skillId);
 
   updateXpDisplay();
   // Rebuilding mid-fight would discard buttons with cooldowns already running,
@@ -309,13 +309,24 @@ function unlockSkill(skillId) {
   saveProgress();
 }
 
+function pointsUsed() {
+  return equippedSkills.reduce((total, skillId) => total + SKILLS[skillId].pointCost, 0);
+}
+
+// Equipping is limited on two axes: slots cap how many skills you carry,
+// points cap how strong that combination is.
+function canEquip(skillId) {
+  return equippedSkills.length < statValue('skillSlots', stats.skillSlots)
+    && pointsUsed() + SKILLS[skillId].pointCost <= statValue('skillPoints', stats.skillPoints);
+}
+
 function toggleEquipped(skillId) {
   const index = equippedSkills.indexOf(skillId);
 
   if (index !== -1) {
     equippedSkills.splice(index, 1);
   } else {
-    if (equippedSkills.length >= statValue('skillSlots', stats.skillSlots)) return;
+    if (!canEquip(skillId)) return;
     equippedSkills.push(skillId);
   }
 
@@ -330,6 +341,8 @@ function renderSkills() {
   const slots = statValue('skillSlots', stats.skillSlots);
   slotsUsedEl.textContent = equippedSkills.length;
   slotsTotalEl.textContent = slots;
+  pointsUsedEl.textContent = pointsUsed();
+  pointsTotalEl.textContent = statValue('skillPoints', stats.skillPoints);
 
   for (const skillId of Object.keys(SKILLS)) {
     const skill = SKILLS[skillId];
@@ -344,13 +357,17 @@ function renderSkills() {
     detail.className = 'skill-detail';
     detail.textContent = describeSkill(skillId);
 
+    const cost = document.createElement('span');
+    cost.className = 'skill-cost';
+    cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'}`;
+
     const action = document.createElement('button');
     action.className = 'unlock-button';
 
     if (unlocked) {
-      // Equipping is blocked only when the slots are full — unequipping always works.
+      // Unequipping always works; equipping needs both a free slot and points.
       action.textContent = equipped ? 'Unequip' : 'Equip';
-      action.disabled = !equipped && equippedSkills.length >= slots;
+      action.disabled = !equipped && !canEquip(skillId);
       action.addEventListener('click', () => toggleEquipped(skillId));
     } else {
       action.textContent = `Unlock (${skill.unlockCost} XP)`;
@@ -360,7 +377,7 @@ function renderSkills() {
 
     const row = document.createElement('div');
     row.className = 'skill-row';
-    row.append(name, detail, action);
+    row.append(name, detail, cost, action);
     skillListEl.append(row);
   }
 }

@@ -98,9 +98,10 @@ test('every stat defines the full data-object shape', () => {
 
 test('every skill defines the full data-object shape', () => {
   for (const [skillId, skill] of Object.entries(SKILLS)) {
-    for (const field of ['label', 'cooldown', 'unlockCost', 'auto']) {
+    for (const field of ['label', 'cooldown', 'unlockCost', 'pointCost', 'auto']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
+    assert.ok(skill.pointCost > 0, `${skillId} costs no skill points to equip`);
     assert.ok(skill.damage !== undefined || skill.healing !== undefined, `${skillId} does neither damage nor healing`);
     assert.ok(skill.cooldown > 0, `${skillId} has a non-positive cooldown`);
   }
@@ -111,6 +112,20 @@ test('starting skills are real skills and cost nothing', () => {
     assert.ok(SKILLS[skillId], `${skillId} is not a defined skill`);
     assert.strictEqual(SKILLS[skillId].unlockCost, 0, `${skillId} starts unlocked so must be free`);
   }
+});
+
+test('a new player can afford to equip every starting skill at once', () => {
+  const budget = statValue('skillPoints', 0);
+  const slots = statValue('skillSlots', 0);
+  const needed = STARTING_SKILLS.reduce((total, skillId) => total + SKILLS[skillId].pointCost, 0);
+
+  assert.ok(needed <= budget, `starting skills need ${needed} points but a new player has ${budget}`);
+  assert.ok(STARTING_SKILLS.length <= slots, `starting skills need ${STARTING_SKILLS.length} slots but a new player has ${slots}`);
+});
+
+test('the cheapest skill always fits a new player budget', () => {
+  const cheapest = Math.min(...Object.values(SKILLS).map((skill) => skill.pointCost));
+  assert.ok(cheapest <= statValue('skillPoints', 0), 'no skill is affordable at skillPoints level 0');
 });
 
 test('every skill that must be bought costs something', () => {
@@ -147,6 +162,9 @@ test('BALANCE SNAPSHOT: current tuning', () => {
 
   assert.strictEqual(statValue('skillSlots', 0), 2);
   assert.strictEqual(statValue('skillSlots', 2), 4);
+
+  assert.strictEqual(statValue('skillPoints', 0), 3);
+  assert.strictEqual(statValue('skillPoints', 2), 7);
 
   assert.strictEqual(statCost('maxHp', 0), 5);
   assert.strictEqual(statCost('maxHp', 1), 7);
