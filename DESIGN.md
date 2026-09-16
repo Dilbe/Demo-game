@@ -100,11 +100,12 @@ The whole point of this milestone is to try the full pipeline once — design to
 ### Publishing milestones
 
 1. Merge the current playable version into `main`.
-2. Enable GitHub Pages on `main` (root folder) in repo settings.
-3. Confirm the published URL (`dilbe.github.io/Demo-game`) loads and is playable, same as local.
-4. At the DNS provider for `dilbe.eu`: add a CNAME record, name `mygame`, value `dilbe.github.io`.
-5. In GitHub Pages settings, set the custom domain to `mygame.dilbe.eu` and wait for GitHub to verify DNS + provision HTTPS.
-6. Confirm `https://mygame.dilbe.eu` loads and is playable.
+2. Make the repo public — Settings → General → Danger Zone → Change repository visibility. (Currently private; GitHub Pages is free for public repos but needs a paid plan on a private one, and nothing in this repo is sensitive.)
+3. Enable GitHub Pages on `main` (root folder) in repo settings.
+4. Confirm the published URL (`dilbe.github.io/Demo-game`) loads and is playable, same as local.
+5. At the DNS provider for `dilbe.eu`: add a CNAME record, name `mygame`, value `dilbe.github.io`.
+6. In GitHub Pages settings, set the custom domain to `mygame.dilbe.eu` and wait for GitHub to verify DNS + provision HTTPS.
+7. Confirm `https://mygame.dilbe.eu` loads and is playable.
 
 ## v3 scope — skills & always-on health
 
