@@ -115,7 +115,8 @@ Picking up the remaining ideas: a Skills tab with unlockable/slottable active sk
 - **Health bar:** moves out of the Fight tab into a persistent bar visible on every tab.
 - **Healing model change:** no more full heal at the end of a fight — HP instead regenerates passively at 1 HP/minute. Base Max HP raised from 10 to 20 to compensate for no longer starting every fight topped up.
 - **New stats:** Health Regen (speeds up passive regen), Skill Slots (how many skills can be active at once), Skill Points (a budget spent by equipping skills — each skill costs some skill points while slotted, on top of taking a slot).
-- **Skills:** unlocked permanently with XP (like today's stats), then equipped/unequipped into a limited action bar. Starting skill: Basic Attack (today's only ability, migrated into this system). New skills: Strong Attack (more damage, longer cooldown than Basic Attack) and Heal.
+- **Skills:** unlocked permanently with XP (like today's stats), then equipped/unequipped into a limited action bar. Starting skill: Basic Attack (today's only ability, migrated into this system). New skills: Strong Attack (more damage, longer cooldown than Basic Attack), Heal, and Auto Attack (low damage, high cooldown, triggers itself automatically whenever its cooldown is up — no click needed).
+- **Per-skill upgrades:** Attack Damage and Attack Speed stop being global Character-tab stats and instead become an upgrade track on each individual skill (so Basic Attack, Strong Attack, Heal, and Auto Attack each level up their own damage/speed independently, XP-funded the same way as before).
 
 ### v3 milestones
 
@@ -124,10 +125,11 @@ Picking up the remaining ideas: a Skills tab with unlockable/slottable active sk
 3. New healing model — remove full-heal-on-fight-end, add passive regen at 1 HP/minute, raise base Max HP to 20.
 4. Health Regen stat — upgradeable, increases the passive regen rate from milestone 3.
 5. Skills tab shell — new tab, navigable, empty/placeholder content for now.
-6. Define skills as data — Basic Attack (migrated from the hardcoded attack button), Strong Attack, and Heal, each unlockable with XP using the milestone-1 data-object pattern.
+6. Define skills as data — Basic Attack (migrated from the hardcoded attack button), Strong Attack, Heal, and Auto Attack, each unlockable with XP using the milestone-1 data-object pattern.
 7. Skill Slots stat + loadout UI — stat sets max active skills; add/remove unlocked skills to/from the action bar.
 8. Skill Points stat + per-skill cost — spendable budget stat; each skill has a skill-point cost while slotted, capped by this stat.
-9. Wire the Fight tab to the equipped skill bar — replace the hardcoded Attack button with buttons generated from the current loadout.
+9. Wire the Fight tab to the equipped skill bar — replace the hardcoded Attack button with buttons generated from the current loadout; Auto Attack triggers itself on cooldown instead of waiting for a click.
+10. Move Attack Damage and Attack Speed off the Character tab — replace the two global stats with a per-skill Damage and Speed upgrade track on the Skills tab, funded by XP the same way the old stats were.
 
 ## v4 scope — monster selection & multi-monster fights
 
@@ -148,3 +150,23 @@ Instead of always fighting the same fixed monster, the player picks an opponent 
 5. Target selection — when more than one monster is active, the player selects which one their attack button targets (e.g. click a monster to select it, then Attack hits that one).
 6. Multi-monster auto-attack — each active monster attacks the player on its own independent cooldown.
 7. Win condition update — a fight is won only once every active monster is defeated; losing still ends the fight immediately as before.
+
+## Fight flow fixes
+
+Two small, standalone corrections to how an in-progress fight behaves — not tied to any of the scopes above, but worth doing before or alongside them since dungeons (below) build on top of this behavior.
+
+### Fight flow milestones
+
+1. Retreat button — visible during an active fight; pressing it ends the fight immediately without a win or loss result, returning to the pre-fight/selection state. Player HP is left as-is (no penalty, no free heal).
+2. Fights keep running across tab switches — switching to the Character or Skills tab mid-fight no longer pauses attack/monster cooldown timers. A fight only ends via a win, a loss, or Retreat, never by navigating away from the Fight tab.
+
+## v5 scope — dungeons
+
+A dungeon is a chain of monster fights, fought back-to-back without returning to the selection screen in between. Builds directly on v4 (monster/multi-monster selection) and the Fight flow fixes above (Retreat needs to cleanly exit a whole dungeon, not just its current fight).
+
+### v5 milestones
+
+1. Dungeon data — a dungeon is a data object: an ordered list of fights, each reusing the v4 monster/multi-monster definitions.
+2. Dungeon selection — alongside picking a single monster or two easy monsters, the player can pick a dungeon to start instead.
+3. Auto-chaining — winning one fight in a dungeon immediately starts the next fight in the chain, with no return to the selection screen until the dungeon ends. Player HP carries over between fights (subject to normal passive regen only — no free heal between fights).
+4. Dungeon end states — clearing every fight in the chain shows a dungeon-complete result; losing a fight, or pressing Retreat, ends the entire dungeon rather than just the current fight within it.
