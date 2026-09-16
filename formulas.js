@@ -33,6 +33,19 @@ const STATS = {
       return this.base / (1 + level * this.perLevel);
     },
   },
+
+  healthRegen: {
+    label: 'Health Regen',
+    // Seconds to regenerate 1 HP. Divides like attackSpeed, so higher levels
+    // mean less time per HP without the interval ever reaching zero.
+    base: 60,
+    perLevel: 0.25,
+    baseCost: 5,
+    costGrowth: 1.5,
+    value(level) {
+      return this.base / (1 + level * this.perLevel);
+    },
+  },
 };
 
 function statValue(statId, level) {

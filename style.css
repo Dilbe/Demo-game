@@ -32,6 +32,19 @@ body {
   line-height: 1.75rem;
 }
 
+/* Fills left to right as passive regen accumulates toward the next HP.
+   Darker than the health fill so it stays readable over both the filled
+   and the empty part of the bar. */
+#regen-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 0%;
+  background: #1b5e20;
+  transition: width 1s linear;
+}
+
 .cooldown-button {
   position: relative;
   overflow: hidden;

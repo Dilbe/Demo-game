@@ -2,6 +2,7 @@ const monsterHpEl = document.getElementById('monster-hp');
 const playerHpEl = document.getElementById('player-hp');
 const playerMaxHpEl = document.getElementById('player-max-hp');
 const healthBarFillEl = document.getElementById('health-bar-fill');
+const regenProgressEl = document.getElementById('regen-progress');
 const attackButton = document.getElementById('attack-button');
 const playerCooldownFillEl = document.getElementById('player-cooldown-fill');
 const monsterCooldownFillEl = document.getElementById('monster-cooldown-fill');
@@ -16,16 +17,17 @@ const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
 const INITIAL_MONSTER_HP = 5;
 
 const XP_PER_KILL = 1;
-const HP_REGEN_INTERVAL_SECONDS = 60;
+const REGEN_TICK_SECONDS = 1;
 
 const SAVE_KEY = 'demo-game-save';
 
-const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0 };
+const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0, healthRegen: 0 };
 
 let monsterHp;
 let playerHp = null;
 let cooldownTimeout;
 let monsterAttackInterval;
+let regenProgress = 0;
 let xp = 0;
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
@@ -52,6 +54,7 @@ upgradeButtons.forEach((button) => {
     stats[stat] += 1;
     updateStatLevelLabels();
     updateHealthBar();
+    updateRegenIndicator();
 
     updateXpDisplay();
     saveProgress();
@@ -87,15 +90,38 @@ function updateHealthBar() {
   healthBarFillEl.style.width = `${(playerHp / maxHp) * 100}%`;
 }
 
+function updateRegenIndicator() {
+  const pending = playerHp < statValue('maxHp', stats.maxHp);
+  const secondsPerHp = statValue('healthRegen', stats.healthRegen);
+  // Clamped because upgrading Health Regen can leave progress above the new
+  // requirement until the next tick collects it.
+  const percent = Math.min(100, (regenProgress / secondsPerHp) * 100);
+  regenProgressEl.style.width = pending ? `${percent}%` : '0%';
+}
+
 // Passive regen runs continuously, including during a fight and after a loss —
 // it is what makes HP recoverable now that fights no longer heal you.
+//
+// Progress accumulates against the *current* seconds-per-HP rather than being
+// scheduled, so upgrading Health Regen applies immediately instead of
+// discarding the wait already served.
 function regenTick() {
   const maxHp = statValue('maxHp', stats.maxHp);
-  if (playerHp >= maxHp) return;
 
-  playerHp = Math.min(maxHp, playerHp + 1);
-  updateHealthBar();
-  saveProgress();
+  if (playerHp >= maxHp) {
+    regenProgress = 0;
+  } else {
+    regenProgress += REGEN_TICK_SECONDS;
+
+    if (regenProgress >= statValue('healthRegen', stats.healthRegen)) {
+      regenProgress = 0;
+      playerHp += 1;
+      updateHealthBar();
+      saveProgress();
+    }
+  }
+
+  updateRegenIndicator();
 }
 
 function monsterAttackTick() {
@@ -181,22 +207,18 @@ function resetCharacter() {
   if (!confirm('Reset all XP and stats back to 0?')) return;
 
   xp = 0;
-  stats.maxHp = 0;
-  stats.attackDamage = 0;
-  stats.attackSpeed = 0;
-  playerHp = statValue('maxHp', stats.maxHp);
-
-  updateStatLevelLabels();
-  updateXpDisplay();
-  saveProgress();
-  startGame();
+  // Reload from no save rather than zeroing state by hand — a fresh player
+  // takes the same path, so this cannot drift as more state is added.
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
 }
 
 loadProgress();
 if (playerHp === null) playerHp = statValue('maxHp', stats.maxHp);
 startGame();
 updateXpDisplay();
-setInterval(regenTick, HP_REGEN_INTERVAL_SECONDS * 1000);
+updateRegenIndicator();
+setInterval(regenTick, REGEN_TICK_SECONDS * 1000);
 
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('.tab-panel');

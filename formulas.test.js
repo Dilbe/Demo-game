@@ -63,12 +63,14 @@ test('upgrading maxHp and attackDamage always increases them', () => {
   }
 });
 
-test('attackSpeed shortens the cooldown but never to zero', () => {
-  for (let level = 0; level < 10; level += 1) {
-    assert.ok(statValue('attackSpeed', level + 1) < statValue('attackSpeed', level), `cooldown did not shorten at level ${level + 1}`);
-  }
-  for (const level of [0, 1, 10, 100, 1000]) {
-    assert.ok(statValue('attackSpeed', level) > 0, `level ${level} produced a non-positive cooldown`);
+test('attackSpeed and healthRegen shorten their interval but never reach zero', () => {
+  for (const statId of ['attackSpeed', 'healthRegen']) {
+    for (let level = 0; level < 10; level += 1) {
+      assert.ok(statValue(statId, level + 1) < statValue(statId, level), `${statId} did not shorten at level ${level + 1}`);
+    }
+    for (const level of [0, 1, 10, 100, 1000]) {
+      assert.ok(statValue(statId, level) > 0, `${statId} at level ${level} produced a non-positive interval`);
+    }
   }
 });
 
@@ -94,6 +96,10 @@ test('BALANCE SNAPSHOT: current tuning', () => {
 
   assert.strictEqual(statValue('attackSpeed', 0), 2);
   assert.strictEqual(statValue('attackSpeed', 5), 1);
+
+  assert.strictEqual(statValue('healthRegen', 0), 60);
+  assert.strictEqual(statValue('healthRegen', 1), 48);
+  assert.strictEqual(statValue('healthRegen', 4), 30);
 
   assert.strictEqual(statCost('maxHp', 0), 5);
   assert.strictEqual(statCost('maxHp', 1), 7);
