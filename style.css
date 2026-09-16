@@ -68,6 +68,14 @@ body {
   position: relative;
 }
 
+.hotkey-hint {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.7rem;
+  color: #666;
+}
+
 #result-message {
   font-size: 1.5rem;
   font-weight: bold;

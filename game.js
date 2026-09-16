@@ -68,7 +68,7 @@ upgradeButtons.forEach((button) => {
 function renderSkillBar() {
   skillBarEl.replaceChildren();
 
-  for (const skillId of unlockedSkills) {
+  unlockedSkills.forEach((skillId, index) => {
     const skill = SKILLS[skillId];
 
     const fill = document.createElement('span');
@@ -83,11 +83,33 @@ function renderSkillBar() {
     button.dataset.skill = skillId;
     button.disabled = true;
     button.append(fill, label);
-    if (!skill.auto) button.addEventListener('click', () => useSkill(skillId));
+
+    if (!skill.auto) {
+      button.addEventListener('click', () => useSkill(skillId));
+
+      // Numbered by position in the bar, so the hint stays correct however the
+      // bar is filled. Automatic skills get no number — they cannot be triggered.
+      const hotkey = document.createElement('span');
+      hotkey.className = 'hotkey-hint';
+      hotkey.textContent = index + 1;
+      button.append(hotkey);
+    }
 
     skillBarEl.append(button);
-  }
+  });
 }
+
+document.addEventListener('keydown', (event) => {
+  if (!fightActive) return;
+
+  const index = Number(event.key) - 1;
+  if (!Number.isInteger(index) || index < 0) return;
+
+  const button = skillBarEl.querySelectorAll('button')[index];
+  if (!button || button.disabled) return;
+
+  useSkill(button.dataset.skill);
+});
 
 // The cooldown runs first and the effect lands when it finishes, matching how
 // the original attack button behaved.
