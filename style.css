@@ -113,6 +113,26 @@ body {
   text-align: left;
 }
 
+.skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.75rem auto;
+}
+
+.skill-name {
+  width: 8rem;
+  text-align: right;
+  font-weight: bold;
+}
+
+.skill-detail {
+  width: 16rem;
+  text-align: left;
+  color: #555;
+}
+
 #reset-character-button {
   margin-top: 1.5rem;
   font-size: 1rem;

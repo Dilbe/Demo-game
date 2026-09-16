@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { STATS, statValue, statCost } = require('./formulas.js');
+const { STATS, SKILLS, STARTING_SKILLS, statValue, statCost, describeSkill } = require('./formulas.js');
 
 // --- Formula maths -----------------------------------------------------
 // Exercised on a temporary fixture stat, so rebalancing the real stats
@@ -81,6 +81,39 @@ test('every stat defines the full data-object shape', () => {
     }
     assert.strictEqual(typeof stat.value, 'function', `${statId} is missing value()`);
   }
+});
+
+// --- Skills ------------------------------------------------------------
+
+test('every skill defines the full data-object shape', () => {
+  for (const [skillId, skill] of Object.entries(SKILLS)) {
+    for (const field of ['label', 'cooldown', 'unlockCost', 'auto']) {
+      assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
+    }
+    assert.ok(skill.damage !== undefined || skill.healing !== undefined, `${skillId} does neither damage nor healing`);
+    assert.ok(skill.cooldown > 0, `${skillId} has a non-positive cooldown`);
+  }
+});
+
+test('starting skills are real skills and cost nothing', () => {
+  for (const skillId of STARTING_SKILLS) {
+    assert.ok(SKILLS[skillId], `${skillId} is not a defined skill`);
+    assert.strictEqual(SKILLS[skillId].unlockCost, 0, `${skillId} starts unlocked so must be free`);
+  }
+});
+
+test('every skill that must be bought costs something', () => {
+  for (const [skillId, skill] of Object.entries(SKILLS)) {
+    if (STARTING_SKILLS.includes(skillId)) continue;
+    assert.ok(skill.unlockCost > 0, `${skillId} is not a starting skill but is free`);
+  }
+});
+
+test('describeSkill reports damage, healing and automatic skills', () => {
+  assert.match(describeSkill('basicAttack'), /1 damage, 2s cooldown/);
+  assert.match(describeSkill('heal'), /^Heals 5/);
+  assert.match(describeSkill('autoAttack'), /automatic$/);
+  assert.doesNotMatch(describeSkill('strongAttack'), /automatic/);
 });
 
 // --- Balance snapshot --------------------------------------------------

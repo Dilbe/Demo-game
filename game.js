@@ -10,6 +10,8 @@ const resultMessageEl = document.getElementById('result-message');
 const restartButton = document.getElementById('restart-button');
 const startButton = document.getElementById('start-button');
 const xpTotalEl = document.getElementById('xp-total');
+const skillsXpTotalEl = document.getElementById('skills-xp-total');
+const skillListEl = document.getElementById('skill-list');
 const upgradeButtons = document.querySelectorAll('.upgrade-button');
 const resetCharacterButton = document.getElementById('reset-character-button');
 
@@ -28,6 +30,7 @@ let playerHp = null;
 let cooldownTimeout;
 let monsterAttackInterval;
 let regenProgress = 0;
+let unlockedSkills = [...STARTING_SKILLS];
 let xp = 0;
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
@@ -172,12 +175,53 @@ function beginFight() {
 
 function updateXpDisplay() {
   xpTotalEl.textContent = xp;
+  skillsXpTotalEl.textContent = xp;
+  renderSkills();
+
   upgradeButtons.forEach((button) => {
     const stat = button.dataset.stat;
     const cost = statCost(stat, stats[stat]);
     button.textContent = `Upgrade (${cost} XP)`;
     button.disabled = xp < cost;
   });
+}
+
+function unlockSkill(skillId) {
+  const cost = SKILLS[skillId].unlockCost;
+  if (unlockedSkills.includes(skillId) || xp < cost) return;
+
+  xp -= cost;
+  unlockedSkills.push(skillId);
+  updateXpDisplay();
+  saveProgress();
+}
+
+function renderSkills() {
+  skillListEl.replaceChildren();
+
+  for (const skillId of Object.keys(SKILLS)) {
+    const skill = SKILLS[skillId];
+    const unlocked = unlockedSkills.includes(skillId);
+
+    const name = document.createElement('span');
+    name.className = 'skill-name';
+    name.textContent = skill.label;
+
+    const detail = document.createElement('span');
+    detail.className = 'skill-detail';
+    detail.textContent = describeSkill(skillId);
+
+    const action = document.createElement('button');
+    action.className = 'unlock-button';
+    action.textContent = unlocked ? 'Unlocked' : `Unlock (${skill.unlockCost} XP)`;
+    action.disabled = unlocked || xp < skill.unlockCost;
+    if (!unlocked) action.addEventListener('click', () => unlockSkill(skillId));
+
+    const row = document.createElement('div');
+    row.className = 'skill-row';
+    row.append(name, detail, action);
+    skillListEl.append(row);
+  }
 }
 
 function updateStatLevelLabels() {
@@ -188,7 +232,7 @@ function updateStatLevelLabels() {
 }
 
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills }));
 }
 
 function loadProgress() {
@@ -199,6 +243,7 @@ function loadProgress() {
   xp = saved.xp;
   Object.assign(stats, saved.stats);
   if (saved.hp !== undefined) playerHp = saved.hp;
+  if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills;
 
   updateStatLevelLabels();
 }
