@@ -71,10 +71,10 @@ Picking up two of the ideas originally parked in "out of scope for v1": rewards 
 - **Tabs:** "Fight" and "Character", plain show/hide of two sections via tab buttons — no router/framework needed.
 - **XP:** each win grants 1 XP.
 - **Stats (bought with XP, on the Character tab):**
-  - **Max HP** — +2 HP per level.
+  - **Max HP** — +5 HP per level.
   - **Attack Damage** — +1 damage per level (base 1 dmg/hit).
   - **Attack Speed** — divides the 2s base cooldown by `1 + 0.2 × level`, so levels give diminishing returns and the cooldown approaches 0 without ever reaching it. (Originally specced as -0.2s per level floored at 0.5s; changed to a divisor during v2, and the floor was dropped as unnecessary once the formula could no longer bottom out.)
-- **Cost:** flat 5 XP per level, same for all three stats. (Arnoud expects to want to tweak XP gain and Attack Speed's formula once it's playable — that's expected and fine, these are just constants.)
+- **Cost:** starts at 5 XP and compounds per level by each stat's own `costGrowth` (currently 1.4 for Max HP, 1.5 for Attack Damage and Attack Speed). All tuning lives in `formulas.js` and is expected to keep changing — treat the numbers here as a description of the current state, not a fixed decision.
 - **Persistence:** `localStorage`, storing only XP balance + stat levels (the Character-side meta progression). The in-progress fight itself does not persist — reloading always starts the next fight fresh at current (upgraded) max HP.
 - **Fight flow change:** the fight no longer auto-starts. A **Start** button appears on the Fight tab; the monster's attack timer doesn't begin until it's pressed. Restart also requires pressing Start again.
 - Tougher/multiple monsters stays parked as the next thing after this milestone list, not part of it.
