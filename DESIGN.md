@@ -170,3 +170,10 @@ A dungeon is a chain of monster fights, fought back-to-back without returning to
 2. Dungeon selection — alongside picking a single monster or two easy monsters, the player can pick a dungeon to start instead.
 3. Auto-chaining — winning one fight in a dungeon immediately starts the next fight in the chain, with no return to the selection screen until the dungeon ends. Player HP carries over between fights (subject to normal passive regen only — no free heal between fights).
 4. Dungeon end states — clearing every fight in the chain shows a dungeon-complete result; losing a fight, or pressing Retreat, ends the entire dungeon rather than just the current fight within it.
+
+## Future ideas (parking lot — not yet planned)
+
+Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
+
+- **Prestige mechanic.** Some kind of reset-for-a-permanent-bonus loop. Not defined yet: what resets, what's kept, what the bonus is.
+- **Graphics for monsters/player.** Currently no art at all. Two directions to weigh later: (a) simple geometric/SVG sprites drawn directly in code (a blob shape for a slime, a basic silhouette for a goblin) — fits the project's plain-HTML/no-tooling approach; (b) actual illustrated art, which would need either a dedicated image-generation tool or free game-asset sources (e.g. Kenney.nl, OpenGameArt.org, itch.io asset packs).
