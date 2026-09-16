@@ -73,7 +73,7 @@ Picking up two of the ideas originally parked in "out of scope for v1": rewards 
 - **Stats (bought with XP, on the Character tab):**
   - **Max HP** — +2 HP per level.
   - **Attack Damage** — +1 damage per level (base 1 dmg/hit).
-  - **Attack Speed** — -0.2s off the attack cooldown per level, floored at 0.5s.
+  - **Attack Speed** — divides the 2s base cooldown by `1 + 0.2 × level`, so levels give diminishing returns and the cooldown approaches 0 without ever reaching it. (Originally specced as -0.2s per level floored at 0.5s; changed to a divisor during v2, and the floor was dropped as unnecessary once the formula could no longer bottom out.)
 - **Cost:** flat 5 XP per level, same for all three stats. (Arnoud expects to want to tweak XP gain and Attack Speed's formula once it's playable — that's expected and fine, these are just constants.)
 - **Persistence:** `localStorage`, storing only XP balance + stat levels (the Character-side meta progression). The in-progress fight itself does not persist — reloading always starts the next fight fresh at current (upgraded) max HP.
 - **Fight flow change:** the fight no longer auto-starts. A **Start** button appears on the Fight tab; the monster's attack timer doesn't begin until it's pressed. Restart also requires pressing Start again.
