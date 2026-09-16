@@ -120,7 +120,10 @@ Not really necessary for a project this size — the point is to learn how GitHu
 1. Extract 1–2 pure functions from `game.js` (e.g. XP cost for a stat level, attack damage calculation) so there's something concrete and meaningful to test.
 2. Add a minimal test file using Node's built-in test runner (`node --test`), with a handful of cases covering the extracted functions.
 3. Add `.github/workflows/ci.yml` — runs on pull requests into `main`, executing `node --test`.
-4. Turn on branch protection for `main` requiring the CI check to pass before merging (manual Settings step).
+4. Turn on branch protection for `main` (manual Settings step) with two settings, both needed:
+   - **Require a pull request before merging** — this is what actually blocks direct pushes to `main`; without it, "require status checks" alone doesn't stop a direct push.
+   - **Require status checks to pass before merging**, with the CI workflow selected — blocks merging the PR until `node --test` passes.
+   - Optional: **Do not allow bypassing the above settings** — without this, the repo owner can still push directly/merge without checks; check it only if the point is to enforce the process on yourself too, not just collaborators.
 5. Add `.github/workflows/deploy.yml` — runs on push to `main`, builds and deploys to GitHub Pages via the official Pages actions.
 6. Confirm the loop end to end: open a PR with a deliberately failing test, see the check fail and block merge; fix it, merge, and see the deploy workflow publish automatically.
 
