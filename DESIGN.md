@@ -87,3 +87,39 @@ Picking up two of the ideas originally parked in "out of scope for v1": rewards 
 4. Upgrade buttons per stat on Character tab — spend XP per the cost rule, stat levels update in memory.
 5. Wire stats into actual combat — Max HP/Attack Damage/Attack Speed levels actually affect the fight.
 6. Persistence — save/load XP + stat levels via `localStorage`.
+
+## Publishing
+
+The whole point of this milestone is to try the full pipeline once — design to code to a real URL — not to add game features.
+
+- **Where:** GitHub Pages, since the project is already 100% static with no build step (per Tech decision #1/#4).
+- **How:** repo Settings → Pages → Deploy from a branch → `main`, root folder. No workflow file, no code changes needed — the existing `index.html`/`style.css`/`game.js` at the repo root are already servable as-is.
+- **Note:** enabling Pages is a repo-admin setting change, not something doable via a commit/PR — it's a manual one-time toggle for the repo owner.
+
+### Publishing milestones
+
+1. Merge the current playable version into `main`.
+2. Enable GitHub Pages on `main` (root folder) in repo settings.
+3. Confirm the published URL loads and is playable, same as local.
+
+## v3 scope — skills & always-on health
+
+Picking up the remaining ideas: a Skills tab with unlockable/slottable active skills, an always-visible health bar with passive regen instead of full-heal-per-fight, and a shared data-object pattern for stats/skills so each one can carry its own formula.
+
+- **Data-object pattern:** every stat and skill gets a config object (base value, XP cost, cost growth, per-level effect, etc.) instead of bespoke code per stat — makes adding new stats/skills mostly a matter of adding data, not new logic.
+- **Health bar:** moves out of the Fight tab into a persistent bar visible on every tab.
+- **Healing model change:** no more full heal at the end of a fight — HP instead regenerates passively at 1 HP/minute. Base Max HP raised from 10 to 20 to compensate for no longer starting every fight topped up.
+- **New stats:** Health Regen (speeds up passive regen), Skill Slots (how many skills can be active at once), Skill Points (a budget spent by equipping skills — each skill costs some skill points while slotted, on top of taking a slot).
+- **Skills:** unlocked permanently with XP (like today's stats), then equipped/unequipped into a limited action bar. Starting skill: Basic Attack (today's only ability, migrated into this system). New skills: Strong Attack (more damage, longer cooldown than Basic Attack) and Heal.
+
+### v3 milestones
+
+1. Refactor the three existing stats (Max HP, Attack Damage, Attack Speed) into data objects (base value, cost, cost growth, per-level effect) — no behavior change, just a foundation for everything below.
+2. Always-visible health bar — move HP display out of the Fight tab into a bar shown on every tab.
+3. New healing model — remove full-heal-on-fight-end, add passive regen at 1 HP/minute, raise base Max HP to 20.
+4. Health Regen stat — upgradeable, increases the passive regen rate from milestone 3.
+5. Skills tab shell — new tab, navigable, empty/placeholder content for now.
+6. Define skills as data — Basic Attack (migrated from the hardcoded attack button), Strong Attack, and Heal, each unlockable with XP using the milestone-1 data-object pattern.
+7. Skill Slots stat + loadout UI — stat sets max active skills; add/remove unlocked skills to/from the action bar.
+8. Skill Points stat + per-skill cost — spendable budget stat; each skill has a skill-point cost while slotted, capped by this stat.
+9. Wire the Fight tab to the equipped skill bar — replace the hardcoded Attack button with buttons generated from the current loadout.
