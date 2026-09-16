@@ -107,17 +107,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 0.75rem;
   margin: 0.75rem auto;
 }
 
 .stat-name {
-  width: 8rem;
+  width: 7.5rem;
   text-align: right;
 }
 
 .stat-level {
   width: 3.5rem;
+  text-align: left;
+}
+
+.stat-description {
+  width: 11.5rem;
+  text-align: left;
+  color: #555;
+}
+
+.stat-change {
+  width: 8rem;
   text-align: left;
 }
 

@@ -85,10 +85,12 @@ test('attackSpeed and healthRegen shorten their interval but never reach zero', 
 
 test('every stat defines the full data-object shape', () => {
   for (const [statId, stat] of Object.entries(STATS)) {
-    for (const field of ['label', 'base', 'perLevel', 'baseCost', 'costGrowth']) {
+    for (const field of ['label', 'description', 'base', 'perLevel', 'baseCost', 'costGrowth']) {
       assert.ok(stat[field] !== undefined, `${statId} is missing ${field}`);
     }
     assert.strictEqual(typeof stat.value, 'function', `${statId} is missing value()`);
+    assert.strictEqual(typeof stat.format, 'function', `${statId} is missing format()`);
+    assert.ok(stat.format(stat.value(0)).length > 0, `${statId} format() produced nothing`);
   }
 });
 
