@@ -81,17 +81,35 @@ const STATS = {
       return `${value}`;
     },
   },
+
+  skillPoints: {
+    label: 'Skill Points',
+    description: 'Budget for equipped skills',
+    // A second limit alongside slots: slots cap how many skills you equip,
+    // points cap how strong that combination can be.
+    base: 3,
+    perLevel: 2,
+    baseCost: 20,
+    costGrowth: 2,
+    value(level) {
+      return this.base + level * this.perLevel;
+    },
+    format(value) {
+      return `${value}`;
+    },
+  },
 };
 
 // Basic Attack is the ability the Fight tab has always had, now described as
-// data. Combat still reads the global Attack Damage / Attack Speed stats —
-// skills only drive the fight once the loadout lands (v3 milestone 9).
+// data. `unlockCost` is XP paid once; `pointCost` is Skill Points held for as
+// long as the skill stays equipped.
 const SKILLS = {
   basicAttack: {
     label: 'Basic Attack',
     damage: 1,
     cooldown: 2,
     unlockCost: 0,
+    pointCost: 1,
     auto: false,
   },
 
@@ -100,6 +118,7 @@ const SKILLS = {
     damage: 3,
     cooldown: 5,
     unlockCost: 15,
+    pointCost: 2,
     auto: false,
   },
 
@@ -108,6 +127,7 @@ const SKILLS = {
     healing: 5,
     cooldown: 8,
     unlockCost: 15,
+    pointCost: 2,
     auto: false,
   },
 
@@ -116,6 +136,8 @@ const SKILLS = {
     damage: 1,
     cooldown: 6,
     unlockCost: 25,
+    // Costs the most to hold: it deals damage without being clicked.
+    pointCost: 3,
     auto: true,
   },
 };
