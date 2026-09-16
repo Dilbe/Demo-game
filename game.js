@@ -189,14 +189,10 @@ function resetCharacter() {
   if (!confirm('Reset all XP and stats back to 0?')) return;
 
   xp = 0;
-  for (const statId of Object.keys(stats)) stats[statId] = 0;
-  playerHp = statValue('maxHp', stats.maxHp);
-
-  updateStatLevelLabels();
-  updateXpDisplay();
-  scheduleRegen();
-  saveProgress();
-  startGame();
+  // Reload from no save rather than zeroing state by hand — a fresh player
+  // takes the same path, so this cannot drift as more state is added.
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
 }
 
 loadProgress();
