@@ -3,8 +3,7 @@ const playerHpEl = document.getElementById('player-hp');
 const playerMaxHpEl = document.getElementById('player-max-hp');
 const healthBarFillEl = document.getElementById('health-bar-fill');
 const regenProgressEl = document.getElementById('regen-progress');
-const attackButton = document.getElementById('attack-button');
-const playerCooldownFillEl = document.getElementById('player-cooldown-fill');
+const skillBarEl = document.getElementById('skill-bar');
 const monsterCooldownFillEl = document.getElementById('monster-cooldown-fill');
 const resultMessageEl = document.getElementById('result-message');
 const restartButton = document.getElementById('restart-button');
@@ -27,7 +26,8 @@ const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0, healthRegen: 0 };
 
 let monsterHp;
 let playerHp = null;
-let cooldownTimeout;
+let fightActive = false;
+const skillTimeouts = new Map();
 let monsterAttackInterval;
 let regenProgress = 0;
 let unlockedSkills = [...STARTING_SKILLS];
@@ -42,7 +42,6 @@ function animateCooldownFill(fillEl, durationSeconds) {
   fillEl.style.height = '0%';
 }
 
-attackButton.addEventListener('click', startCooldown);
 restartButton.addEventListener('click', startGame);
 startButton.addEventListener('click', beginFight);
 resetCharacterButton.addEventListener('click', resetCharacter);
@@ -64,26 +63,69 @@ upgradeButtons.forEach((button) => {
   });
 });
 
-function startCooldown() {
-  attackButton.disabled = true;
-  const cooldownSeconds = statValue('attackSpeed', stats.attackSpeed);
-  animateCooldownFill(playerCooldownFillEl, cooldownSeconds);
+// One button per unlocked skill. Automatic skills get a button too, but only
+// as a cooldown indicator — they fire themselves rather than being clicked.
+function renderSkillBar() {
+  skillBarEl.replaceChildren();
 
-  clearTimeout(cooldownTimeout);
-  cooldownTimeout = setTimeout(() => {
-    monsterHp = Math.max(0, monsterHp - statValue('attackDamage', stats.attackDamage));
-    monsterHpEl.textContent = monsterHp;
+  for (const skillId of unlockedSkills) {
+    const skill = SKILLS[skillId];
 
-    if (monsterHp <= 0) {
-      xp += XP_PER_KILL;
-      updateXpDisplay();
-      saveProgress();
-      endGame('You win!');
-      return;
-    }
+    const fill = document.createElement('span');
+    fill.className = 'cooldown-fill';
 
-    attackButton.disabled = false;
-  }, cooldownSeconds * 1000);
+    const label = document.createElement('span');
+    label.className = 'cooldown-label';
+    label.textContent = skill.label;
+
+    const button = document.createElement('button');
+    button.className = 'cooldown-button';
+    button.dataset.skill = skillId;
+    button.disabled = true;
+    button.append(fill, label);
+    if (!skill.auto) button.addEventListener('click', () => useSkill(skillId));
+
+    skillBarEl.append(button);
+  }
+}
+
+// The cooldown runs first and the effect lands when it finishes, matching how
+// the original attack button behaved.
+function useSkill(skillId) {
+  if (!fightActive || skillTimeouts.has(skillId)) return;
+
+  const skill = SKILLS[skillId];
+  const button = skillBarEl.querySelector(`[data-skill="${skillId}"]`);
+  button.disabled = true;
+  animateCooldownFill(button.querySelector('.cooldown-fill'), skill.cooldown);
+
+  skillTimeouts.set(skillId, setTimeout(() => {
+    skillTimeouts.delete(skillId);
+    applySkill(skill);
+
+    if (!fightActive) return;
+    if (skill.auto) useSkill(skillId);
+    else button.disabled = false;
+  }, skill.cooldown * 1000));
+}
+
+function applySkill(skill) {
+  if (skill.healing) {
+    playerHp = Math.min(statValue('maxHp', stats.maxHp), playerHp + skill.healing);
+    updateHealthBar();
+    saveProgress();
+    return;
+  }
+
+  monsterHp = Math.max(0, monsterHp - skill.damage);
+  monsterHpEl.textContent = monsterHp;
+
+  if (monsterHp <= 0) {
+    xp += XP_PER_KILL;
+    updateXpDisplay();
+    saveProgress();
+    endGame('You win!');
+  }
 }
 
 function updateHealthBar() {
@@ -141,15 +183,19 @@ function monsterAttackTick() {
 }
 
 function endGame(message) {
+  fightActive = false;
   clearInterval(monsterAttackInterval);
-  clearTimeout(cooldownTimeout);
-  attackButton.disabled = true;
+  for (const timeout of skillTimeouts.values()) clearTimeout(timeout);
+  skillTimeouts.clear();
+  skillBarEl.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+
   resultMessageEl.textContent = message;
   resultMessageEl.hidden = false;
   restartButton.hidden = false;
 }
 
 function startGame() {
+  fightActive = false;
   monsterHp = INITIAL_MONSTER_HP;
   monsterHpEl.textContent = monsterHp;
   updateHealthBar();
@@ -157,7 +203,8 @@ function startGame() {
   resultMessageEl.hidden = true;
   restartButton.hidden = true;
 
-  attackButton.hidden = true;
+  renderSkillBar();
+  skillBarEl.hidden = true;
   startButton.hidden = false;
 
   monsterCooldownFillEl.style.transition = 'none';
@@ -165,9 +212,14 @@ function startGame() {
 }
 
 function beginFight() {
+  fightActive = true;
   startButton.hidden = true;
-  attackButton.hidden = false;
-  attackButton.disabled = false;
+  skillBarEl.hidden = false;
+
+  for (const skillId of unlockedSkills) {
+    if (SKILLS[skillId].auto) useSkill(skillId);
+    else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
+  }
 
   animateCooldownFill(monsterCooldownFillEl, MONSTER_ATTACK_INTERVAL_SECONDS);
   monsterAttackInterval = setInterval(monsterAttackTick, MONSTER_ATTACK_INTERVAL_SECONDS * 1000);
@@ -193,6 +245,9 @@ function unlockSkill(skillId) {
   xp -= cost;
   unlockedSkills.push(skillId);
   updateXpDisplay();
+  // Rebuilding mid-fight would discard buttons with cooldowns already running,
+  // so a skill bought during a fight joins the bar on the next one.
+  if (!fightActive) renderSkillBar();
   saveProgress();
 }
 
