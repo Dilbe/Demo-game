@@ -48,6 +48,52 @@ const STATS = {
   },
 };
 
+// Basic Attack is the ability the Fight tab has always had, now described as
+// data. Combat still reads the global Attack Damage / Attack Speed stats —
+// skills only drive the fight once the loadout lands (v3 milestone 9).
+const SKILLS = {
+  basicAttack: {
+    label: 'Basic Attack',
+    damage: 1,
+    cooldown: 2,
+    unlockCost: 0,
+    auto: false,
+  },
+
+  strongAttack: {
+    label: 'Strong Attack',
+    damage: 3,
+    cooldown: 5,
+    unlockCost: 15,
+    auto: false,
+  },
+
+  heal: {
+    label: 'Heal',
+    healing: 5,
+    cooldown: 8,
+    unlockCost: 15,
+    auto: false,
+  },
+
+  autoAttack: {
+    label: 'Auto Attack',
+    damage: 1,
+    cooldown: 6,
+    unlockCost: 25,
+    auto: true,
+  },
+};
+
+// Unlocked from the start, so a new player always has something to attack with.
+const STARTING_SKILLS = ['basicAttack'];
+
+function describeSkill(skillId) {
+  const skill = SKILLS[skillId];
+  const effect = skill.healing ? `Heals ${skill.healing}` : `${skill.damage} damage`;
+  return `${effect}, ${skill.cooldown}s cooldown${skill.auto ? ', automatic' : ''}`;
+}
+
 function statValue(statId, level) {
   return STATS[statId].value(level);
 }
@@ -59,5 +105,5 @@ function statCost(statId, level) {
 
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
-  module.exports = { STATS, statValue, statCost };
+  module.exports = { STATS, SKILLS, STARTING_SKILLS, statValue, statCost, describeSkill };
 }
