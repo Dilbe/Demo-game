@@ -1,6 +1,7 @@
 const STATS = {
   maxHp: {
     label: 'Max HP',
+    description: 'Health you can hold',
     base: 20,
     perLevel: 5,
     baseCost: 5,
@@ -8,10 +9,16 @@ const STATS = {
     value(level) {
       return this.base + level * this.perLevel;
     },
+    format(value) {
+      return `${value} HP`;
+    },
   },
 
   attackDamage: {
     label: 'Attack Damage',
+    // Dormant until milestone 10 turns it into a per-skill upgrade — skills
+    // currently carry their own damage. Said plainly so it is not bought blind.
+    description: 'Damage per hit — unused',
     base: 1,
     perLevel: 1,
     baseCost: 5,
@@ -19,10 +26,14 @@ const STATS = {
     value(level) {
       return this.base + level * this.perLevel;
     },
+    format(value) {
+      return `${value} dmg`;
+    },
   },
 
   attackSpeed: {
     label: 'Attack Speed',
+    description: 'Attack cooldown — unused',
     base: 2,
     perLevel: 0.2,
     baseCost: 5,
@@ -32,10 +43,31 @@ const STATS = {
     value(level) {
       return this.base / (1 + level * this.perLevel);
     },
+    format(value) {
+      return `${value.toFixed(1)}s`;
+    },
+  },
+
+  healthRegen: {
+    label: 'Health Regen',
+    description: 'Seconds per healed HP',
+    // Seconds to regenerate 1 HP. Divides like attackSpeed, so higher levels
+    // mean less time per HP without the interval ever reaching zero.
+    base: 60,
+    perLevel: 0.25,
+    baseCost: 5,
+    costGrowth: 1.5,
+    value(level) {
+      return this.base / (1 + level * this.perLevel);
+    },
+    format(value) {
+      return `${Math.round(value)}s`;
+    },
   },
 
   skillSlots: {
     label: 'Skill Slots',
+    description: 'Skills you can equip',
     // How many skills can be equipped at once. Starts at 2 so a new player has
     // one empty slot, which advertises that unlocking a skill is worth doing.
     base: 2,
@@ -45,18 +77,8 @@ const STATS = {
     value(level) {
       return this.base + level * this.perLevel;
     },
-  },
-
-  healthRegen: {
-    label: 'Health Regen',
-    // Seconds to regenerate 1 HP. Divides like attackSpeed, so higher levels
-    // mean less time per HP without the interval ever reaching zero.
-    base: 60,
-    perLevel: 0.25,
-    baseCost: 5,
-    costGrowth: 1.5,
-    value(level) {
-      return this.base / (1 + level * this.perLevel);
+    format(value) {
+      return `${value}`;
     },
   },
 };

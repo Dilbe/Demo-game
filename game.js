@@ -13,7 +13,7 @@ const skillsXpTotalEl = document.getElementById('skills-xp-total');
 const slotsUsedEl = document.getElementById('slots-used');
 const slotsTotalEl = document.getElementById('slots-total');
 const skillListEl = document.getElementById('skill-list');
-const upgradeButtons = document.querySelectorAll('.upgrade-button');
+const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 
 const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
@@ -24,7 +24,8 @@ const REGEN_TICK_SECONDS = 1;
 
 const SAVE_KEY = 'demo-game-save';
 
-const stats = { maxHp: 0, attackDamage: 0, attackSpeed: 0, healthRegen: 0, skillSlots: 0 };
+// Derived from STATS so a new stat needs defining in one place only.
+const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0]));
 
 let monsterHp;
 let playerHp = null;
@@ -50,22 +51,53 @@ restartButton.addEventListener('click', startGame);
 startButton.addEventListener('click', beginFight);
 resetCharacterButton.addEventListener('click', resetCharacter);
 
-upgradeButtons.forEach((button) => {
-  button.addEventListener('click', () => {
-    const stat = button.dataset.stat;
-    const cost = statCost(stat, stats[stat]);
-    if (xp < cost) return;
+function upgradeStat(statId) {
+  const cost = statCost(statId, stats[statId]);
+  if (xp < cost) return;
 
-    xp -= cost;
-    stats[stat] += 1;
-    updateStatLevelLabels();
-    updateHealthBar();
-    updateRegenIndicator();
+  xp -= cost;
+  stats[statId] += 1;
 
-    updateXpDisplay();
-    saveProgress();
-  });
-});
+  updateHealthBar();
+  updateRegenIndicator();
+  updateXpDisplay();
+  saveProgress();
+}
+
+function renderStats() {
+  statListEl.replaceChildren();
+
+  for (const [statId, stat] of Object.entries(STATS)) {
+    const name = document.createElement('span');
+    name.className = 'stat-name';
+    name.textContent = stat.label;
+
+    const level = document.createElement('span');
+    level.className = 'stat-level';
+    level.textContent = `Lvl ${stats[statId]}`;
+
+    const description = document.createElement('span');
+    description.className = 'stat-description';
+    description.textContent = stat.description;
+
+    // Shows what the level costs you in outcome terms, not just in levels.
+    const change = document.createElement('span');
+    change.className = 'stat-change';
+    change.textContent = `${stat.format(statValue(statId, stats[statId]))} → ${stat.format(statValue(statId, stats[statId] + 1))}`;
+
+    const cost = statCost(statId, stats[statId]);
+    const button = document.createElement('button');
+    button.className = 'upgrade-button';
+    button.textContent = `Upgrade (${cost} XP)`;
+    button.disabled = xp < cost;
+    button.addEventListener('click', () => upgradeStat(statId));
+
+    const row = document.createElement('div');
+    row.className = 'stat-row';
+    row.append(name, level, description, change, button);
+    statListEl.append(row);
+  }
+}
 
 // One button per unlocked skill. Automatic skills get a button too, but only
 // as a cooldown indicator — they fire themselves rather than being clicked.
@@ -254,14 +286,8 @@ function beginFight() {
 function updateXpDisplay() {
   xpTotalEl.textContent = xp;
   skillsXpTotalEl.textContent = xp;
+  renderStats();
   renderSkills();
-
-  upgradeButtons.forEach((button) => {
-    const stat = button.dataset.stat;
-    const cost = statCost(stat, stats[stat]);
-    button.textContent = `Upgrade (${cost} XP)`;
-    button.disabled = xp < cost;
-  });
 }
 
 function unlockSkill(skillId) {
@@ -339,13 +365,6 @@ function renderSkills() {
   }
 }
 
-function updateStatLevelLabels() {
-  upgradeButtons.forEach((button) => {
-    const stat = button.dataset.stat;
-    button.closest('.stat-row').querySelector('.stat-level').textContent = `Lvl ${stats[stat]}`;
-  });
-}
-
 function saveProgress() {
   localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills }));
 }
@@ -360,8 +379,6 @@ function loadProgress() {
   if (saved.hp !== undefined) playerHp = saved.hp;
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills;
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
-
-  updateStatLevelLabels();
 }
 
 function resetCharacter() {
