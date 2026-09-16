@@ -19,6 +19,11 @@ test('attackCooldownSeconds starts at 2s and shortens per level', () => {
   assert.strictEqual(attackCooldownSeconds(5), 1);
 });
 
+// DELIBERATELY FAILING — proves the CI gate blocks a merge. Do not merge; delete this branch.
+test('DELIBERATE FAILURE: proves CI blocks merges', () => {
+  assert.strictEqual(attackDamage(0), 999);
+});
+
 test('attackCooldownSeconds always returns a positive cooldown', () => {
   for (const level of [0, 1, 10, 100]) {
     assert.ok(attackCooldownSeconds(level) > 0, `level ${level} produced a non-positive cooldown`);
