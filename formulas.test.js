@@ -1,26 +1,55 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { playerMaxHp, attackDamage, attackCooldownSeconds } = require('./formulas.js');
+const { STATS, statValue, statCost } = require('./formulas.js');
 
-test('playerMaxHp starts at 10 and gains 2 per level', () => {
-  assert.strictEqual(playerMaxHp(0), 10);
-  assert.strictEqual(playerMaxHp(1), 12);
-  assert.strictEqual(playerMaxHp(5), 20);
+test('maxHp starts at 10 and gains 2 per level', () => {
+  assert.strictEqual(statValue('maxHp', 0), 10);
+  assert.strictEqual(statValue('maxHp', 1), 12);
+  assert.strictEqual(statValue('maxHp', 5), 20);
 });
 
 test('attackDamage starts at 1 and gains 1 per level', () => {
-  assert.strictEqual(attackDamage(0), 1);
-  assert.strictEqual(attackDamage(1), 2);
-  assert.strictEqual(attackDamage(10), 11);
+  assert.strictEqual(statValue('attackDamage', 0), 1);
+  assert.strictEqual(statValue('attackDamage', 1), 2);
+  assert.strictEqual(statValue('attackDamage', 10), 11);
 });
 
-test('attackCooldownSeconds starts at 2s and shortens per level', () => {
-  assert.strictEqual(attackCooldownSeconds(0), 2);
-  assert.strictEqual(attackCooldownSeconds(5), 1);
+test('attackSpeed starts at a 2s cooldown and shortens per level', () => {
+  assert.strictEqual(statValue('attackSpeed', 0), 2);
+  assert.strictEqual(statValue('attackSpeed', 5), 1);
 });
 
-test('attackCooldownSeconds always returns a positive cooldown', () => {
+test('attackSpeed cooldown stays positive at every level', () => {
   for (const level of [0, 1, 10, 100]) {
-    assert.ok(attackCooldownSeconds(level) > 0, `level ${level} produced a non-positive cooldown`);
+    assert.ok(statValue('attackSpeed', level) > 0, `level ${level} produced a non-positive cooldown`);
+  }
+});
+
+test('every stat costs a flat 5 XP while costGrowth is 1', () => {
+  for (const statId of Object.keys(STATS)) {
+    for (const level of [0, 1, 5, 20]) {
+      assert.strictEqual(statCost(statId, level), 5, `${statId} at level ${level}`);
+    }
+  }
+});
+
+test('costGrowth above 1 compounds the cost per level', () => {
+  const original = STATS.maxHp.costGrowth;
+  STATS.maxHp.costGrowth = 2;
+  try {
+    assert.strictEqual(statCost('maxHp', 0), 5);
+    assert.strictEqual(statCost('maxHp', 1), 10);
+    assert.strictEqual(statCost('maxHp', 3), 40);
+  } finally {
+    STATS.maxHp.costGrowth = original;
+  }
+});
+
+test('every stat defines the full data-object shape', () => {
+  for (const [statId, stat] of Object.entries(STATS)) {
+    for (const field of ['label', 'base', 'perLevel', 'baseCost', 'costGrowth']) {
+      assert.ok(stat[field] !== undefined, `${statId} is missing ${field}`);
+    }
+    assert.strictEqual(typeof stat.value, 'function', `${statId} is missing value()`);
   }
 });
