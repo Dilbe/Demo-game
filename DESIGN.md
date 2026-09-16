@@ -107,7 +107,13 @@ The whole point of this milestone is to try the full pipeline once — design to
 6. In GitHub Pages settings, set the custom domain to `mygame.dilbe.eu` and wait for GitHub to verify DNS + provision HTTPS.
 7. Confirm `https://mygame.dilbe.eu` loads and is playable.
 
-**Publishing status: milestones 1–4 done.** The game is live and playable at `dilbe.github.io/Demo-game`, deployed by the Actions pipeline. Milestones 5–7 (custom domain) are **blocked pending DNS access**. Note that `*.dilbe.eu` has a wildcard record pointing at the registrar's parking page, so `mygame.dilbe.eu` already resolves — but not to GitHub. An explicit `mygame` CNAME will override it without touching the apex or its MX records.
+**Publishing status: done.** All 7 milestones complete. The game is live at `https://mygame.dilbe.eu`, served by GitHub Pages over a GitHub-issued certificate and deployed by the Actions pipeline; `dilbe.github.io/Demo-game` redirects to it.
+
+Three things learned doing it, worth remembering if the domain ever changes:
+
+- **Setting the custom domain is not enough — the Pages deployment must be re-run afterwards.** Until then GitHub returns "Site not found" for the new hostname even though the DNS check passes.
+- **`*.dilbe.eu` has a wildcard record at the registrar**, so any subdomain resolves whether or not a real record exists. Never treat "it resolves" as proof; check the record type (`nslookup -type=CNAME`) — a real record returns the CNAME, the wildcard returns the SOA.
+- **A stale wildcard answer outlives the new record's TTL**, because it was cached under the wildcard's own (much longer) TTL. Expect the new hostname to work everywhere else while the local network still lands on the old address. `curl --resolve <host>:443:<ip>` tests the real server regardless of local DNS.
 
 ## CI/CD (learning GitHub Actions)
 
