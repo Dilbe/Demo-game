@@ -38,6 +38,8 @@ let regenProgress = 0;
 let unlockedSkills = [...STARTING_SKILLS];
 // Order matters: it decides the order of the fight bar and therefore the hotkeys.
 let equippedSkills = [...STARTING_SKILLS];
+// Per-skill upgrade tracks, replacing the old global Attack Damage/Speed stats.
+let skillLevels = Object.fromEntries(Object.keys(SKILLS).map((skillId) => [skillId, { power: 0, speed: 0 }]));
 let xp = 0;
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
@@ -156,28 +158,32 @@ function useSkill(skillId) {
 
   const skill = SKILLS[skillId];
   const button = skillBarEl.querySelector(`[data-skill="${skillId}"]`);
+  const cooldown = skillCooldown(skillId, skillLevels[skillId].speed);
   button.disabled = true;
-  animateCooldownFill(button.querySelector('.cooldown-fill'), skill.cooldown);
+  animateCooldownFill(button.querySelector('.cooldown-fill'), cooldown);
 
   skillTimeouts.set(skillId, setTimeout(() => {
     skillTimeouts.delete(skillId);
-    applySkill(skill);
+    applySkill(skillId);
 
     if (!fightActive) return;
     if (skill.auto) useSkill(skillId);
     else button.disabled = false;
-  }, skill.cooldown * 1000));
+  }, cooldown * 1000));
 }
 
-function applySkill(skill) {
+function applySkill(skillId) {
+  const skill = SKILLS[skillId];
+  const power = skillPower(skillId, skillLevels[skillId].power);
+
   if (skill.healing) {
-    playerHp = Math.min(statValue('maxHp', stats.maxHp), playerHp + skill.healing);
+    playerHp = Math.min(statValue('maxHp', stats.maxHp), playerHp + power);
     updateHealthBar();
     saveProgress();
     return;
   }
 
-  monsterHp = Math.max(0, monsterHp - skill.damage);
+  monsterHp = Math.max(0, monsterHp - power);
   monsterHpEl.textContent = monsterHp;
 
   if (monsterHp <= 0) {
@@ -355,7 +361,7 @@ function renderSkills() {
 
     const detail = document.createElement('span');
     detail.className = 'skill-detail';
-    detail.textContent = describeSkill(skillId);
+    detail.textContent = describeSkill(skillId, skillLevels[skillId]);
 
     const cost = document.createElement('span');
     cost.className = 'skill-cost';
@@ -378,12 +384,52 @@ function renderSkills() {
     const row = document.createElement('div');
     row.className = 'skill-row';
     row.append(name, detail, cost, action);
-    skillListEl.append(row);
+
+    const entry = document.createElement('div');
+    entry.className = 'skill-entry';
+    entry.append(row);
+    // Upgrade tracks only make sense once a skill is yours.
+    if (unlocked) entry.append(buildUpgradeRow(skillId));
+    skillListEl.append(entry);
   }
 }
 
+function buildUpgradeRow(skillId) {
+  const row = document.createElement('div');
+  row.className = 'skill-upgrades';
+
+  for (const track of ['power', 'speed']) {
+    const level = skillLevels[skillId][track];
+    const cost = skillUpgradeCost(skillId, level);
+
+    const label = document.createElement('span');
+    label.className = 'track-label';
+    label.textContent = `${track === 'power' ? powerLabel(skillId) : 'Speed'} Lvl ${level}`;
+
+    const button = document.createElement('button');
+    button.className = 'upgrade-button';
+    button.textContent = `Upgrade (${cost} XP)`;
+    button.disabled = xp < cost;
+    button.addEventListener('click', () => upgradeSkillTrack(skillId, track));
+
+    row.append(label, button);
+  }
+
+  return row;
+}
+
+function upgradeSkillTrack(skillId, track) {
+  const cost = skillUpgradeCost(skillId, skillLevels[skillId][track]);
+  if (xp < cost) return;
+
+  xp -= cost;
+  skillLevels[skillId][track] += 1;
+  updateXpDisplay();
+  saveProgress();
+}
+
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels }));
 }
 
 function loadProgress() {
@@ -396,6 +442,7 @@ function loadProgress() {
   if (saved.hp !== undefined) playerHp = saved.hp;
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills;
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
+  if (saved.skillLevels) Object.assign(skillLevels, saved.skillLevels);
 }
 
 function resetCharacter() {
