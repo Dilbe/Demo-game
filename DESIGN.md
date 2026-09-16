@@ -191,6 +191,23 @@ A dungeon is a chain of monster fights, fought back-to-back without returning to
 3. Auto-chaining — winning one fight in a dungeon immediately starts the next fight in the chain, with no return to the selection screen until the dungeon ends. Player HP carries over between fights (subject to normal passive regen only — no free heal between fights).
 4. Dungeon end states — clearing every fight in the chain shows a dungeon-complete result; losing a fight, or pressing Retreat, ends the entire dungeon rather than just the current fight within it.
 
+## v6 scope — quests & progressive unlocks
+
+Instead of a new player seeing every tab at once, tabs unlock progressively by completing simple objectives. A new player starts seeing only the Fight tab, with a short quest text on the side (e.g. "Kill 5 enemies"); completing it reveals the Character tab and shows the next quest ("Kill 10 enemies"), which in turn reveals the Skills tab. More quests with other rewards can be added later.
+
+- **Data-object pattern (again):** each quest is a data object — description text, completion condition, and a reward (initially "unlock this tab," but kept generic so future quests can reward other things, e.g. unlocking a monster or a dungeon).
+- **One active quest at a time**, shown as a small always-visible tracker (description + progress, e.g. "Kill 5 enemies (3/5)") — similar in spirit to the always-visible health bar from v3.
+- **Depends on / changes:** this supersedes the "tabs are visible from the start" assumption in v2 (Character tab) and v3 (Skills tab) — once this ships, those tabs need to start hidden and reveal only when their unlocking quest completes, rather than always being shown.
+
+### v6 milestones
+
+1. Quest data — define quests as data objects (description, completion condition, reward), starting with "Kill 5 enemies" → unlock Character tab, and "Kill 10 enemies" → unlock Skills tab.
+2. Enemy-kill counter — track total enemies defeated persistently, separate from XP (a new counter alongside the existing saved state).
+3. Quest tracker UI — a small always-visible panel showing the current active quest's text and progress.
+4. Tab gating — Character and Skills tabs start hidden for a new player and only appear once their respective quest completes; other tabs (Fight, and later About) remain always visible.
+5. Sequential progression — completing one quest immediately reveals the tracker for the next quest in the chain.
+6. Persistence — save quest completion state and the kill counter via `localStorage`, alongside the existing XP/stat/skill save data.
+
 ## About tab & versioning
 
 A small, standalone addition: a place that explains what the project is, plus a visible version number.
