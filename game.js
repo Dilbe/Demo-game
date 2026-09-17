@@ -48,8 +48,15 @@ let regenProgress = 0;
 let unlockedSkills = [...STARTING_SKILLS];
 // Order matters: it decides the order of the fight bar and therefore the hotkeys.
 let equippedSkills = [...STARTING_SKILLS];
-// Per-skill upgrade tracks, replacing the old global Attack Damage/Speed stats.
-let skillLevels = Object.fromEntries(Object.keys(SKILLS).map((skillId) => [skillId, { power: 0, speed: 0 }]));
+// Per-skill upgrade tracks, replacing the old global Attack Damage/Speed
+// stats. Derived from each skill's own `upgrades` array so this doesn't
+// assume every skill has the same set of tracks.
+let skillLevels = Object.fromEntries(
+  Object.entries(SKILLS).map(([skillId, skill]) => [
+    skillId,
+    Object.fromEntries(skill.upgrades.map((upgrade) => [upgrade.id, 0])),
+  ])
+);
 let xp = 0;
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
@@ -634,36 +641,44 @@ function renderSkills() {
   }
 }
 
+// One row per entry in the skill's `upgrades` array, whatever tracks that
+// happens to be — same pattern renderStats uses for the Character tab, down
+// to the current → next preview.
 function buildUpgradeRow(skillId) {
+  const skill = SKILLS[skillId];
   const row = document.createElement('div');
   row.className = 'skill-upgrades';
 
-  for (const track of ['power', 'speed']) {
-    const level = skillLevels[skillId][track];
-    const cost = skillUpgradeCost(skillId, level);
+  for (const upgrade of skill.upgrades) {
+    const level = skillLevels[skillId][upgrade.id];
+    const cost = skillUpgradeCost(skillId, upgrade.id, level);
 
     const label = document.createElement('span');
     label.className = 'track-label';
-    label.textContent = `${track === 'power' ? powerLabel(skillId) : 'Speed'} Lvl ${level}`;
+    label.textContent = `${upgrade.label} Lvl ${level}`;
+
+    const change = document.createElement('span');
+    change.className = 'track-change';
+    change.textContent = `${upgrade.format(upgrade.value(skill, level))} → ${upgrade.format(upgrade.value(skill, level + 1))}`;
 
     const button = document.createElement('button');
     button.className = 'upgrade-button';
     button.textContent = `Upgrade (${cost} XP)`;
     button.disabled = xp < cost;
-    button.addEventListener('click', () => upgradeSkillTrack(skillId, track));
+    button.addEventListener('click', () => upgradeSkillTrack(skillId, upgrade.id));
 
-    row.append(label, button);
+    row.append(label, change, button);
   }
 
   return row;
 }
 
-function upgradeSkillTrack(skillId, track) {
-  const cost = skillUpgradeCost(skillId, skillLevels[skillId][track]);
+function upgradeSkillTrack(skillId, upgradeId) {
+  const cost = skillUpgradeCost(skillId, upgradeId, skillLevels[skillId][upgradeId]);
   if (xp < cost) return;
 
   xp -= cost;
-  skillLevels[skillId][track] += 1;
+  skillLevels[skillId][upgradeId] += 1;
   updateXpDisplay();
   saveProgress();
 }
