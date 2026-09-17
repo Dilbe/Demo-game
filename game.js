@@ -18,6 +18,7 @@ const pointsUsedEl = document.getElementById('points-used');
 const pointsTotalEl = document.getElementById('points-total');
 const skillListEl = document.getElementById('skill-list');
 const skillSlotsEl = document.getElementById('skill-slots');
+const skillDetailPanelEl = document.getElementById('skill-detail-panel');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 const questTrackerEl = document.getElementById('quest-tracker');
@@ -71,6 +72,10 @@ let skillLevels = Object.fromEntries(
     Object.fromEntries(skill.upgrades.map((upgrade) => [upgrade.id, 0])),
   ])
 );
+// Which skill's square was last clicked, shown in the detail panel below the
+// list/slots — null when nothing is currently selected. Not persisted; every
+// reload starts with the panel closed.
+let inspectedSkillId = null;
 let xp = 0;
 // Total enemies defeated across every fight, ever — separate from XP because
 // quests key off it directly rather than off however XP happens to convert.
@@ -684,6 +689,7 @@ function updateXpDisplay() {
   renderStats();
   renderSkills();
   renderSkillSlots();
+  renderSkillDetail();
 }
 
 function unlockSkill(skillId) {
@@ -779,7 +785,8 @@ function renderSkills() {
       // Styled like the in-combat skill button, so a skill looks the same
       // here as it does on the Fight tab. Draggable so it can be dropped
       // onto a slot to equip it, or (if already equipped) dragged back here
-      // to unequip it. See skill-slots.
+      // to unequip it (see skill-slots); clicking it (rather than dragging)
+      // opens its stats/upgrades in the detail panel below.
       const label = document.createElement('span');
       label.className = 'cooldown-label';
       label.textContent = skill.label;
@@ -788,13 +795,13 @@ function renderSkills() {
       square.type = 'button';
       square.className = 'cooldown-button skill-square';
       square.classList.toggle('equipped', equipped);
+      square.classList.toggle('inspected', inspectedSkillId === skillId);
       square.draggable = true;
       square.append(label);
       square.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+      square.addEventListener('click', () => inspectSkill(skillId));
 
       entry.append(square);
-      // Upgrade tracks only make sense once a skill is yours.
-      entry.append(buildUpgradeRow(skillId));
     } else {
       const name = document.createElement('span');
       name.className = 'skill-name';
@@ -827,7 +834,9 @@ function renderSkills() {
 // A loadout bar matching the in-combat skill bar's look, one box per Skill
 // Slots level. Drag an unlocked skill from the list onto a slot to equip it
 // there (bumping out whatever was there); drag a filled slot onto another
-// slot to move it, or back onto the list to unequip it.
+// slot to move it, or back onto the list to unequip it. Clicking a filled
+// slot (rather than dragging it) opens its stats/upgrades in the detail
+// panel below, same as clicking its square in the list.
 function renderSkillSlots() {
   skillSlotsEl.replaceChildren();
 
@@ -843,11 +852,13 @@ function renderSkillSlots() {
     const box = document.createElement('button');
     box.type = 'button';
     box.className = 'cooldown-button skill-slot';
+    box.classList.toggle('inspected', Boolean(skillId) && inspectedSkillId === skillId);
     box.append(label);
 
     if (skillId) {
       box.draggable = true;
       box.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+      box.addEventListener('click', () => inspectSkill(skillId));
     }
 
     box.addEventListener('dragover', (event) => {
@@ -863,6 +874,46 @@ function renderSkillSlots() {
 
     skillSlotsEl.append(box);
   }
+}
+
+// Toggles the detail panel for `skillId` — clicking an already-open skill's
+// square closes it, clicking a different one switches to it. Re-renders the
+// list/slots too so the clicked square's `inspected` highlight moves.
+function inspectSkill(skillId) {
+  inspectedSkillId = inspectedSkillId === skillId ? null : skillId;
+  renderSkills();
+  renderSkillSlots();
+  renderSkillDetail();
+}
+
+// The stats/upgrades panel for whichever skill was last clicked — hidden
+// when nothing is selected. Reused by updateXpDisplay so it stays current
+// (e.g. an upgrade bought while the panel is open updates its cost/preview)
+// without the click handlers needing to know about that themselves.
+function renderSkillDetail() {
+  if (!inspectedSkillId) {
+    skillDetailPanelEl.hidden = true;
+    skillDetailPanelEl.replaceChildren();
+    return;
+  }
+
+  const skillId = inspectedSkillId;
+  const skill = SKILLS[skillId];
+
+  const heading = document.createElement('h3');
+  heading.className = 'skill-detail-heading';
+  heading.textContent = skill.label;
+
+  const summary = document.createElement('p');
+  summary.className = 'skill-detail-summary';
+  summary.textContent = describeSkill(skillId, skillLevels[skillId]);
+
+  const cost = document.createElement('p');
+  cost.className = 'skill-detail-cost';
+  cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'} while equipped`;
+
+  skillDetailPanelEl.replaceChildren(heading, summary, cost, buildUpgradeRow(skillId));
+  skillDetailPanelEl.hidden = false;
 }
 
 // One row per entry in the skill's `upgrades` array, whatever tracks that
