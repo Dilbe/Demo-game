@@ -38,6 +38,11 @@ body {
   vertical-align: middle;
 }
 
+.combatant.defeated {
+  opacity: 0.5;
+  cursor: default;
+}
+
 #monster-select {
   margin: 0 auto 1.5rem;
 }

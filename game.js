@@ -157,9 +157,8 @@ function renderMonsterList(monsters, { interactive = false } = {}) {
     const hpLine = document.createElement('p');
     hpLine.append('HP: ', hpEl, ` / ${monster.maxHp}`);
 
-    // An indicator only — not clickable itself. Only the front card's fill
-    // ever animates right now; the rest sit idle until independent attacks
-    // land in the next milestone.
+    // An indicator only — not clickable itself; each monster's own attack
+    // interval animates its fill.
     const fill = document.createElement('span');
     fill.className = 'cooldown-fill';
     const label = document.createElement('span');
@@ -177,7 +176,7 @@ function renderMonsterList(monsters, { interactive = false } = {}) {
     if (targetable) {
       card.classList.add('targetable');
       card.addEventListener('click', () => {
-        if (!fightActive) return;
+        if (!fightActive || activeMonsters[index].hp <= 0) return;
         targetIndex = index;
         updateTargetHighlight();
       });
@@ -334,9 +333,33 @@ function applySkill(skillId) {
   if (target.hp <= 0) {
     xp += MONSTERS[target.monsterId].xp;
     updateXpDisplay();
+    defeatMonster(targetIndex);
     saveProgress();
-    endGame('You win!');
+
+    if (activeMonsters.every((monster) => monster.hp <= 0)) {
+      endGame('You win!');
+      return;
+    }
+
+    // Move the fight on to whichever monster is still standing, so the
+    // player doesn't have to reselect a target just to keep attacking.
+    targetIndex = activeMonsters.findIndex((monster) => monster.hp > 0);
+    updateTargetHighlight();
   }
+}
+
+// A defeated monster stops attacking and can no longer be targeted, but its
+// card stays visible at 0 HP rather than disappearing.
+function defeatMonster(index) {
+  clearInterval(monsterAttackIntervals[index]);
+  monsterAttackIntervals[index] = null;
+
+  const card = monsterCards[index];
+  card.cardEl.classList.add('defeated');
+  if (card.badgeEl) card.badgeEl.hidden = true;
+  card.cardEl.querySelector('.cooldown-label').textContent = 'Defeated';
+  card.cooldownFillEl.style.transition = 'none';
+  card.cooldownFillEl.style.height = '0%';
 }
 
 function updateHealthBar() {
