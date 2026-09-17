@@ -1,13 +1,10 @@
 const monsterSelectEl = document.getElementById('monster-select');
-const monsterNameEl = document.getElementById('monster-name');
-const monsterHpEl = document.getElementById('monster-hp');
-const monsterMaxHpEl = document.getElementById('monster-max-hp');
+const monsterListEl = document.getElementById('monster-list');
 const playerHpEl = document.getElementById('player-hp');
 const playerMaxHpEl = document.getElementById('player-max-hp');
 const healthBarFillEl = document.getElementById('health-bar-fill');
 const regenProgressEl = document.getElementById('regen-progress');
 const skillBarEl = document.getElementById('skill-bar');
-const monsterCooldownFillEl = document.getElementById('monster-cooldown-fill');
 const resultMessageEl = document.getElementById('result-message');
 const restartButton = document.getElementById('restart-button');
 const startButton = document.getElementById('start-button');
@@ -32,12 +29,15 @@ const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0])
 // screen below. `activeMonsters` is only populated once a fight starts: one
 // entry ({ monsterId, hp }) per monster in the group, in queue order.
 //
-// Only the front entry (index 0) is shown or fights right now — full
-// multi-monster display, targeting, and independent attacks are the next
-// few milestones, so picking "Two Small Monsters" fights identically to
-// "Small Monster" until then, with the second monster waiting unseen.
+// Every monster in the list gets its own card (see renderMonsterList), but
+// only the front entry (index 0) actually fights right now — targeting and
+// independent attacks are the next two milestones, so a second monster is
+// visible but untouched: full HP, idle cooldown, until then.
 let selectedGroupId = null;
 let activeMonsters = [];
+// DOM refs for the currently rendered monster cards, parallel to whichever
+// list (preview or live) renderMonsterList was last given.
+let monsterCards = [];
 let playerHp = null;
 let fightActive = false;
 const skillTimeouts = new Map();
@@ -115,14 +115,60 @@ function selectMonsterGroup(groupId) {
   saveProgress();
 }
 
+// One combatant card per monster in `monsters` ({ monsterId, hp }[]). Used
+// both for the pre-fight preview (every monster in the chosen group, at full
+// HP) and for the live fight (the real, mutating state) — same shape either
+// way, so one renderer covers both.
+function renderMonsterList(monsters) {
+  monsterListEl.replaceChildren();
+
+  if (monsters.length === 0) {
+    const placeholder = document.createElement('h2');
+    placeholder.textContent = 'No monster selected';
+    monsterListEl.append(placeholder);
+    monsterCards = [];
+    return;
+  }
+
+  monsterCards = monsters.map(({ monsterId, hp }) => {
+    const monster = MONSTERS[monsterId];
+
+    const name = document.createElement('h2');
+    name.textContent = monster.label;
+
+    const hpEl = document.createElement('span');
+    hpEl.textContent = hp;
+    const hpLine = document.createElement('p');
+    hpLine.append('HP: ', hpEl, ` / ${monster.maxHp}`);
+
+    // An indicator only — not clickable. Only the front card's fill ever
+    // animates right now; the rest sit idle until independent attacks land.
+    const fill = document.createElement('span');
+    fill.className = 'cooldown-fill';
+    const label = document.createElement('span');
+    label.className = 'cooldown-label';
+    label.textContent = 'Attack';
+    const button = document.createElement('button');
+    button.className = 'cooldown-button';
+    button.disabled = true;
+    button.append(fill, label);
+
+    const card = document.createElement('div');
+    card.className = 'combatant';
+    card.append(name, hpLine, button);
+    monsterListEl.append(card);
+
+    return { hpEl, cooldownFillEl: fill };
+  });
+}
+
 // Shows what the current selection would fight, before Start commits to it.
-// Previews only the front monster, matching what a fight actually shows.
 function updateMonsterPreview() {
   const group = selectedGroupId ? MONSTER_GROUPS[selectedGroupId] : null;
-  const monster = group ? MONSTERS[group.monsterIds[0]] : null;
-  monsterNameEl.textContent = monster ? monster.label : 'No monster selected';
-  monsterHpEl.textContent = monster ? monster.maxHp : '—';
-  monsterMaxHpEl.textContent = monster ? monster.maxHp : '—';
+  const monsters = group
+    ? group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }))
+    : [];
+  renderMonsterList(monsters);
   startButton.disabled = !group;
 }
 
@@ -248,7 +294,7 @@ function applySkill(skillId) {
 
   const target = activeMonsters[0];
   target.hp = Math.max(0, target.hp - power);
-  monsterHpEl.textContent = target.hp;
+  monsterCards[0].hpEl.textContent = target.hp;
 
   if (target.hp <= 0) {
     xp += MONSTERS[target.monsterId].xp;
@@ -310,7 +356,7 @@ function monsterAttackTick() {
     return;
   }
 
-  animateCooldownFill(monsterCooldownFillEl, monster.cooldown);
+  animateCooldownFill(monsterCards[0].cooldownFillEl, monster.cooldown);
 }
 
 function endGame(message) {
@@ -340,9 +386,6 @@ function startGame() {
   renderSkillBar();
   skillBarEl.hidden = true;
   startButton.hidden = false;
-
-  monsterCooldownFillEl.style.transition = 'none';
-  monsterCooldownFillEl.style.height = '0%';
 }
 
 function beginFight() {
@@ -350,11 +393,9 @@ function beginFight() {
 
   const group = MONSTER_GROUPS[selectedGroupId];
   activeMonsters = group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }));
+  renderMonsterList(activeMonsters);
 
   const monster = frontMonster();
-  monsterNameEl.textContent = monster.label;
-  monsterHpEl.textContent = activeMonsters[0].hp;
-  monsterMaxHpEl.textContent = monster.maxHp;
 
   fightActive = true;
   startButton.hidden = true;
@@ -366,7 +407,7 @@ function beginFight() {
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
 
-  animateCooldownFill(monsterCooldownFillEl, monster.cooldown);
+  animateCooldownFill(monsterCards[0].cooldownFillEl, monster.cooldown);
   monsterAttackInterval = setInterval(monsterAttackTick, monster.cooldown * 1000);
 }
 
