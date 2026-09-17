@@ -980,7 +980,11 @@ updateXpDisplay();
 updateRegenIndicator();
 applyCompletedQuestRewards();
 updateQuestTracker();
-versionValueEl.textContent = VERSION;
+// The placeholder only ever ships from deploy.yml having stamped a real SHA
+// in; any other copy (local dev, `node --test`, a clone) shows this instead
+// of the literal placeholder token.
+const buildLabel = BUILD_SHA === '__BUILD_SHA__' ? 'unreleased build' : BUILD_SHA;
+versionValueEl.textContent = `${VERSION} (${buildLabel})`;
 setInterval(regenTick, REGEN_TICK_SECONDS * 1000);
 
 const tabButtons = document.querySelectorAll('.tab-button');

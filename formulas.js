@@ -3,6 +3,14 @@
 // separate scheme. Bump it by hand whenever the next `vN` scope ships.
 const VERSION = 'v6';
 
+// Which exact commit is live, for tracing "what code is running" without a
+// separate build-number counter or git tag — the commit SHA already is that
+// identifier. deploy.yml overwrites this placeholder with the short SHA
+// before publishing to Pages; any copy it never touched (a local checkout,
+// `node --test`, a clone) keeps the placeholder, which the About tab shows
+// as "unreleased build" rather than a fake SHA.
+const BUILD_SHA = '__BUILD_SHA__';
+
 const STATS = {
   maxHp: {
     label: 'Max HP',
@@ -417,7 +425,7 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    VERSION, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
+    VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
