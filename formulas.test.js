@@ -1,10 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS,
+  STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill,
-  describeMonster, describeMonsterGroup, advanceRegen,
+  describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   activeQuest, questComplete, describeQuestProgress,
 } = require('./formulas.js');
 
@@ -277,6 +277,36 @@ test('describeMonsterGroup matches describeMonster for a single-monster group', 
 
 test('describeMonsterGroup totals XP across a multi-monster group', () => {
   assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 2 XP total');
+});
+
+// --- Dungeons --------------------------------------------------------------
+
+test('every dungeon defines the full data-object shape', () => {
+  for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
+    assert.ok(dungeon.label, `${dungeonId} is missing a label`);
+    assert.ok(Array.isArray(dungeon.fightIds) && dungeon.fightIds.length > 0, `${dungeonId} has no fights`);
+  }
+});
+
+test('every dungeon fight reuses a real MONSTER_GROUPS entry', () => {
+  for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
+    for (const groupId of dungeon.fightIds) {
+      assert.ok(MONSTER_GROUPS[groupId], `${dungeonId} references unknown group ${groupId}`);
+    }
+  }
+});
+
+test('a dungeon chains more than one fight', () => {
+  for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
+    assert.ok(dungeon.fightIds.length > 1, `${dungeonId} has only one fight, so isn't really a chain`);
+  }
+});
+
+test('describeDungeon lists every fight in order and totals their XP', () => {
+  assert.strictEqual(
+    describeDungeon('goblinGauntlet'),
+    'Small Monster → Small Monster → Medium Monster · 6 XP total',
+  );
 });
 
 // --- Quests --------------------------------------------------------------
