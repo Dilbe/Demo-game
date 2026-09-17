@@ -1,3 +1,8 @@
+// Low-ceremony versioning: matches the `vN` milestone-scope naming DESIGN.md
+// already uses (v1 stats/skills, ..., v6 quests) rather than inventing a
+// separate scheme. Bump it by hand whenever the next `vN` scope ships.
+const VERSION = 'v6';
+
 const STATS = {
   maxHp: {
     label: 'Max HP',
@@ -412,7 +417,7 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
+    VERSION, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,

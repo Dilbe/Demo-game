@@ -21,6 +21,7 @@ const skillSlotsEl = document.getElementById('skill-slots');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 const questTrackerEl = document.getElementById('quest-tracker');
+const versionValueEl = document.getElementById('version-value');
 
 const REGEN_TICK_SECONDS = 1;
 
@@ -979,6 +980,7 @@ updateXpDisplay();
 updateRegenIndicator();
 applyCompletedQuestRewards();
 updateQuestTracker();
+versionValueEl.textContent = VERSION;
 setInterval(regenTick, REGEN_TICK_SECONDS * 1000);
 
 const tabButtons = document.querySelectorAll('.tab-button');

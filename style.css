@@ -345,3 +345,16 @@ body {
   font-size: 1rem;
   padding: 0.5rem 1.5rem;
 }
+
+.about-blurb {
+  max-width: 28rem;
+  margin: 0 auto 1.5rem;
+  text-align: left;
+  color: #333;
+  line-height: 1.5;
+}
+
+#version-label {
+  color: #555;
+  font-size: 0.9rem;
+}

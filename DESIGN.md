@@ -258,6 +258,8 @@ A small, standalone addition: a place that explains what the project is, plus a 
 1. About tab shell — new tab alongside Fight/Character(/Skills), navigable like the others.
 2. About content — a short blurb on what the project is (a from-scratch learning project, not a product), plus a version number shown on the page. Exact versioning scheme (simple incrementing `v0.x`, semantic versioning, etc.) is a detail to decide when building this — keep it low-ceremony, consistent with the rest of the project.
 
+**About tab status: done.** Both milestones complete. Landed on the lowest-ceremony scheme available: `VERSION` in `formulas.js` just reuses the `vN` milestone-scope label DESIGN.md already gives each release (currently `v6`, since quests was the most recently completed scope) rather than inventing a separate semantic-versioning number that would need its own bump rules. It's bumped by hand whenever the next `vN` scope ships. The About tab itself is always visible like Fight, never gated behind a quest (its nav button has no `hidden` attribute, unlike Character/Skills) — matching the "other tabs... remain always visible" note in the v6 scope.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

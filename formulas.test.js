@@ -1,12 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
+  VERSION, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   activeQuest, questComplete, describeQuestProgress,
 } = require('./formulas.js');
+
+// --- Version ---------------------------------------------------------
+
+test('VERSION follows the vN milestone-scope naming', () => {
+  assert.match(VERSION, /^v\d+$/);
+});
 
 // --- Formula maths -----------------------------------------------------
 // Exercised on a temporary fixture stat, so rebalancing the real stats
