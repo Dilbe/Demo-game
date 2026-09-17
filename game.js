@@ -840,7 +840,8 @@ function renderSkillSlots() {
     label.className = 'cooldown-label';
     label.textContent = skillId ? SKILLS[skillId].label : 'Empty';
 
-    const box = document.createElement('div');
+    const box = document.createElement('button');
+    box.type = 'button';
     box.className = 'cooldown-button skill-slot';
     box.append(label);
 
