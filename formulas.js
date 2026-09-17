@@ -66,6 +66,37 @@ const STATS = {
   },
 };
 
+// A monster is data for the same reason stats and skills are: adding one should
+// be a data entry rather than new fight logic. Small is the monster the game has
+// always had — 5 HP, 1 damage every 3 seconds, 1 XP — now described as data.
+// `xp` is part of the template because otherwise a tougher monster would be
+// strictly worse to pick: more HP to chew through for the same reward.
+const MONSTERS = {
+  small: {
+    label: 'Small Monster',
+    maxHp: 5,
+    damage: 1,
+    cooldown: 3,
+    xp: 1,
+  },
+
+  medium: {
+    label: 'Medium Monster',
+    maxHp: 15,
+    damage: 2,
+    cooldown: 3,
+    xp: 4,
+  },
+
+  big: {
+    label: 'Big Monster',
+    maxHp: 40,
+    damage: 4,
+    cooldown: 4,
+    xp: 12,
+  },
+};
+
 // Basic Attack is the ability the Fight tab has always had, now described as
 // data. `unlockCost` is XP paid once; `pointCost` is Skill Points held for as
 // long as the skill stays equipped.
@@ -158,6 +189,11 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }) {
   return `${effect}, ${cooldown}s cooldown${skill.auto ? ', automatic' : ''}`;
 }
 
+function describeMonster(monsterId) {
+  const monster = MONSTERS[monsterId];
+  return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${monster.xp} XP`;
+}
+
 function statValue(statId, level) {
   return STATS[statId].value(level);
 }
@@ -170,8 +206,9 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    STATS, SKILLS, STARTING_SKILLS,
+    STATS, SKILLS, STARTING_SKILLS, MONSTERS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
+    describeMonster,
   };
 }
