@@ -266,7 +266,7 @@ A small, standalone addition: a place that explains what the project is, plus a 
 
 A pass over rough edges across the Skills tab and the Fight tab — not a new feature, just smoothing out things that already work but feel unfinished.
 
-- **Skills tab redesign:** the unlocked-skills list becomes a row of squares styled like the in-combat skill buttons (same icon/label), instead of today's list of rows. Clicking a square opens a detail view of that skill's stats and upgrade tracks — the info today's row shows inline, just moved behind a click. Dragging a square onto a slot bar box still equips it, same as today.
+- **Skills tab redesign:** the unlocked-skills list becomes a row of squares styled like the in-combat skill buttons (same icon/label), instead of today's list of rows. The equipped-skill slot boxes at the bottom get the same square look (today they're visually a plain div, not matching the buttons above them). Clicking any square — unlocked-list or equipped-slot — opens a detail view of that skill's stats and upgrade tracks — the info today's row shows inline, just moved behind a click. Dragging a square onto a slot bar box still equips it, same as today.
 - **Skill-points shortfall message:** dropping a skill onto a slot when doing so would exceed the Skill Points budget currently just silently fails (`equipInSlot` returns early with no feedback). Replace that with a visible message.
 - **Group-kill XP bonus:** killing a monster that's part of a multi-monster group (Two Small Monsters, and any future multi-monster group) grants a compounding ×1.25 XP bonus per kill within that group — 1st kill in the group at normal XP, 2nd at ×1.25, 3rd at ×1.25² = ×1.5625, and so on. Single-monster fights are unaffected.
 - **Dungeon-clear bonus XP:** clearing every fight in a dungeon awards a bonus XP amount on top of what its monsters already paid out, defined per dungeon (`DUNGEONS.<id>.completionBonusXp`) — same data-object pattern as everything else, so tuning it later is a data edit.
@@ -275,8 +275,8 @@ A pass over rough edges across the Skills tab and the Fight tab — not a new fe
 
 ### v7 milestones
 
-1. Skills tab: unlocked-skill squares — replace the unlocked-skills list rows with squares styled like the in-combat skill buttons; dragging a square onto a slot bar box still equips it exactly as today.
-2. Skills tab: click-to-inspect — clicking a square opens a detail panel for that skill showing its current stats and upgrade tracks.
+1. Skills tab: unlocked-skill squares — replace the unlocked-skills list rows with squares styled like the in-combat skill buttons, and give the equipped-slot boxes the same square look; dragging a square onto a slot bar box still equips it exactly as today.
+2. Skills tab: click-to-inspect — clicking a square (unlocked-list or equipped-slot) opens a detail panel for that skill showing its current stats and upgrade tracks.
 3. Skill-points shortfall message — report a visible message instead of silently refusing when a drop would exceed the Skill Points budget.
 4. Group-kill XP bonus — kills inside a multi-monster group compound ×1.25 per kill in that group; single-monster fights unaffected.
 5. Dungeon-clear bonus XP — add `completionBonusXp` per dungeon in `DUNGEONS`, paid out once alongside the dungeon-complete result.
