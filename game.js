@@ -314,8 +314,11 @@ document.addEventListener('keydown', (event) => {
   useSkill(button.dataset.skill);
 });
 
-// The cooldown runs first and the effect lands when it finishes, matching how
-// the original attack button behaved.
+// The effect lands at skill.triggerAt (a fraction of the cooldown — 0 fires
+// immediately, 1 only once the cooldown finishes), independently of the
+// button re-enabling / auto-retrigger, which always waits for the full
+// cooldown. Two separate timeouts, so a skill with triggerAt < 1 can still
+// only be used again once its whole cooldown is over.
 function useSkill(skillId) {
   if (!fightActive || skillTimeouts.has(skillId)) return;
 
@@ -325,14 +328,17 @@ function useSkill(skillId) {
   button.disabled = true;
   animateCooldownFill(button.querySelector('.cooldown-fill'), cooldown);
 
-  skillTimeouts.set(skillId, setTimeout(() => {
+  const effectTimeout = setTimeout(() => applySkill(skillId), cooldown * skill.triggerAt * 1000);
+
+  const cooldownTimeout = setTimeout(() => {
     skillTimeouts.delete(skillId);
-    applySkill(skillId);
 
     if (!fightActive) return;
     if (skill.auto) useSkill(skillId);
     else button.disabled = false;
-  }, cooldown * 1000));
+  }, cooldown * 1000);
+
+  skillTimeouts.set(skillId, [effectTimeout, cooldownTimeout]);
 }
 
 function applySkill(skillId) {
@@ -458,7 +464,10 @@ function monsterAttackTick(index) {
 function stopFightTimers() {
   monsterAttackIntervals.forEach(clearInterval);
   monsterAttackIntervals = [];
-  for (const timeout of skillTimeouts.values()) clearTimeout(timeout);
+  // Each skill has two timeouts (its effect, and its cooldown finishing —
+  // see useSkill) that both need clearing, or a not-yet-fired effect could
+  // still land after the fight is already over.
+  for (const timeouts of skillTimeouts.values()) timeouts.forEach(clearTimeout);
   skillTimeouts.clear();
 }
 
