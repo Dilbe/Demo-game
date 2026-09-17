@@ -1,10 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
+  STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill,
   describeMonster, describeMonsterGroup, advanceRegen,
+  activeQuest, questComplete, describeQuestProgress,
 } = require('./formulas.js');
 
 // --- Formula maths -----------------------------------------------------
@@ -276,6 +277,52 @@ test('describeMonsterGroup matches describeMonster for a single-monster group', 
 
 test('describeMonsterGroup totals XP across a multi-monster group', () => {
   assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 2 XP total');
+});
+
+// --- Quests --------------------------------------------------------------
+
+test('every quest defines the full data-object shape', () => {
+  for (const quest of QUESTS) {
+    for (const field of ['id', 'description', 'target', 'reward']) {
+      assert.ok(quest[field] !== undefined, `${quest.id ?? '?'} is missing ${field}`);
+    }
+    assert.ok(quest.target > 0, `${quest.id} has a non-positive target`);
+    assert.ok(quest.reward.type, `${quest.id}'s reward has no type`);
+  }
+});
+
+test('quest ids are unique', () => {
+  const ids = QUESTS.map((quest) => quest.id);
+  assert.strictEqual(new Set(ids).size, ids.length, 'QUESTS has duplicate ids');
+});
+
+test('killFive unlocks the Character tab and killTen unlocks the Skills tab', () => {
+  const killFive = QUESTS.find((quest) => quest.id === 'killFive');
+  const killTen = QUESTS.find((quest) => quest.id === 'killTen');
+  assert.deepStrictEqual(killFive.reward, { type: 'unlockTab', tabId: 'character-tab' });
+  assert.deepStrictEqual(killTen.reward, { type: 'unlockTab', tabId: 'skills-tab' });
+});
+
+test('activeQuest returns quests in order, skipping completed ones', () => {
+  assert.strictEqual(activeQuest([]).id, QUESTS[0].id);
+  assert.strictEqual(activeQuest([QUESTS[0].id]).id, QUESTS[1].id);
+});
+
+test('activeQuest returns null once every quest is completed', () => {
+  assert.strictEqual(activeQuest(QUESTS.map((quest) => quest.id)), null);
+});
+
+test('questComplete is true once the kill count reaches the target, not before', () => {
+  const quest = { target: 5 };
+  assert.strictEqual(questComplete(quest, 4), false);
+  assert.strictEqual(questComplete(quest, 5), true);
+  assert.strictEqual(questComplete(quest, 6), true);
+});
+
+test('describeQuestProgress reports progress capped at the target', () => {
+  const quest = { description: 'Kill 5 enemies', target: 5 };
+  assert.strictEqual(describeQuestProgress(quest, 3), 'Kill 5 enemies (3/5)');
+  assert.strictEqual(describeQuestProgress(quest, 9), 'Kill 5 enemies (5/5)');
 });
 
 // --- advanceRegen --------------------------------------------------------

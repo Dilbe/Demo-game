@@ -19,6 +19,7 @@ const skillListEl = document.getElementById('skill-list');
 const skillSlotsEl = document.getElementById('skill-slots');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
+const questTrackerEl = document.getElementById('quest-tracker');
 
 const REGEN_TICK_SECONDS = 1;
 
@@ -61,6 +62,12 @@ let skillLevels = Object.fromEntries(
   ])
 );
 let xp = 0;
+// Total enemies defeated across every fight, ever — separate from XP because
+// quests key off it directly rather than off however XP happens to convert.
+let totalKills = 0;
+// Quest ids completed so far, in the order they were completed (which is
+// always QUESTS order, since quests only ever complete sequentially).
+let completedQuestIds = [];
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
 function animateCooldownFill(fillEl, durationSeconds) {
@@ -379,6 +386,7 @@ function applySkill(skillId) {
   if (target.hp <= 0) {
     xp += MONSTERS[target.monsterId].xp;
     updateXpDisplay();
+    registerKill();
     defeatMonster(targetIndex);
     saveProgress();
 
@@ -788,8 +796,51 @@ function upgradeSkillTrack(skillId, upgradeId) {
   saveProgress();
 }
 
+// Applies a quest's reward. Only `unlockTab` exists today, but this stays a
+// switch on `reward.type` so a future reward kind (e.g. unlocking a monster)
+// is a new case here, not a change to how completion is detected.
+function applyQuestReward(reward) {
+  if (reward.type === 'unlockTab') {
+    document.querySelector(`.tab-button[data-tab="${reward.tabId}"]`).hidden = false;
+  }
+}
+
+// Re-applies every already-completed quest's reward — used on load, so a
+// returning player's unlocked tabs reflect their save rather than starting
+// hidden again.
+function applyCompletedQuestRewards() {
+  for (const questId of completedQuestIds) {
+    const quest = QUESTS.find((q) => q.id === questId);
+    if (quest) applyQuestReward(quest.reward);
+  }
+}
+
+function updateQuestTracker() {
+  const quest = activeQuest(completedQuestIds);
+  questTrackerEl.hidden = !quest;
+  if (!quest) return;
+
+  questTrackerEl.textContent = describeQuestProgress(quest, totalKills);
+}
+
+// Called once per enemy defeated. A `while` (rather than an `if`) covers a
+// quest whose target the kill counter has already passed, so progression
+// never stalls even if a future quest's target is skipped over in one kill.
+function registerKill() {
+  totalKills += 1;
+
+  let quest = activeQuest(completedQuestIds);
+  while (quest && questComplete(quest, totalKills)) {
+    completedQuestIds.push(quest.id);
+    applyQuestReward(quest.reward);
+    quest = activeQuest(completedQuestIds);
+  }
+
+  updateQuestTracker();
+}
+
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedGroupId }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedGroupId, totalKills, completedQuestIds }));
 }
 
 function loadProgress() {
@@ -804,6 +855,8 @@ function loadProgress() {
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
   if (saved.skillLevels) Object.assign(skillLevels, saved.skillLevels);
   if (saved.selectedGroupId) selectedGroupId = saved.selectedGroupId;
+  if (saved.totalKills) totalKills = saved.totalKills;
+  if (saved.completedQuestIds) completedQuestIds = saved.completedQuestIds;
 }
 
 function resetCharacter() {
@@ -821,6 +874,8 @@ if (playerHp === null) playerHp = statValue('maxHp', stats.maxHp);
 startGame();
 updateXpDisplay();
 updateRegenIndicator();
+applyCompletedQuestRewards();
+updateQuestTracker();
 setInterval(regenTick, REGEN_TICK_SECONDS * 1000);
 
 const tabButtons = document.querySelectorAll('.tab-button');
