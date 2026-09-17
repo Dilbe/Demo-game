@@ -21,16 +21,18 @@
   </nav>
 
   <section id="fight-tab" class="tab-panel">
+    <div id="monster-select"></div>
+
     <div class="combatant" id="monster">
-      <h2 id="monster-name">Monster</h2>
-      <p>HP: <span id="monster-hp">5</span> / <span id="monster-max-hp">5</span></p>
+      <h2 id="monster-name">No monster selected</h2>
+      <p>HP: <span id="monster-hp">—</span> / <span id="monster-max-hp">—</span></p>
       <button id="monster-attack-indicator" class="cooldown-button" disabled>
         <span class="cooldown-fill" id="monster-cooldown-fill"></span>
         <span class="cooldown-label">Attack</span>
       </button>
     </div>
 
-    <button id="start-button">Start</button>
+    <button id="start-button" disabled>Start</button>
 
     <div id="skill-bar" hidden></div>
 

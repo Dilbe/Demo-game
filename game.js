@@ -1,3 +1,4 @@
+const monsterSelectEl = document.getElementById('monster-select');
 const monsterNameEl = document.getElementById('monster-name');
 const monsterHpEl = document.getElementById('monster-hp');
 const monsterMaxHpEl = document.getElementById('monster-max-hp');
@@ -27,9 +28,11 @@ const SAVE_KEY = 'demo-game-save';
 // Derived from STATS so a new stat needs defining in one place only.
 const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0]));
 
-// The monster this fight is against. Fixed to Small for now — picking one
-// is the next milestone.
-let activeMonster = MONSTERS.small;
+// The player's current pick from MONSTERS, chosen on the selection screen
+// below. `activeMonster` is only set once a fight actually starts, so it
+// stays null while a monster is merely selected but not yet fought.
+let selectedMonsterId = null;
+let activeMonster = null;
 let monsterHp;
 let playerHp = null;
 let fightActive = false;
@@ -67,6 +70,54 @@ function upgradeStat(statId) {
   updateRegenIndicator();
   updateXpDisplay();
   saveProgress();
+}
+
+// One row per monster in the data, same pattern as renderStats/renderSkills.
+// Disabled entirely mid-fight — the opponent can't change once a fight starts.
+function renderMonsterSelect() {
+  monsterSelectEl.replaceChildren();
+
+  for (const [monsterId, monster] of Object.entries(MONSTERS)) {
+    const selected = monsterId === selectedMonsterId;
+
+    const name = document.createElement('span');
+    name.className = 'monster-name';
+    name.textContent = monster.label;
+
+    const detail = document.createElement('span');
+    detail.className = 'monster-detail';
+    detail.textContent = describeMonster(monsterId);
+
+    const button = document.createElement('button');
+    button.className = 'monster-select-button';
+    button.textContent = selected ? 'Selected' : 'Select';
+    button.disabled = fightActive || selected;
+    button.addEventListener('click', () => selectMonster(monsterId));
+
+    const row = document.createElement('div');
+    row.className = 'monster-row';
+    row.classList.toggle('selected', selected);
+    row.append(name, detail, button);
+    monsterSelectEl.append(row);
+  }
+}
+
+function selectMonster(monsterId) {
+  if (fightActive) return;
+
+  selectedMonsterId = monsterId;
+  renderMonsterSelect();
+  updateMonsterPreview();
+  saveProgress();
+}
+
+// Shows what the current selection would fight, before Start commits to it.
+function updateMonsterPreview() {
+  const monster = selectedMonsterId ? MONSTERS[selectedMonsterId] : null;
+  monsterNameEl.textContent = monster ? monster.label : 'No monster selected';
+  monsterHpEl.textContent = monster ? monster.maxHp : '—';
+  monsterMaxHpEl.textContent = monster ? monster.maxHp : '—';
+  startButton.disabled = !monster;
 }
 
 function renderStats() {
@@ -263,11 +314,13 @@ function endGame(message) {
 
 function startGame() {
   fightActive = false;
-  monsterHp = activeMonster.maxHp;
-  monsterNameEl.textContent = activeMonster.label;
-  monsterHpEl.textContent = monsterHp;
-  monsterMaxHpEl.textContent = activeMonster.maxHp;
+  activeMonster = null;
+  monsterHp = null;
   updateHealthBar();
+
+  renderMonsterSelect();
+  updateMonsterPreview();
+  monsterSelectEl.hidden = false;
 
   resultMessageEl.hidden = true;
   restartButton.hidden = true;
@@ -281,8 +334,17 @@ function startGame() {
 }
 
 function beginFight() {
+  if (!selectedMonsterId) return;
+
+  activeMonster = MONSTERS[selectedMonsterId];
+  monsterHp = activeMonster.maxHp;
+  monsterNameEl.textContent = activeMonster.label;
+  monsterHpEl.textContent = monsterHp;
+  monsterMaxHpEl.textContent = activeMonster.maxHp;
+
   fightActive = true;
   startButton.hidden = true;
+  monsterSelectEl.hidden = true;
   skillBarEl.hidden = false;
 
   for (const skillId of equippedSkills) {
@@ -432,7 +494,7 @@ function upgradeSkillTrack(skillId, track) {
 }
 
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedMonsterId }));
 }
 
 function loadProgress() {
@@ -446,6 +508,7 @@ function loadProgress() {
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills;
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
   if (saved.skillLevels) Object.assign(skillLevels, saved.skillLevels);
+  if (saved.selectedMonsterId) selectedMonsterId = saved.selectedMonsterId;
 }
 
 function resetCharacter() {

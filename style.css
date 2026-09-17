@@ -8,6 +8,38 @@ body {
   margin: 1.5rem auto;
 }
 
+#monster-select {
+  margin: 0 auto 1.5rem;
+}
+
+.monster-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0.75rem auto;
+}
+
+.monster-row.selected {
+  font-weight: bold;
+}
+
+.monster-name {
+  width: 8rem;
+  text-align: right;
+}
+
+.monster-detail {
+  width: 16rem;
+  text-align: left;
+  color: #555;
+}
+
+.monster-select-button {
+  font-size: 1rem;
+  padding: 0.4rem 1rem;
+}
+
 #health-bar {
   position: relative;
   width: 16rem;
