@@ -61,6 +61,15 @@ function animateCooldownFill(fillEl, durationSeconds) {
   fillEl.style.height = '0%';
 }
 
+// Snaps a cooldown fill to empty and drops whatever CSS transition was in
+// flight. Clearing the JS interval/timeout that would schedule the *next*
+// attack does nothing on its own to a transition already running on the
+// element — it would otherwise keep visibly animating on its own.
+function resetCooldownFill(fillEl) {
+  fillEl.style.transition = 'none';
+  fillEl.style.height = '0%';
+}
+
 restartButton.addEventListener('click', startGame);
 startButton.addEventListener('click', beginFight);
 retreatButton.addEventListener('click', retreat);
@@ -160,7 +169,8 @@ function renderMonsterList(monsters, { interactive = false } = {}) {
     hpLine.append('HP: ', hpEl, ` / ${monster.maxHp}`);
 
     // An indicator only — not clickable itself; each monster's own attack
-    // interval animates its fill.
+    // interval animates its fill. Hidden outside an active fight, the same
+    // as the player's own skill bar — there's nothing to indicate yet.
     const fill = document.createElement('span');
     fill.className = 'cooldown-fill';
     const label = document.createElement('span');
@@ -169,6 +179,7 @@ function renderMonsterList(monsters, { interactive = false } = {}) {
     const button = document.createElement('button');
     button.className = 'cooldown-button';
     button.disabled = true;
+    button.hidden = !interactive;
     button.append(fill, label);
 
     const card = document.createElement('div');
@@ -360,8 +371,7 @@ function defeatMonster(index) {
   card.cardEl.classList.add('defeated');
   if (card.badgeEl) card.badgeEl.hidden = true;
   card.cardEl.querySelector('.cooldown-label').textContent = 'Defeated';
-  card.cooldownFillEl.style.transition = 'none';
-  card.cooldownFillEl.style.height = '0%';
+  resetCooldownFill(card.cooldownFillEl);
 }
 
 function updateHealthBar() {
@@ -386,20 +396,33 @@ function updateRegenIndicator() {
 // Progress accumulates against the *current* seconds-per-HP rather than being
 // scheduled, so upgrading Health Regen applies immediately instead of
 // discarding the wait already served.
+//
+// Driven by real elapsed time (see advanceRegen) rather than counting ticks,
+// because a browser throttles setInterval once its tab is backgrounded — a
+// 1-second timer can end up firing only once a minute. Without this, regen
+// already in progress would still land on the rare tick that does fire, but
+// the next one would take far longer than it should to even start.
+let lastRegenTimestamp = Date.now();
+
 function regenTick() {
-  const maxHp = statValue('maxHp', stats.maxHp);
+  const now = Date.now();
+  const elapsedSeconds = (now - lastRegenTimestamp) / 1000;
+  lastRegenTimestamp = now;
 
-  if (playerHp >= maxHp) {
-    regenProgress = 0;
-  } else {
-    regenProgress += REGEN_TICK_SECONDS;
+  const result = advanceRegen({
+    hp: playerHp,
+    maxHp: statValue('maxHp', stats.maxHp),
+    progress: regenProgress,
+    secondsPerHp: statValue('healthRegen', stats.healthRegen),
+  }, elapsedSeconds);
 
-    if (regenProgress >= statValue('healthRegen', stats.healthRegen)) {
-      regenProgress = 0;
-      playerHp += 1;
-      updateHealthBar();
-      saveProgress();
-    }
+  const healed = result.hp !== playerHp;
+  playerHp = result.hp;
+  regenProgress = result.progress;
+
+  if (healed) {
+    updateHealthBar();
+    saveProgress();
   }
 
   updateRegenIndicator();
@@ -435,7 +458,16 @@ function stopFightTimers() {
 function endGame(message) {
   fightActive = false;
   stopFightTimers();
-  skillBarEl.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+
+  // stopFightTimers only stops the JS timers that would schedule the *next*
+  // attack; any cooldown fill whose CSS transition was already running (a
+  // monster mid-attack, or a skill mid-cooldown) would otherwise keep
+  // visibly animating on its own after the fight is over.
+  monsterCards.forEach((card) => resetCooldownFill(card.cooldownFillEl));
+  skillBarEl.querySelectorAll('button').forEach((button) => {
+    button.disabled = true;
+    resetCooldownFill(button.querySelector('.cooldown-fill'));
+  });
   retreatButton.hidden = true;
 
   resultMessageEl.textContent = message;

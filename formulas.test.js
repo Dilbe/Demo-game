@@ -4,7 +4,7 @@ const {
   STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
-  describeMonster, describeMonsterGroup,
+  describeMonster, describeMonsterGroup, advanceRegen,
 } = require('./formulas.js');
 
 // --- Formula maths -----------------------------------------------------
@@ -248,4 +248,32 @@ test('describeMonsterGroup matches describeMonster for a single-monster group', 
 
 test('describeMonsterGroup totals XP across a multi-monster group', () => {
   assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 2 XP total');
+});
+
+// --- advanceRegen --------------------------------------------------------
+
+test('advanceRegen accumulates progress without healing before the threshold', () => {
+  const result = advanceRegen({ hp: 10, maxHp: 20, progress: 0, secondsPerHp: 60 }, 30);
+  assert.deepStrictEqual(result, { hp: 10, progress: 30 });
+});
+
+test('advanceRegen heals exactly one HP when progress reaches the threshold', () => {
+  const result = advanceRegen({ hp: 10, maxHp: 20, progress: 50, secondsPerHp: 60 }, 10);
+  assert.deepStrictEqual(result, { hp: 11, progress: 0 });
+});
+
+test('advanceRegen catches up multiple HP from a single large gap (a throttled/backgrounded tab)', () => {
+  const result = advanceRegen({ hp: 10, maxHp: 20, progress: 0, secondsPerHp: 60 }, 185);
+  // 185s / 60s-per-HP = 3 HP healed, 5s progress left over.
+  assert.deepStrictEqual(result, { hp: 13, progress: 5 });
+});
+
+test('advanceRegen stops at maxHp and does not carry leftover progress past full', () => {
+  const result = advanceRegen({ hp: 19, maxHp: 20, progress: 0, secondsPerHp: 60 }, 600);
+  assert.deepStrictEqual(result, { hp: 20, progress: 0 });
+});
+
+test('advanceRegen is a no-op once already at maxHp', () => {
+  const result = advanceRegen({ hp: 20, maxHp: 20, progress: 45, secondsPerHp: 60 }, 100);
+  assert.deepStrictEqual(result, { hp: 20, progress: 0 });
 });

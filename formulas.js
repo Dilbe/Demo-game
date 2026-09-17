@@ -219,6 +219,28 @@ function describeMonsterGroup(groupId) {
   return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${totalXp} XP total`;
 }
 
+// Advances passive HP regen by however much real time has actually passed,
+// rather than assuming one call equals one fixed-size tick. A browser
+// throttles setInterval heavily once its tab is backgrounded — a 1-second
+// timer can end up firing only once a minute — so driving regen off elapsed
+// wall-clock time (instead of counting ticks) means a long gap still credits
+// the HP it should, catching up in one step instead of nearly stalling.
+function advanceRegen({ hp, maxHp, progress, secondsPerHp }, elapsedSeconds) {
+  if (hp >= maxHp) return { hp, progress: 0 };
+
+  let newHp = hp;
+  let newProgress = progress + elapsedSeconds;
+
+  while (newProgress >= secondsPerHp && newHp < maxHp) {
+    newProgress -= secondsPerHp;
+    newHp += 1;
+  }
+
+  if (newHp >= maxHp) newProgress = 0;
+
+  return { hp: newHp, progress: newProgress };
+}
+
 function statValue(statId, level) {
   return STATS[statId].value(level);
 }
@@ -234,6 +256,6 @@ if (typeof module !== 'undefined') {
     STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
-    describeMonster, describeMonsterGroup,
+    describeMonster, describeMonsterGroup, advanceRegen,
   };
 }
