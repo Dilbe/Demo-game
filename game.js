@@ -28,13 +28,14 @@ const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0])
 // The player's current pick from MONSTER_GROUPS, chosen on the selection
 // screen below. `activeMonsters` is only populated once a fight starts: one
 // entry ({ monsterId, hp }) per monster in the group, in queue order.
-//
-// Every monster in the list gets its own card (see renderMonsterList), but
-// only the front entry (index 0) actually fights right now — targeting and
-// independent attacks are the next two milestones, so a second monster is
-// visible but untouched: full HP, idle cooldown, until then.
 let selectedGroupId = null;
 let activeMonsters = [];
+// Which entry of activeMonsters the player's own attacks hit — selectable by
+// clicking a card once more than one monster is active, defaulting to the
+// front. The front monster (index 0) is still the only one that attacks the
+// player; giving every monster its own independent attack is the next
+// milestone.
+let targetIndex = 0;
 // DOM refs for the currently rendered monster cards, parallel to whichever
 // list (preview or live) renderMonsterList was last given.
 let monsterCards = [];
@@ -117,9 +118,13 @@ function selectMonsterGroup(groupId) {
 
 // One combatant card per monster in `monsters` ({ monsterId, hp }[]). Used
 // both for the pre-fight preview (every monster in the chosen group, at full
-// HP) and for the live fight (the real, mutating state) — same shape either
-// way, so one renderer covers both.
-function renderMonsterList(monsters) {
+// HP, not clickable) and for the live fight (the real, mutating state) —
+// same shape either way, so one renderer covers both.
+//
+// `interactive` makes cards clickable to change the attack target, but only
+// when there's more than one monster to choose between — a single monster is
+// always the target, so no click affordance is shown for it.
+function renderMonsterList(monsters, { interactive = false } = {}) {
   monsterListEl.replaceChildren();
 
   if (monsters.length === 0) {
@@ -130,19 +135,31 @@ function renderMonsterList(monsters) {
     return;
   }
 
-  monsterCards = monsters.map(({ monsterId, hp }) => {
+  const targetable = interactive && monsters.length > 1;
+
+  monsterCards = monsters.map(({ monsterId, hp }, index) => {
     const monster = MONSTERS[monsterId];
 
     const name = document.createElement('h2');
     name.textContent = monster.label;
+
+    let badge = null;
+    if (targetable) {
+      badge = document.createElement('span');
+      badge.className = 'target-badge';
+      badge.textContent = 'Target';
+      badge.hidden = true;
+      name.append(' ', badge);
+    }
 
     const hpEl = document.createElement('span');
     hpEl.textContent = hp;
     const hpLine = document.createElement('p');
     hpLine.append('HP: ', hpEl, ` / ${monster.maxHp}`);
 
-    // An indicator only — not clickable. Only the front card's fill ever
-    // animates right now; the rest sit idle until independent attacks land.
+    // An indicator only — not clickable itself. Only the front card's fill
+    // ever animates right now; the rest sit idle until independent attacks
+    // land in the next milestone.
     const fill = document.createElement('span');
     fill.className = 'cooldown-fill';
     const label = document.createElement('span');
@@ -156,9 +173,32 @@ function renderMonsterList(monsters) {
     const card = document.createElement('div');
     card.className = 'combatant';
     card.append(name, hpLine, button);
+
+    if (targetable) {
+      card.classList.add('targetable');
+      card.addEventListener('click', () => {
+        if (!fightActive) return;
+        targetIndex = index;
+        updateTargetHighlight();
+      });
+    }
+
     monsterListEl.append(card);
 
-    return { hpEl, cooldownFillEl: fill };
+    return { cardEl: card, hpEl, cooldownFillEl: fill, badgeEl: badge };
+  });
+
+  if (targetable) updateTargetHighlight();
+}
+
+// Highlights whichever card is currently targeted, without rebuilding the
+// cards — a rebuild would wipe the front monster's in-progress cooldown
+// animation.
+function updateTargetHighlight() {
+  monsterCards.forEach((card, index) => {
+    const isTarget = index === targetIndex;
+    card.cardEl.classList.toggle('targeted', isTarget);
+    if (card.badgeEl) card.badgeEl.hidden = !isTarget;
   });
 }
 
@@ -292,9 +332,9 @@ function applySkill(skillId) {
     return;
   }
 
-  const target = activeMonsters[0];
+  const target = activeMonsters[targetIndex];
   target.hp = Math.max(0, target.hp - power);
-  monsterCards[0].hpEl.textContent = target.hp;
+  monsterCards[targetIndex].hpEl.textContent = target.hp;
 
   if (target.hp <= 0) {
     xp += MONSTERS[target.monsterId].xp;
@@ -393,7 +433,8 @@ function beginFight() {
 
   const group = MONSTER_GROUPS[selectedGroupId];
   activeMonsters = group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }));
-  renderMonsterList(activeMonsters);
+  targetIndex = 0;
+  renderMonsterList(activeMonsters, { interactive: true });
 
   const monster = frontMonster();
 
