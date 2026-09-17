@@ -16,6 +16,7 @@ const slotsTotalEl = document.getElementById('slots-total');
 const pointsUsedEl = document.getElementById('points-used');
 const pointsTotalEl = document.getElementById('points-total');
 const skillListEl = document.getElementById('skill-list');
+const skillSlotsEl = document.getElementById('skill-slots');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 
@@ -46,7 +47,9 @@ const skillTimeouts = new Map();
 let monsterAttackIntervals = [];
 let regenProgress = 0;
 let unlockedSkills = [...STARTING_SKILLS];
-// Order matters: it decides the order of the fight bar and therefore the hotkeys.
+// One entry per skill slot, in slot order — a skillId, or null/undefined for
+// an empty slot. Index order also decides the fight bar's order and
+// therefore its hotkeys (see equippedSkillIds).
 let equippedSkills = [...STARTING_SKILLS];
 // Per-skill upgrade tracks, replacing the old global Attack Damage/Speed
 // stats. Derived from each skill's own `upgrades` array so this doesn't
@@ -81,6 +84,15 @@ restartButton.addEventListener('click', startGame);
 startButton.addEventListener('click', beginFight);
 retreatButton.addEventListener('click', retreat);
 resetCharacterButton.addEventListener('click', resetCharacter);
+
+// Dropping a skill back onto the list unequips it — the list itself is a
+// fixed element (only its rows get rebuilt), so this is wired up once here
+// rather than inside renderSkills.
+skillListEl.addEventListener('dragover', (event) => event.preventDefault());
+skillListEl.addEventListener('drop', (event) => {
+  event.preventDefault();
+  unequipSkill(event.dataTransfer.getData('text/plain'));
+});
 
 function upgradeStat(statId) {
   const cost = statCost(statId, stats[statId]);
@@ -266,12 +278,20 @@ function renderStats() {
   }
 }
 
+// The compact list of what's actually equipped, in slot order, with the
+// empty-slot gaps removed — what fight logic and the point/slot counts care
+// about, as opposed to `equippedSkills` itself which also encodes which
+// physical slot each one sits in.
+function equippedSkillIds() {
+  return equippedSkills.filter((skillId) => skillId);
+}
+
 // One button per unlocked skill. Automatic skills get a button too, but only
 // as a cooldown indicator — they fire themselves rather than being clicked.
 function renderSkillBar() {
   skillBarEl.replaceChildren();
 
-  equippedSkills.forEach((skillId, index) => {
+  equippedSkillIds().forEach((skillId, index) => {
     const skill = SKILLS[skillId];
 
     const fill = document.createElement('span');
@@ -533,7 +553,7 @@ function beginFight() {
   skillBarEl.hidden = false;
   retreatButton.hidden = false;
 
-  for (const skillId of equippedSkills) {
+  for (const skillId of equippedSkillIds()) {
     if (SKILLS[skillId].auto) useSkill(skillId);
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
@@ -552,6 +572,7 @@ function updateXpDisplay() {
   skillsXpTotalEl.textContent = xp;
   renderStats();
   renderSkills();
+  renderSkillSlots();
 }
 
 function unlockSkill(skillId) {
@@ -562,7 +583,8 @@ function unlockSkill(skillId) {
   unlockedSkills.push(skillId);
   // Equip straight away when it fits, so buying a skill does something visible
   // rather than needing a second click to matter.
-  if (canEquip(skillId)) equippedSkills.push(skillId);
+  const slot = firstEmptySlotIndex();
+  if (slot !== -1 && canEquip(skillId)) equippedSkills[slot] = skillId;
 
   updateXpDisplay();
   // Rebuilding mid-fight would discard buttons with cooldowns already running,
@@ -572,25 +594,53 @@ function unlockSkill(skillId) {
 }
 
 function pointsUsed() {
-  return equippedSkills.reduce((total, skillId) => total + SKILLS[skillId].pointCost, 0);
+  return equippedSkillIds().reduce((total, skillId) => total + SKILLS[skillId].pointCost, 0);
+}
+
+// The lowest-index slot (within today's Skill Slots count) that's empty, or
+// -1 if every slot is already filled.
+function firstEmptySlotIndex() {
+  const slotCount = statValue('skillSlots', stats.skillSlots);
+  for (let index = 0; index < slotCount; index += 1) {
+    if (!equippedSkills[index]) return index;
+  }
+  return -1;
 }
 
 // Equipping is limited on two axes: slots cap how many skills you carry,
 // points cap how strong that combination is.
 function canEquip(skillId) {
-  return equippedSkills.length < statValue('skillSlots', stats.skillSlots)
+  return equippedSkillIds().length < statValue('skillSlots', stats.skillSlots)
     && pointsUsed() + SKILLS[skillId].pointCost <= statValue('skillPoints', stats.skillPoints);
 }
 
-function toggleEquipped(skillId) {
-  const index = equippedSkills.indexOf(skillId);
+// Equips `skillId` into `slotIndex`, moving it there if it's already
+// equipped somewhere else and bumping out whatever currently sits in that
+// slot. Refuses only if the result would exceed the Skill Points budget —
+// the slot count itself is never at risk, since a drop always targets one
+// of the slots already on screen.
+function equipInSlot(skillId, slotIndex) {
+  if (!skillId || !unlockedSkills.includes(skillId)) return;
+  if (equippedSkills[slotIndex] === skillId) return;
 
-  if (index !== -1) {
-    equippedSkills.splice(index, 1);
-  } else {
-    if (!canEquip(skillId)) return;
-    equippedSkills.push(skillId);
-  }
+  const previousIndex = equippedSkills.indexOf(skillId);
+  const otherIds = equippedSkills.filter((id, index) => id && index !== previousIndex && index !== slotIndex);
+  const projectedPoints = otherIds.reduce((total, id) => total + SKILLS[id].pointCost, 0) + SKILLS[skillId].pointCost;
+  if (projectedPoints > statValue('skillPoints', stats.skillPoints)) return;
+
+  if (previousIndex !== -1) equippedSkills[previousIndex] = null;
+  equippedSkills[slotIndex] = skillId;
+
+  updateXpDisplay();
+  if (!fightActive) renderSkillBar();
+  saveProgress();
+}
+
+function unequipSkill(skillId) {
+  const index = equippedSkills.indexOf(skillId);
+  if (index === -1) return;
+
+  equippedSkills[index] = null;
 
   updateXpDisplay();
   if (!fightActive) renderSkillBar();
@@ -601,7 +651,7 @@ function renderSkills() {
   skillListEl.replaceChildren();
 
   const slots = statValue('skillSlots', stats.skillSlots);
-  slotsUsedEl.textContent = equippedSkills.length;
+  slotsUsedEl.textContent = equippedSkillIds().length;
   slotsTotalEl.textContent = slots;
   pointsUsedEl.textContent = pointsUsed();
   pointsTotalEl.textContent = statValue('skillPoints', stats.skillPoints);
@@ -623,23 +673,29 @@ function renderSkills() {
     cost.className = 'skill-cost';
     cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'}`;
 
-    const action = document.createElement('button');
-    action.className = 'unlock-button';
+    const row = document.createElement('div');
+    row.className = 'skill-row';
 
     if (unlocked) {
-      // Unequipping always works; equipping needs both a free slot and points.
-      action.textContent = equipped ? 'Unequip' : 'Equip';
-      action.disabled = !equipped && !canEquip(skillId);
-      action.addEventListener('click', () => toggleEquipped(skillId));
+      // Draggable so it can be dropped onto a slot to equip it, or (if
+      // already equipped) dragged back here to unequip it. See skill-slots.
+      row.classList.add('draggable');
+      row.classList.toggle('equipped', equipped);
+      row.draggable = true;
+      row.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+
+      const status = document.createElement('span');
+      status.className = 'equip-status';
+      status.textContent = equipped ? 'Equipped' : '';
+      row.append(name, detail, cost, status);
     } else {
+      const action = document.createElement('button');
+      action.className = 'unlock-button';
       action.textContent = `Unlock (${skill.unlockCost} XP)`;
       action.disabled = xp < skill.unlockCost;
       action.addEventListener('click', () => unlockSkill(skillId));
+      row.append(name, detail, cost, action);
     }
-
-    const row = document.createElement('div');
-    row.className = 'skill-row';
-    row.append(name, detail, cost, action);
 
     const entry = document.createElement('div');
     entry.className = 'skill-entry';
@@ -647,6 +703,46 @@ function renderSkills() {
     // Upgrade tracks only make sense once a skill is yours.
     if (unlocked) entry.append(buildUpgradeRow(skillId));
     skillListEl.append(entry);
+  }
+}
+
+// A loadout bar matching the in-combat skill bar's look, one box per Skill
+// Slots level. Drag an unlocked skill from the list onto a slot to equip it
+// there (bumping out whatever was there); drag a filled slot onto another
+// slot to move it, or back onto the list to unequip it.
+function renderSkillSlots() {
+  skillSlotsEl.replaceChildren();
+
+  const slotCount = statValue('skillSlots', stats.skillSlots);
+
+  for (let index = 0; index < slotCount; index += 1) {
+    const skillId = equippedSkills[index];
+
+    const label = document.createElement('span');
+    label.className = 'cooldown-label';
+    label.textContent = skillId ? SKILLS[skillId].label : 'Empty';
+
+    const box = document.createElement('div');
+    box.className = 'cooldown-button skill-slot';
+    box.append(label);
+
+    if (skillId) {
+      box.draggable = true;
+      box.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+    }
+
+    box.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      box.classList.add('drag-over');
+    });
+    box.addEventListener('dragleave', () => box.classList.remove('drag-over'));
+    box.addEventListener('drop', (event) => {
+      event.preventDefault();
+      box.classList.remove('drag-over');
+      equipInSlot(event.dataTransfer.getData('text/plain'), index);
+    });
+
+    skillSlotsEl.append(box);
   }
 }
 
