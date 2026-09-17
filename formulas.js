@@ -127,15 +127,21 @@ const MONSTER_GROUPS = {
 // fights happen in — and reuses MONSTER_GROUPS entries rather than defining
 // its own monsters, so a dungeon is just a sequence of existing fight
 // options, matching the reuse in MONSTER_GROUPS itself.
+// `completionBonusXp` is a flat extra reward paid once, only if every fight
+// in the chain is cleared — Retreat or a loss ends the dungeon (see
+// v5's scope) without paying it, same as it forfeits any fight already in
+// progress. Sized roughly proportional to each dungeon's own monster XP.
 const DUNGEONS = {
   goblinGauntlet: {
     label: 'Goblin Gauntlet',
     fightIds: ['small', 'small', 'medium'],
+    completionBonusXp: 5,
   },
 
   monsterRush: {
     label: 'Monster Rush',
     fightIds: ['small', 'medium', 'big'],
+    completionBonusXp: 10,
   },
 };
 
@@ -404,13 +410,16 @@ function describeQuestProgress(quest, killCount) {
 
 // Chains describeMonsterGroup's summaries with the fight order, plus a
 // running total XP across the whole dungeon — mirrors describeMonsterGroup's
-// own total-XP line (bonus included), just summed over every fight instead
-// of every monster. Each fight is its own group for the bonus's purposes, so
-// this doesn't compound across fights, only within each one.
+// own total-XP line (group-kill bonus included), summed over every fight
+// instead of every monster, plus the dungeon's own completionBonusXp on top
+// (paid only on a full clear, which is exactly what this total assumes).
+// Each fight is its own group for the kill bonus's purposes, so that part
+// doesn't compound across fights, only within each one.
 function describeDungeon(dungeonId) {
-  const { fightIds } = DUNGEONS[dungeonId];
-  const labels = fightIds.map((groupId) => MONSTER_GROUPS[groupId].label);
-  const totalXp = fightIds.reduce((sum, groupId) => sum + groupTotalXp(MONSTER_GROUPS[groupId].monsterIds), 0);
+  const dungeon = DUNGEONS[dungeonId];
+  const labels = dungeon.fightIds.map((groupId) => MONSTER_GROUPS[groupId].label);
+  const monsterXp = dungeon.fightIds.reduce((sum, groupId) => sum + groupTotalXp(MONSTER_GROUPS[groupId].monsterIds), 0);
+  const totalXp = monsterXp + dungeon.completionBonusXp;
   return `${labels.join(' → ')} · ${totalXp} XP total`;
 }
 
