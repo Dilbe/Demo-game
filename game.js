@@ -32,9 +32,7 @@ let selectedGroupId = null;
 let activeMonsters = [];
 // Which entry of activeMonsters the player's own attacks hit — selectable by
 // clicking a card once more than one monster is active, defaulting to the
-// front. The front monster (index 0) is still the only one that attacks the
-// player; giving every monster its own independent attack is the next
-// milestone.
+// front.
 let targetIndex = 0;
 // DOM refs for the currently rendered monster cards, parallel to whichever
 // list (preview or live) renderMonsterList was last given.
@@ -42,7 +40,9 @@ let monsterCards = [];
 let playerHp = null;
 let fightActive = false;
 const skillTimeouts = new Map();
-let monsterAttackInterval;
+// One interval per monster in activeMonsters — each attacks the player on
+// its own cooldown, independently of the others.
+let monsterAttackIntervals = [];
 let regenProgress = 0;
 let unlockedSkills = [...STARTING_SKILLS];
 // Order matters: it decides the order of the fight bar and therefore the hotkeys.
@@ -210,11 +210,6 @@ function updateMonsterPreview() {
     : [];
   renderMonsterList(monsters);
   startButton.disabled = !group;
-}
-
-// The monster currently shown/fought — the front of the queue.
-function frontMonster() {
-  return activeMonsters.length ? MONSTERS[activeMonsters[0].monsterId] : null;
 }
 
 function renderStats() {
@@ -385,8 +380,11 @@ function regenTick() {
   updateRegenIndicator();
 }
 
-function monsterAttackTick() {
-  const monster = frontMonster();
+// `index` identifies which monster in activeMonsters is attacking, so each
+// one's interval (see beginFight) deals its own damage and animates its own
+// card, independently of every other monster's cooldown.
+function monsterAttackTick(index) {
+  const monster = MONSTERS[activeMonsters[index].monsterId];
   playerHp = Math.max(0, playerHp - monster.damage);
   updateHealthBar();
   saveProgress();
@@ -396,12 +394,13 @@ function monsterAttackTick() {
     return;
   }
 
-  animateCooldownFill(monsterCards[0].cooldownFillEl, monster.cooldown);
+  animateCooldownFill(monsterCards[index].cooldownFillEl, monster.cooldown);
 }
 
 function endGame(message) {
   fightActive = false;
-  clearInterval(monsterAttackInterval);
+  monsterAttackIntervals.forEach(clearInterval);
+  monsterAttackIntervals = [];
   for (const timeout of skillTimeouts.values()) clearTimeout(timeout);
   skillTimeouts.clear();
   skillBarEl.querySelectorAll('button').forEach((button) => { button.disabled = true; });
@@ -436,8 +435,6 @@ function beginFight() {
   targetIndex = 0;
   renderMonsterList(activeMonsters, { interactive: true });
 
-  const monster = frontMonster();
-
   fightActive = true;
   startButton.hidden = true;
   monsterSelectEl.hidden = true;
@@ -448,8 +445,13 @@ function beginFight() {
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
 
-  animateCooldownFill(monsterCards[0].cooldownFillEl, monster.cooldown);
-  monsterAttackInterval = setInterval(monsterAttackTick, monster.cooldown * 1000);
+  // Every monster starts attacking as soon as the fight begins, each on its
+  // own cooldown.
+  monsterAttackIntervals = activeMonsters.map((entry, index) => {
+    const monster = MONSTERS[entry.monsterId];
+    animateCooldownFill(monsterCards[index].cooldownFillEl, monster.cooldown);
+    return setInterval(() => monsterAttackTick(index), monster.cooldown * 1000);
+  });
 }
 
 function updateXpDisplay() {
