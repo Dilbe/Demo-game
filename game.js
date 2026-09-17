@@ -1,4 +1,6 @@
+const monsterNameEl = document.getElementById('monster-name');
 const monsterHpEl = document.getElementById('monster-hp');
+const monsterMaxHpEl = document.getElementById('monster-max-hp');
 const playerHpEl = document.getElementById('player-hp');
 const playerMaxHpEl = document.getElementById('player-max-hp');
 const healthBarFillEl = document.getElementById('health-bar-fill');
@@ -18,10 +20,6 @@ const skillListEl = document.getElementById('skill-list');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 
-const MONSTER_ATTACK_INTERVAL_SECONDS = 3;
-const INITIAL_MONSTER_HP = 5;
-
-const XP_PER_KILL = 1;
 const REGEN_TICK_SECONDS = 1;
 
 const SAVE_KEY = 'demo-game-save';
@@ -29,6 +27,9 @@ const SAVE_KEY = 'demo-game-save';
 // Derived from STATS so a new stat needs defining in one place only.
 const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0]));
 
+// The monster this fight is against. Fixed to Small for now — picking one
+// is the next milestone.
+let activeMonster = MONSTERS.small;
 let monsterHp;
 let playerHp = null;
 let fightActive = false;
@@ -187,7 +188,7 @@ function applySkill(skillId) {
   monsterHpEl.textContent = monsterHp;
 
   if (monsterHp <= 0) {
-    xp += XP_PER_KILL;
+    xp += activeMonster.xp;
     updateXpDisplay();
     saveProgress();
     endGame('You win!');
@@ -236,7 +237,7 @@ function regenTick() {
 }
 
 function monsterAttackTick() {
-  playerHp = Math.max(0, playerHp - 1);
+  playerHp = Math.max(0, playerHp - activeMonster.damage);
   updateHealthBar();
   saveProgress();
 
@@ -245,7 +246,7 @@ function monsterAttackTick() {
     return;
   }
 
-  animateCooldownFill(monsterCooldownFillEl, MONSTER_ATTACK_INTERVAL_SECONDS);
+  animateCooldownFill(monsterCooldownFillEl, activeMonster.cooldown);
 }
 
 function endGame(message) {
@@ -262,8 +263,10 @@ function endGame(message) {
 
 function startGame() {
   fightActive = false;
-  monsterHp = INITIAL_MONSTER_HP;
+  monsterHp = activeMonster.maxHp;
+  monsterNameEl.textContent = activeMonster.label;
   monsterHpEl.textContent = monsterHp;
+  monsterMaxHpEl.textContent = activeMonster.maxHp;
   updateHealthBar();
 
   resultMessageEl.hidden = true;
@@ -287,8 +290,8 @@ function beginFight() {
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
 
-  animateCooldownFill(monsterCooldownFillEl, MONSTER_ATTACK_INTERVAL_SECONDS);
-  monsterAttackInterval = setInterval(monsterAttackTick, MONSTER_ATTACK_INTERVAL_SECONDS * 1000);
+  animateCooldownFill(monsterCooldownFillEl, activeMonster.cooldown);
+  monsterAttackInterval = setInterval(monsterAttackTick, activeMonster.cooldown * 1000);
 }
 
 function updateXpDisplay() {

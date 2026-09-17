@@ -1,9 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  STATS, SKILLS, STARTING_SKILLS,
+  STATS, SKILLS, STARTING_SKILLS, MONSTERS,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
+  describeMonster,
 } = require('./formulas.js');
 
 // --- Formula maths -----------------------------------------------------
@@ -209,4 +210,24 @@ test('BALANCE SNAPSHOT: current tuning', () => {
 
   assert.strictEqual(statCost('maxHp', 0), 5);
   assert.strictEqual(statCost('maxHp', 1), 7);
+});
+
+test('Small monster matches the game\'s original fixed monster', () => {
+  assert.strictEqual(MONSTERS.small.maxHp, 5);
+  assert.strictEqual(MONSTERS.small.damage, 1);
+  assert.strictEqual(MONSTERS.small.cooldown, 3);
+  assert.strictEqual(MONSTERS.small.xp, 1);
+});
+
+test('Medium and Big monsters are tougher and worth more XP than Small', () => {
+  for (const monsterId of ['medium', 'big']) {
+    const monster = MONSTERS[monsterId];
+    assert.ok(monster.maxHp > MONSTERS.small.maxHp);
+    assert.ok(monster.damage >= MONSTERS.small.damage);
+    assert.ok(monster.xp > MONSTERS.small.xp);
+  }
+});
+
+test('describeMonster summarizes HP, damage, cooldown, and XP', () => {
+  assert.strictEqual(describeMonster('small'), '5 HP \u00b7 1 damage every 3s \u00b7 1 XP');
 });
