@@ -424,6 +424,51 @@ body {
   padding: 0.5rem 1.5rem;
 }
 
+/* Hidden until lifetime XP reaches Max XP (see renderPrestige) — matches
+   #health-bar's look, in gold rather than green to read as a distinct,
+   special-occasion meter rather than another health-style resource. */
+#prestige-section {
+  margin: 0 auto 1.5rem;
+}
+
+#prestige-section[hidden] {
+  display: none;
+}
+
+#prestige-bar {
+  position: relative;
+  width: 16rem;
+  height: 1.75rem;
+  margin: 0 auto 0.75rem;
+  border: 1px solid #999;
+  background: #eee;
+  overflow: hidden;
+}
+
+#prestige-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: #d4af37;
+  transition: width 0.2s linear;
+}
+
+#prestige-bar-label {
+  position: relative;
+  line-height: 1.75rem;
+}
+
+#prestige-button {
+  font-size: 1rem;
+  padding: 0.5rem 1.5rem;
+}
+
+#prestige-button[hidden] {
+  display: none;
+}
+
 .about-blurb {
   max-width: 28rem;
   margin: 0 auto 1.5rem;

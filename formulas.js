@@ -1,7 +1,7 @@
 // Low-ceremony versioning: matches the `vN` milestone-scope naming DESIGN.md
 // already uses (v1 stats/skills, ..., v6 quests) rather than inventing a
 // separate scheme. Bump it by hand whenever the next `vN` scope ships.
-const VERSION = 'v6';
+const VERSION = 'v7';
 
 // Which exact commit is live, for tracing "what code is running" without a
 // separate build-number counter or git tag — the commit SHA already is that
@@ -144,6 +144,21 @@ const DUNGEONS = {
     completionBonusXp: 10,
   },
 };
+
+// A new game's starting Max XP — a lifetime-XP milestone, separate from the
+// spendable XP balance (which keeps working exactly as it always has).
+// Reaching it unlocks the prestige bar; prestiging raises it by 100 for the
+// next cycle. See PRESTIGE_BONUS_PER_CYCLE and prestigeTarget below.
+const STARTING_MAX_XP = 100;
+
+// How much Max XP goes up by each time the player prestiges.
+const PRESTIGE_BONUS_PER_CYCLE = 100;
+
+// Once lifetime XP earned reaches maxXp, the prestige bar needs this much
+// further XP — 10% of maxXp — to fill before the Prestige button appears.
+function prestigeTarget(maxXp) {
+  return Math.round(maxXp * 0.1);
+}
 
 // Rounds an upgrade/stat's cost the same way for all of them: compounding
 // baseCost by costGrowth per level, like statCost below.
@@ -463,5 +478,6 @@ if (typeof module !== 'undefined') {
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     activeQuest, questComplete, describeQuestProgress,
     groupKillXp, groupTotalXp,
+    STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget,
   };
 }

@@ -41,7 +41,15 @@
   </section>
 
   <section id="character-tab" class="tab-panel" hidden>
-    <p>XP: <span id="xp-total">0</span></p>
+    <p>XP: <span id="xp-total">0</span> &middot; Max XP: <span id="max-xp-value">100</span></p>
+
+    <div id="prestige-section" hidden>
+      <div id="prestige-bar">
+        <div id="prestige-bar-fill"></div>
+        <span id="prestige-bar-label">Prestige: <span id="prestige-progress-value">0</span> / <span id="prestige-target-value">10</span></span>
+      </div>
+      <button id="prestige-button" hidden>Prestige (Max XP +100)</button>
+    </div>
 
     <div id="stat-list"></div>
 

@@ -24,10 +24,20 @@ const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 const questTrackerEl = document.getElementById('quest-tracker');
 const versionValueEl = document.getElementById('version-value');
+const maxXpValueEl = document.getElementById('max-xp-value');
+const prestigeSectionEl = document.getElementById('prestige-section');
+const prestigeBarFillEl = document.getElementById('prestige-bar-fill');
+const prestigeProgressValueEl = document.getElementById('prestige-progress-value');
+const prestigeTargetValueEl = document.getElementById('prestige-target-value');
+const prestigeButton = document.getElementById('prestige-button');
 
 const REGEN_TICK_SECONDS = 1;
 
 const SAVE_KEY = 'demo-game-save';
+// Separate from SAVE_KEY so a prestige reset (which wipes SAVE_KEY back to a
+// fresh game) can raise Max XP without needing to special-case it inside
+// whatever shape the main save happens to be — it simply isn't in there.
+const MAX_XP_KEY = 'demo-game-max-xp';
 
 // Derived from STATS so a new stat needs defining in one place only.
 const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0]));
@@ -83,6 +93,19 @@ let skillLevels = Object.fromEntries(
 // reload starts with the panel closed.
 let inspectedSkillId = null;
 let xp = 0;
+// Total XP ever earned (never reduced by spending, unlike xp) — drives the
+// prestige bar once it reaches maxXp. Reset to 0 by a prestige itself, since
+// each cycle needs to build back up to its own (higher) maxXp.
+let lifetimeXp = 0;
+// Starts at STARTING_MAX_XP and only ever goes up, by PRESTIGE_BONUS_PER_CYCLE
+// per prestige — kept in its own localStorage key (see MAX_XP_KEY) rather
+// than the main save, so a prestige's reset of everything else can't also
+// wipe the one number the whole mechanic is about preserving.
+let maxXp = STARTING_MAX_XP;
+// How much post-threshold XP has been earned toward this cycle's prestige
+// (see awardXp) — needs prestigeTarget(maxXp) to fill before the Prestige
+// button appears. Reset to 0 alongside lifetimeXp on prestige.
+let prestigeProgress = 0;
 // Total enemies defeated across every fight, ever — separate from XP because
 // quests key off it directly rather than off however XP happens to convert.
 let totalKills = 0;
@@ -112,6 +135,7 @@ restartButton.addEventListener('click', startGame);
 startButton.addEventListener('click', beginFight);
 retreatButton.addEventListener('click', retreat);
 resetCharacterButton.addEventListener('click', resetCharacter);
+prestigeButton.addEventListener('click', prestige);
 
 // Dropping a skill back onto the list unequips it — the list itself is a
 // fixed element (only its rows get rebuilt), so this is wired up once here
@@ -459,7 +483,7 @@ function applySkill(skillId) {
   monsterCards[targetIndex].hpEl.textContent = target.hp;
 
   if (target.hp <= 0) {
-    xp += groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount);
+    awardXp(groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount));
     groupKillCount += 1;
     updateXpDisplay();
     registerKill();
@@ -477,7 +501,7 @@ function applySkill(skillId) {
         // fight in the chain is cleared. Retreat and a loss both end the
         // dungeon elsewhere, without ever reaching this branch.
         const bonus = DUNGEONS[activeDungeonId].completionBonusXp;
-        xp += bonus;
+        awardXp(bonus);
         updateXpDisplay();
         saveProgress();
         endGame(`${DUNGEONS[activeDungeonId].label} cleared! (+${bonus} bonus XP)`);
@@ -712,6 +736,24 @@ function advanceDungeonFight() {
   saveProgress();
 }
 
+// Every XP-earning moment (a kill, a dungeon-clear bonus) should route
+// through here rather than adding to `xp` directly, so lifetime tracking and
+// the prestige bar can never drift out of sync with what was actually
+// earned. Spending XP (upgrades, unlocks) still just subtracts from `xp`
+// directly — lifetimeXp and prestigeProgress only ever move forward.
+function awardXp(amount) {
+  xp += amount;
+  lifetimeXp += amount;
+
+  if (lifetimeXp >= maxXp) {
+    // Simplification: an award that itself crosses the threshold counts in
+    // full toward the bar, rather than splitting the part that happened
+    // before/after crossing — awards are small relative to the target (10%
+    // of maxXp), so the possible overshoot is negligible.
+    prestigeProgress = Math.min(prestigeTarget(maxXp), prestigeProgress + amount);
+  }
+}
+
 function updateXpDisplay() {
   xpTotalEl.textContent = xp;
   skillsXpTotalEl.textContent = xp;
@@ -719,6 +761,42 @@ function updateXpDisplay() {
   renderSkills();
   renderSkillSlots();
   renderSkillDetail();
+  renderPrestige();
+}
+
+// Hidden until lifetime XP reaches maxXp; once visible, fills toward
+// prestigeTarget(maxXp) and reveals the Prestige button once full.
+function renderPrestige() {
+  maxXpValueEl.textContent = maxXp;
+
+  const ready = lifetimeXp >= maxXp;
+  prestigeSectionEl.hidden = !ready;
+  if (!ready) return;
+
+  const target = prestigeTarget(maxXp);
+  prestigeProgressValueEl.textContent = prestigeProgress;
+  prestigeTargetValueEl.textContent = target;
+  prestigeBarFillEl.style.width = `${Math.min(100, (prestigeProgress / target) * 100)}%`;
+  prestigeButton.hidden = prestigeProgress < target;
+}
+
+// Resets everything a fresh game starts with — XP, stats, skills, quests,
+// kill count, the current fight selection — but raises maxXp by
+// PRESTIGE_BONUS_PER_CYCLE for the next cycle. Mirrors resetCharacter's
+// "wipe the save and reload" approach, since that already takes a fresh
+// player's exact path with no chance to drift as more state is added; the
+// one difference is maxXp needing to survive, which is exactly why it lives
+// in its own localStorage key instead of the main save.
+function prestige() {
+  const target = prestigeTarget(maxXp);
+  if (prestigeProgress < target) return;
+
+  const newMaxXp = maxXp + PRESTIGE_BONUS_PER_CYCLE;
+  if (!confirm(`Prestige now? This resets your XP, stats, skills, quests, and kill count back to a fresh start, but raises Max XP from ${maxXp} to ${newMaxXp}.`)) return;
+
+  localStorage.setItem(MAX_XP_KEY, String(newMaxXp));
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
 }
 
 function unlockSkill(skillId) {
@@ -1058,10 +1136,19 @@ function registerKill() {
 }
 
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedGroupId, selectedDungeonId, totalKills, completedQuestIds }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({
+    xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
+    selectedGroupId, selectedDungeonId, totalKills, completedQuestIds,
+    lifetimeXp, prestigeProgress,
+  }));
 }
 
 function loadProgress() {
+  // maxXp lives outside SAVE_KEY (see MAX_XP_KEY) specifically so it
+  // survives a prestige wiping everything else back to a fresh game.
+  const savedMaxXp = Number(localStorage.getItem(MAX_XP_KEY));
+  if (savedMaxXp) maxXp = savedMaxXp;
+
   const raw = localStorage.getItem(SAVE_KEY);
   if (!raw) return;
 
@@ -1076,6 +1163,8 @@ function loadProgress() {
   if (saved.selectedDungeonId) selectedDungeonId = saved.selectedDungeonId;
   if (saved.totalKills) totalKills = saved.totalKills;
   if (saved.completedQuestIds) completedQuestIds = saved.completedQuestIds;
+  if (saved.lifetimeXp) lifetimeXp = saved.lifetimeXp;
+  if (saved.prestigeProgress) prestigeProgress = saved.prestigeProgress;
 }
 
 function resetCharacter() {
