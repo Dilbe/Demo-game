@@ -309,6 +309,13 @@ body {
   margin: 1.5rem auto 0;
 }
 
+#skill-equip-message {
+  color: #b71c1c;
+  font-size: 0.85rem;
+  max-width: 24rem;
+  margin: 0.75rem auto 0;
+}
+
 #skill-slots {
   display: flex;
   justify-content: center;
