@@ -245,6 +245,8 @@ Instead of a new player seeing every tab at once, tabs unlock progressively by c
 5. Sequential progression — completing one quest immediately reveals the tracker for the next quest in the chain.
 6. Persistence — save quest completion state and the kill counter via `localStorage`, alongside the existing XP/stat/skill save data.
 
+**v6 status: done.** All 6 milestones complete. `QUESTS` in `formulas.js` is an ordered array (order encodes the sequence, matching `activeQuest`'s "first not-yet-completed" lookup) of `{ id, description, target, reward }` objects; `reward` is a generic `{ type, ...}` shape so `unlockTab` isn't the only kind a future quest could use. `totalKills` counts every monster defeat regardless of fight outcome, tracked independently of XP. The tracker is a single always-visible `#quest-tracker` div (hidden once every quest is done) showing `describeQuestProgress`'s `"<description> (<kills>/<target>)"` text. Character and Skills tabs' nav buttons start with the `hidden` attribute in `index.html`; completing a quest un-hides the one its reward names, and `registerKill` loops (rather than checking once) so progression can't stall if a kill ever satisfied more than one quest at a time. `totalKills` and `completedQuestIds` save/load alongside the rest of the state, and already-completed rewards are re-applied on load so a returning player's unlocked tabs match their save.
+
 ## About tab & versioning
 
 A small, standalone addition: a place that explains what the project is, plus a visible version number.

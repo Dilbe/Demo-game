@@ -166,6 +166,18 @@ body {
   display: none;
 }
 
+#quest-tracker {
+  width: 16rem;
+  margin: 0 auto 1.5rem;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+/* Layout only applies while shown — same pattern as #retreat-button/#skill-bar. */
+#quest-tracker[hidden] {
+  display: none;
+}
+
 #tabs {
   margin-bottom: 1.5rem;
 }

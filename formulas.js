@@ -313,6 +313,41 @@ function describeMonsterGroup(groupId) {
   return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${totalXp} XP total`;
 }
 
+// A new player sees only the Fight tab; completing a quest reveals the tab
+// (or other reward) it names and moves on to the next quest in order. Same
+// data-object pattern as stats/skills/monsters — adding a quest is a data
+// entry, not new gating logic. `reward` is generic (`type` plus whatever
+// that type needs) so a future quest can unlock something other than a tab
+// without changing how quests are processed, only how rewards are applied.
+const QUESTS = [
+  {
+    id: 'killFive',
+    description: 'Kill 5 enemies',
+    target: 5,
+    reward: { type: 'unlockTab', tabId: 'character-tab' },
+  },
+  {
+    id: 'killTen',
+    description: 'Kill 10 enemies',
+    target: 10,
+    reward: { type: 'unlockTab', tabId: 'skills-tab' },
+  },
+];
+
+// The first quest not yet in `completedQuestIds` — quests complete strictly
+// in order, so there is always at most one active quest.
+function activeQuest(completedQuestIds) {
+  return QUESTS.find((quest) => !completedQuestIds.includes(quest.id)) ?? null;
+}
+
+function questComplete(quest, killCount) {
+  return killCount >= quest.target;
+}
+
+function describeQuestProgress(quest, killCount) {
+  return `${quest.description} (${Math.min(killCount, quest.target)}/${quest.target})`;
+}
+
 // Advances passive HP regen by however much real time has actually passed,
 // rather than assuming one call equals one fixed-size tick. A browser
 // throttles setInterval heavily once its tab is backgrounded — a 1-second
@@ -347,9 +382,10 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
+    STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill,
     describeMonster, describeMonsterGroup, advanceRegen,
+    activeQuest, questComplete, describeQuestProgress,
   };
 }
