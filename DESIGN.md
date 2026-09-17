@@ -262,10 +262,83 @@ A small, standalone addition: a place that explains what the project is, plus a 
 
 **Build stamp (added after the initial About tab work):** the site has no accounts or backend, so "what code is running for a given player" has no server log to check — the deployed page itself is the only record. Rather than a separate build-number counter (the Azure-pipeline pattern) or a git tag pushed on every deploy, `BUILD_SHA` in `formulas.js` starts as the placeholder `__BUILD_SHA__`, which `deploy.yml` overwrites with the short commit SHA (`sed`, one step, no real build tooling) right before publishing to Pages. The commit SHA already is a unique, permanent pointer to the exact source — `git show <sha>` — so it needs no separate counter to stay in sync with. A checkout that never went through that step (local dev, `node --test`, a clone) keeps the placeholder, and the About tab shows that as "unreleased build" rather than a fake SHA. The version line reads e.g. `v6 (a1b2c3d)` once deployed.
 
+## v7 scope — polish
+
+A pass over rough edges across the Skills tab and the Fight tab — not a new feature, just smoothing out things that already work but feel unfinished.
+
+- **Skills tab redesign:** the unlocked-skills list becomes a row of squares styled like the in-combat skill buttons (same icon/label), instead of today's list of rows. Clicking a square opens a detail view of that skill's stats and upgrade tracks — the info today's row shows inline, just moved behind a click. Dragging a square onto a slot bar box still equips it, same as today.
+- **Skill-points shortfall message:** dropping a skill onto a slot when doing so would exceed the Skill Points budget currently just silently fails (`equipInSlot` returns early with no feedback). Replace that with a visible message.
+- **Group-kill XP bonus:** killing a monster that's part of a multi-monster group (Two Small Monsters, and any future multi-monster group) grants a compounding ×1.25 XP bonus per kill within that group — 1st kill in the group at normal XP, 2nd at ×1.25, 3rd at ×1.25² = ×1.5625, and so on. Single-monster fights are unaffected.
+- **Dungeon-clear bonus XP:** clearing every fight in a dungeon awards a bonus XP amount on top of what its monsters already paid out, defined per dungeon (`DUNGEONS.<id>.completionBonusXp`) — same data-object pattern as everything else, so tuning it later is a data edit.
+- **Fight-button jitter:** the skill buttons in the Fight tab visibly shift position during a fight. Root cause to be diagnosed when picked up (likely candidates: cooldown-countdown text changing width, or a disabled-state style changing padding/border) — the fix is whatever keeps each button's box a fixed size regardless of state.
+- **Trigger-point indicator:** draw a thin horizontal line across each combat skill button's cooldown fill at its `triggerAt` fraction, so the player can see at a glance *when* (not just whether) the effect will land as the button fills.
+
+### v7 milestones
+
+1. Skills tab: unlocked-skill squares — replace the unlocked-skills list rows with squares styled like the in-combat skill buttons; dragging a square onto a slot bar box still equips it exactly as today.
+2. Skills tab: click-to-inspect — clicking a square opens a detail panel for that skill showing its current stats and upgrade tracks.
+3. Skill-points shortfall message — report a visible message instead of silently refusing when a drop would exceed the Skill Points budget.
+4. Group-kill XP bonus — kills inside a multi-monster group compound ×1.25 per kill in that group; single-monster fights unaffected.
+5. Dungeon-clear bonus XP — add `completionBonusXp` per dungeon in `DUNGEONS`, paid out once alongside the dungeon-complete result.
+6. Fight-button layout stability — diagnose and fix whatever is shifting the skill buttons' position during a fight.
+7. Trigger-point indicator — draw a `triggerAt` marker line on each combat skill button's cooldown fill.
+
+## v8 scope — prestige
+
+A reset-for-a-permanent-bonus loop, picking up the "Prestige mechanic" idea parked since v1. Introduces `maxXp` as a second, slower-moving number alongside the existing XP balance rather than replacing it.
+
+- **`maxXp` starts at 100** in a new game — a lifetime-XP milestone, not a cap on the spendable XP balance already earned and spent on stats/skills today (that keeps working exactly as now).
+- **Prestige progress bar:** once lifetime XP earned reaches `maxXp`, a second bar appears and starts filling with XP gained from that point on (the regular XP balance keeps accumulating/spending as normal alongside it). It needs 10% of `maxXp` (10 XP, at the starting value) to fill.
+- **Prestige button:** once the prestige bar is full, a "Prestige" button appears. Pressing it resets the whole game — XP balance, stats, skills, quests, kill counter, dungeon/monster selection, everything `localStorage` currently saves — back to a fresh start, except `maxXp` is now 100 higher than it was.
+- Later, possibly: additional permanent rewards for prestiging (unspecified — parked for a future pass, not part of this scope).
+
+### v8 milestones
+
+1. `maxXp` + lifetime-XP tracking — new persisted counter (starts at 100), plus a running lifetime-XP-earned total separate from the spendable balance.
+2. Prestige progress bar UI — hidden until lifetime XP reaches `maxXp`; once visible, fills with post-threshold XP gains toward the 10%-of-`maxXp` target.
+3. Prestige button + reset — appears when the bar is full; pressing it wipes every other piece of saved state and raises `maxXp` by 100 for the new game.
+4. Persistence — save `maxXp` and lifetime-XP-earned alongside existing save data, surviving a reload mid-way through filling the bar.
+
+## v9 scope — skills: passives, objective unlocks, and optional upgrades
+
+Three related changes to how skills work: a first passive skill, unlocking skills through gameplay objectives instead of XP, and a new kind of skill upgrade that's toggled on/off rather than leveled continuously.
+
+- **Passive skills:** a new skill kind that isn't used in combat at all — while equipped (using a slot and Skill Points like any other skill), it just grants a flat stat boost for as long as it stays equipped.
+- **Two new skills:** Regen (+100% HP regen rate while equipped) and Strength (+25% damage on all attacks while equipped).
+- **Objective-gated unlocks replace XP unlocks for Strong Attack and Heal:** two new objectives — kill a Medium Monster unlocks Strong Attack, kill a Big Monster unlocks Heal — and completing the objective unlocks the skill directly, free of charge. Their existing `unlockCost` XP price goes away.
+- **Optional per-skill upgrades ("toggles"):** a new array per skill, separate from the existing continuous Power/Speed upgrade tracks. Each toggle is unlocked once with an XP cost, then can be switched on/off freely; switching one on increases that skill's Skill Point cost while equipped (switching it off returns the cost to normal).
+  - Basic Attack gets a **Multi Attack** toggle: while on, each hit strikes every active monster for full listed damage instead of just the targeted one.
+  - Heal gets a **Heal over Time** toggle: while on, casting Heal instead applies a 10-second heal-over-time effect, healing the same total HP the instant cast would have, spread evenly across the 10 seconds.
+  - Auto Attack is removed as a skill entirely (superseded by Basic Attack's Multi Attack toggle and the general direction of this milestone).
+  - A new objective — win a dungeon — unlocks the ability to use toggles at all (before that, the toggle list is visible but locked).
+
+### v9 milestones
+
+1. Passive skill type — a skill can be marked passive (no combat button, no cooldown); while equipped, its stat boost applies.
+2. Regen and Strength skills — defined as data, using the passive type above.
+3. Objective unlocks for Strong Attack / Heal — new quests (kill-a-Medium, kill-a-Big) that unlock those two skills directly; remove their XP `unlockCost`.
+4. Toggle upgrades: data + unlock — each skill gets a `toggles` array (id, label, XP unlock cost, Skill Point surcharge, effect); unlocking a toggle is a one-time XP purchase, independent of turning it on/off.
+5. Toggle upgrades: on/off + Skill Point cost — an unlocked toggle can be flipped on/off; while on, its Skill Point surcharge is added to the skill's cost against the Skill Points budget.
+6. Multi Attack toggle on Basic Attack — while on, Basic Attack hits every active monster for full damage instead of the single targeted one.
+7. Heal over Time toggle on Heal — while on, casting Heal applies a 10-second HoT healing the same total HP a straight cast would, spread evenly over the duration, instead of healing instantly.
+8. Remove Auto Attack — retire the skill (and migrate any existing save data that has it unlocked/equipped).
+9. Basic attack and strong attack get an upgrade toggle for auto attack. This makes those abilities trigger automatically as soon as they are available.
+10. "Win a dungeon" objective — new objective that gates the toggle system itself; toggles are visible-but-locked until it completes.
+
+## v10 scope — graphics
+
+Picking up the "Graphics for monsters/player" idea parked since v1. Simple, in-code sprites for monsters and skills rather than illustrated art — fits the project's plain-HTML/no-tooling approach (no image-generation tool or external asset pipeline needed).
+
+- **Monster sprites:** a simple geometric/SVG shape per monster (Small/Medium/Big get visually distinct silhouettes), shown on their combatant card during a fight and on the selection screen.
+- **Skill icons:** a simple geometric/SVG icon per skill, shown on its combat button, its Skills-tab square (from v7), and its slot-bar box.
+
+### v10 milestones
+
+1. Monster sprites — one SVG/shape per `MONSTERS` entry, rendered on the selection screen and each combatant card.
+2. Skill icons — one SVG/shape per `SKILLS` entry, rendered on the combat button, the Skills-tab square, and the slot-bar box.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
 
-- **Prestige mechanic.** Some kind of reset-for-a-permanent-bonus loop. Not defined yet: what resets, what's kept, what the bonus is.
-- **Graphics for monsters/player.** Currently no art at all. Two directions to weigh later: (a) simple geometric/SVG sprites drawn directly in code (a blob shape for a slime, a basic silhouette for a goblin) — fits the project's plain-HTML/no-tooling approach; (b) actual illustrated art, which would need either a dedicated image-generation tool or free game-asset sources (e.g. Kenney.nl, OpenGameArt.org, itch.io asset packs).
 - **Legal/privacy disclosures.** Not a lawyer, not legal advice — but worth a note: currently the site has no backend, no accounts, no analytics/tracking scripts, and no cookies; `localStorage` for saving progress is generally treated as functionally-necessary storage, not something requiring cookie-consent banners. As it stands, there's likely nothing legally required beyond normal copyright. Revisit this if the project ever adds anything that processes visitor data — analytics, ads, accounts, or real multiplayer — since that's the point a real privacy policy (and, depending on country/monetization, an "imprint"/legal-notice page) could become necessary.
