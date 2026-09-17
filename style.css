@@ -17,6 +17,27 @@ body {
   margin: 0;
 }
 
+.combatant.targetable {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  padding: 0.25rem;
+}
+
+.combatant.targeted {
+  border-color: #333;
+}
+
+.target-badge {
+  font-size: 0.7rem;
+  font-weight: normal;
+  color: #333;
+  border: 1px solid #333;
+  border-radius: 3px;
+  padding: 0 0.3rem;
+  vertical-align: middle;
+}
+
 #monster-select {
   margin: 0 auto 1.5rem;
 }
