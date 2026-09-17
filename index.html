@@ -20,6 +20,7 @@
     <button class="tab-button" data-tab="fight-tab">Fight</button>
     <button class="tab-button" data-tab="character-tab" hidden>Character</button>
     <button class="tab-button" data-tab="skills-tab" hidden>Skills</button>
+    <button class="tab-button" data-tab="about-tab">About</button>
   </nav>
 
   <section id="fight-tab" class="tab-panel">
@@ -52,6 +53,20 @@
     <div id="skill-list"></div>
     <p class="skill-slots-hint">Drag a skill here to equip it, or drag it back to the list to unequip.</p>
     <div id="skill-slots"></div>
+  </section>
+
+  <section id="about-tab" class="tab-panel" hidden>
+    <p class="about-blurb">
+      Demo Game is a from-scratch learning project, not a product: a small
+      combat game built to practice plain JavaScript and HTML/CSS with no
+      build tooling, and to work through a data-driven design pattern where
+      stats, skills, monsters, dungeons, and quests are all just data
+      objects. There's no backend, no accounts, and nothing for sale &mdash;
+      just a repo growing through small, individually-finishable milestones
+      (see <code>DESIGN.md</code> in the repository for the full list).
+    </p>
+
+    <p id="version-label">Version <span id="version-value"></span></p>
   </section>
 
   <script src="formulas.js"></script>

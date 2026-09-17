@@ -1,12 +1,24 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
+  VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   activeQuest, questComplete, describeQuestProgress,
 } = require('./formulas.js');
+
+// --- Version ---------------------------------------------------------
+
+test('VERSION follows the vN milestone-scope naming', () => {
+  assert.match(VERSION, /^v\d+$/);
+});
+
+test('BUILD_SHA is the untouched placeholder in a checkout deploy.yml never stamped', () => {
+  // deploy.yml overwrites this at publish time; a plain checkout (like the
+  // one running this test) should never carry a real SHA.
+  assert.strictEqual(BUILD_SHA, '__BUILD_SHA__');
+});
 
 // --- Formula maths -----------------------------------------------------
 // Exercised on a temporary fixture stat, so rebalancing the real stats
