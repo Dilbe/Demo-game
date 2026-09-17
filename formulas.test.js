@@ -326,6 +326,7 @@ test('every dungeon defines the full data-object shape', () => {
   for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
     assert.ok(dungeon.label, `${dungeonId} is missing a label`);
     assert.ok(Array.isArray(dungeon.fightIds) && dungeon.fightIds.length > 0, `${dungeonId} has no fights`);
+    assert.ok(dungeon.completionBonusXp > 0, `${dungeonId} has no completionBonusXp`);
   }
 });
 
@@ -343,10 +344,11 @@ test('a dungeon chains more than one fight', () => {
   }
 });
 
-test('describeDungeon lists every fight in order and totals their XP', () => {
+test('describeDungeon lists every fight in order and totals their XP, completion bonus included', () => {
+  assert.strictEqual(DUNGEONS.goblinGauntlet.completionBonusXp, 5);
   assert.strictEqual(
     describeDungeon('goblinGauntlet'),
-    'Small Monster → Small Monster → Medium Monster · 6 XP total',
+    'Small Monster → Small Monster → Medium Monster · 11 XP total', // 1 + 1 + 4 monster XP + 5 bonus
   );
 });
 

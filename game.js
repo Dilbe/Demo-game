@@ -463,7 +463,19 @@ function applySkill(skillId) {
         return;
       }
 
-      endGame(activeDungeonId ? `${DUNGEONS[activeDungeonId].label} cleared!` : 'You win!');
+      if (activeDungeonId) {
+        // Paid once, only here — reaching this point already means every
+        // fight in the chain is cleared. Retreat and a loss both end the
+        // dungeon elsewhere, without ever reaching this branch.
+        const bonus = DUNGEONS[activeDungeonId].completionBonusXp;
+        xp += bonus;
+        updateXpDisplay();
+        saveProgress();
+        endGame(`${DUNGEONS[activeDungeonId].label} cleared! (+${bonus} bonus XP)`);
+        return;
+      }
+
+      endGame('You win!');
       return;
     }
 
