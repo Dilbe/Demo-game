@@ -322,7 +322,8 @@ Three related changes to how skills work: a first passive skill, unlocking skill
 6. Multi Attack toggle on Basic Attack — while on, Basic Attack hits every active monster for full damage instead of the single targeted one.
 7. Heal over Time toggle on Heal — while on, casting Heal applies a 10-second HoT healing the same total HP a straight cast would, spread evenly over the duration, instead of healing instantly.
 8. Remove Auto Attack — retire the skill (and migrate any existing save data that has it unlocked/equipped).
-9. "Win a dungeon" objective — new quest that gates the toggle system itself; toggles are visible-but-locked until it completes.
+9. Basic attack and strong attack get an upgrade toggle for auto attack. This makes those abilities trigger automatically as soon as they are available.
+10. "Win a dungeon" objective — new objective that gates the toggle system itself; toggles are visible-but-locked until it completes.
 
 ## v10 scope — graphics
 
