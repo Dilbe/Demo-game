@@ -198,6 +198,8 @@ Two small, standalone corrections to how an in-progress fight behaves — not ti
 1. Retreat button — visible during an active fight; pressing it ends the fight immediately without a win or loss result, returning to the pre-fight/selection state. Player HP is left as-is (no penalty, no free heal).
 2. Fights keep running across tab switches — switching to the Character or Skills tab mid-fight no longer pauses attack/monster cooldown timers. A fight only ends via a win, a loss, or Retreat, never by navigating away from the Fight tab.
 
+**Fight flow fixes status: done.** Retreat is a button, visible only during an active fight, that stops every timer and returns straight to monster selection with HP untouched — no win/loss message. The second fix needed no code change: `setInterval`/`setTimeout` were already independent of a tab-panel's `hidden` attribute, so switching tabs never paused a fight; verified by watching a fight run to completion (win and loss) while the Fight tab was hidden. A comment now documents that the tab-switch handler must never touch fight timers, so this can't regress silently.
+
 ## v5 scope — dungeons
 
 A dungeon is a chain of monster fights, fought back-to-back without returning to the selection screen in between. Builds directly on v4 (monster/multi-monster selection) and the Fight flow fixes above (Retreat needs to cleanly exit a whole dungeon, not just its current fight).

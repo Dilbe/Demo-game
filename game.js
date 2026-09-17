@@ -7,6 +7,7 @@ const regenProgressEl = document.getElementById('regen-progress');
 const skillBarEl = document.getElementById('skill-bar');
 const resultMessageEl = document.getElementById('result-message');
 const restartButton = document.getElementById('restart-button');
+const retreatButton = document.getElementById('retreat-button');
 const startButton = document.getElementById('start-button');
 const xpTotalEl = document.getElementById('xp-total');
 const skillsXpTotalEl = document.getElementById('skills-xp-total');
@@ -62,6 +63,7 @@ function animateCooldownFill(fillEl, durationSeconds) {
 
 restartButton.addEventListener('click', startGame);
 startButton.addEventListener('click', beginFight);
+retreatButton.addEventListener('click', retreat);
 resetCharacterButton.addEventListener('click', resetCharacter);
 
 function upgradeStat(statId) {
@@ -420,17 +422,35 @@ function monsterAttackTick(index) {
   animateCooldownFill(monsterCards[index].cooldownFillEl, monster.cooldown);
 }
 
-function endGame(message) {
-  fightActive = false;
+// Stops every timer a fight has running — both directions (endGame and
+// Retreat) need this so nothing keeps ticking, and possibly damaging the
+// player, once the fight is no longer active.
+function stopFightTimers() {
   monsterAttackIntervals.forEach(clearInterval);
   monsterAttackIntervals = [];
   for (const timeout of skillTimeouts.values()) clearTimeout(timeout);
   skillTimeouts.clear();
+}
+
+function endGame(message) {
+  fightActive = false;
+  stopFightTimers();
   skillBarEl.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+  retreatButton.hidden = true;
 
   resultMessageEl.textContent = message;
   resultMessageEl.hidden = false;
   restartButton.hidden = false;
+}
+
+// Ends the fight immediately with no win or loss — just back to picking a
+// monster. HP is left exactly as it was; there's no penalty or free heal.
+function retreat() {
+  if (!fightActive) return;
+
+  fightActive = false;
+  stopFightTimers();
+  startGame();
 }
 
 function startGame() {
@@ -444,6 +464,7 @@ function startGame() {
 
   resultMessageEl.hidden = true;
   restartButton.hidden = true;
+  retreatButton.hidden = true;
 
   renderSkillBar();
   skillBarEl.hidden = true;
@@ -462,6 +483,7 @@ function beginFight() {
   startButton.hidden = true;
   monsterSelectEl.hidden = true;
   skillBarEl.hidden = false;
+  retreatButton.hidden = false;
 
   for (const skillId of equippedSkills) {
     if (SKILLS[skillId].auto) useSkill(skillId);
@@ -652,6 +674,11 @@ setInterval(regenTick, REGEN_TICK_SECONDS * 1000);
 const tabButtons = document.querySelectorAll('.tab-button');
 const tabPanels = document.querySelectorAll('.tab-panel');
 
+// This only ever hides/shows panels — it must never pause or clear a fight's
+// timers. setInterval/setTimeout keep running regardless of a hidden
+// ancestor, which is exactly what lets a fight keep going while the player
+// is on the Character or Skills tab; a fight ends only via a win, a loss, or
+// Retreat.
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => {
     const targetId = button.dataset.tab;
