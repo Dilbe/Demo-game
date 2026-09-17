@@ -328,6 +328,43 @@ body {
   outline: 2px dashed #333;
 }
 
+.skill-square.inspected,
+.skill-slot.inspected {
+  background: #eaf1fb;
+}
+
+/* inline-block (rather than a fixed max-width) so it hugs its content and
+   relies on body's text-align: center to center it — an upgrade row with
+   two tracks needs more width than a readable-paragraph max-width would
+   allow without wrapping awkwardly. */
+#skill-detail-panel {
+  display: inline-block;
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fafafa;
+  text-align: center;
+}
+
+#skill-detail-panel[hidden] {
+  display: none;
+}
+
+.skill-detail-heading {
+  margin: 0 0 0.5rem;
+}
+
+.skill-detail-summary {
+  margin: 0 0 0.25rem;
+  color: #555;
+}
+
+.skill-detail-cost {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
 .skill-upgrades {
   display: flex;
   align-items: center;

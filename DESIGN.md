@@ -337,6 +337,21 @@ Picking up the "Graphics for monsters/player" idea parked since v1. Simple, in-c
 1. Monster sprites — one SVG/shape per `MONSTERS` entry, rendered on the selection screen and each combatant card.
 2. Skill icons — one SVG/shape per `SKILLS` entry, rendered on the combat button, the Skills-tab square, and the slot-bar box.
 
+## v11 scope — mobile friendly
+
+Everything so far has only been shaped for desktop mouse/keyboard use — no viewport meta tag, layouts with fixed widths sized well past a phone's screen, and skill equipping built entirely on HTML5 drag-and-drop, which most mobile browsers don't fire over touch at all. This scope is a pass to make the game actually playable on a phone.
+
+- **Viewport meta tag:** `index.html` has none today, so mobile browsers render it zoomed out to a desktop-width layout instead of fitting the screen.
+- **Responsive layout:** several elements assume a wide screen — fixed `width` values on `.monster-name`/`.monster-detail`/`.stat-*`/`.track-*`, and rows of 80px `.cooldown-button` squares (skill bar, Skills tab list, skill slots) that don't wrap — which can overflow or force horizontal scrolling on a narrow viewport.
+- **Touch-compatible skill equipping:** dragging a skill onto a slot is standard HTML5 drag-and-drop, which iOS Safari and most mobile browsers never fire over touch — equipping would be simply broken on a phone as things stand, not just awkward. Needs a touch-compatible interaction; exact approach (tap-to-select-then-tap-a-slot, touch-event-based dragging, etc.) still to be decided when this is picked up.
+- **Tap target sizing:** controls sized for a mouse cursor (the small Upgrade buttons, hotkey hints) may be too small or too close together for a fingertip.
+
+### v11 milestones
+
+1. Viewport meta tag + baseline responsive pass — add the meta tag, replace fixed pixel/rem widths that can overflow a phone screen with layouts that reflow instead.
+2. Touch-compatible skill equipping — replace or augment the drag-and-drop equip/unequip flow with something that works over touch.
+3. Tap target pass — check every interactive element is comfortably tappable (size and spacing) on a phone-sized screen.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
