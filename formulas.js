@@ -109,6 +109,23 @@ const MONSTER_GROUPS = {
   twoSmall: { label: 'Two Small Monsters', monsterIds: ['small', 'small'] },
 };
 
+// A dungeon chains several fights back-to-back, fought without returning to
+// the selection screen in between. `fightIds` is ordered — the sequence the
+// fights happen in — and reuses MONSTER_GROUPS entries rather than defining
+// its own monsters, so a dungeon is just a sequence of existing fight
+// options, matching the reuse in MONSTER_GROUPS itself.
+const DUNGEONS = {
+  goblinGauntlet: {
+    label: 'Goblin Gauntlet',
+    fightIds: ['small', 'small', 'medium'],
+  },
+
+  monsterRush: {
+    label: 'Monster Rush',
+    fightIds: ['small', 'medium', 'big'],
+  },
+};
+
 // Rounds an upgrade/stat's cost the same way for all of them: compounding
 // baseCost by costGrowth per level, like statCost below.
 function costForLevel(baseCost, costGrowth, level) {
@@ -348,6 +365,19 @@ function describeQuestProgress(quest, killCount) {
   return `${quest.description} (${Math.min(killCount, quest.target)}/${quest.target})`;
 }
 
+// Chains describeMonsterGroup's summaries with the fight order, plus a
+// running total XP across the whole dungeon — mirrors describeMonsterGroup's
+// own total-XP line, just summed over every fight instead of every monster.
+function describeDungeon(dungeonId) {
+  const { fightIds } = DUNGEONS[dungeonId];
+  const labels = fightIds.map((groupId) => MONSTER_GROUPS[groupId].label);
+  const totalXp = fightIds.reduce((sum, groupId) => {
+    const { monsterIds } = MONSTER_GROUPS[groupId];
+    return sum + monsterIds.reduce((groupSum, monsterId) => groupSum + MONSTERS[monsterId].xp, 0);
+  }, 0);
+  return `${labels.join(' → ')} · ${totalXp} XP total`;
+}
+
 // Advances passive HP regen by however much real time has actually passed,
 // rather than assuming one call equals one fixed-size tick. A browser
 // throttles setInterval heavily once its tab is backgrounded — a 1-second
@@ -382,10 +412,10 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS,
+    STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill,
-    describeMonster, describeMonsterGroup, advanceRegen,
+    describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     activeQuest, questComplete, describeQuestProgress,
   };
 }

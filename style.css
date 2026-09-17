@@ -47,6 +47,20 @@ body {
   margin: 0 auto 1.5rem;
 }
 
+.select-section-label {
+  font-weight: bold;
+  margin: 1rem auto 0.5rem;
+}
+
+#dungeon-progress {
+  color: #555;
+  margin: 0 auto 1rem;
+}
+
+#dungeon-progress[hidden] {
+  display: none;
+}
+
 .monster-row {
   display: flex;
   align-items: center;

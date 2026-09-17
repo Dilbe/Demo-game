@@ -1,4 +1,5 @@
 const monsterSelectEl = document.getElementById('monster-select');
+const dungeonProgressEl = document.getElementById('dungeon-progress');
 const monsterListEl = document.getElementById('monster-list');
 const playerHpEl = document.getElementById('player-hp');
 const playerMaxHpEl = document.getElementById('player-max-hp');
@@ -28,10 +29,18 @@ const SAVE_KEY = 'demo-game-save';
 // Derived from STATS so a new stat needs defining in one place only.
 const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0]));
 
-// The player's current pick from MONSTER_GROUPS, chosen on the selection
-// screen below. `activeMonsters` is only populated once a fight starts: one
-// entry ({ monsterId, hp }) per monster in the group, in queue order.
+// The player's current pick from MONSTER_GROUPS or DUNGEONS, chosen on the
+// selection screen below — exactly one of the two is set at a time, picking
+// one clears the other. `activeMonsters` is only populated once a fight
+// starts: one entry ({ monsterId, hp }) per monster in the current fight, in
+// queue order.
 let selectedGroupId = null;
+let selectedDungeonId = null;
+// Set only while fighting through a dungeon: which dungeon, and the index
+// into its fightIds the player is currently on. Both null/0 outside a
+// dungeon fight, including for a plain single-group fight.
+let activeDungeonId = null;
+let dungeonFightIndex = 0;
 let activeMonsters = [];
 // Which entry of activeMonsters the player's own attacks hit — selectable by
 // clicking a card once more than one monster is active, defaulting to the
@@ -114,7 +123,9 @@ function upgradeStat(statId) {
   saveProgress();
 }
 
-// One row per fight option, same pattern as renderStats/renderSkills.
+// One row per fight option, same pattern as renderStats/renderSkills. Covers
+// both single/multi-monster groups and dungeons — a dungeon row picks the
+// whole chain rather than one fight, but is otherwise the same row shape.
 // Disabled entirely mid-fight — the opponent can't change once a fight starts.
 function renderMonsterSelect() {
   monsterSelectEl.replaceChildren();
@@ -142,12 +153,52 @@ function renderMonsterSelect() {
     row.append(name, detail, button);
     monsterSelectEl.append(row);
   }
+
+  const dungeonsLabel = document.createElement('div');
+  dungeonsLabel.className = 'select-section-label';
+  dungeonsLabel.textContent = 'Dungeons';
+  monsterSelectEl.append(dungeonsLabel);
+
+  for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
+    const selected = dungeonId === selectedDungeonId;
+
+    const name = document.createElement('span');
+    name.className = 'monster-name';
+    name.textContent = dungeon.label;
+
+    const detail = document.createElement('span');
+    detail.className = 'monster-detail';
+    detail.textContent = describeDungeon(dungeonId);
+
+    const button = document.createElement('button');
+    button.className = 'monster-select-button';
+    button.textContent = selected ? 'Selected' : 'Select';
+    button.disabled = fightActive || selected;
+    button.addEventListener('click', () => selectDungeon(dungeonId));
+
+    const row = document.createElement('div');
+    row.className = 'monster-row';
+    row.classList.toggle('selected', selected);
+    row.append(name, detail, button);
+    monsterSelectEl.append(row);
+  }
 }
 
 function selectMonsterGroup(groupId) {
   if (fightActive) return;
 
   selectedGroupId = groupId;
+  selectedDungeonId = null;
+  renderMonsterSelect();
+  updateMonsterPreview();
+  saveProgress();
+}
+
+function selectDungeon(dungeonId) {
+  if (fightActive) return;
+
+  selectedDungeonId = dungeonId;
+  selectedGroupId = null;
   renderMonsterSelect();
   updateMonsterPreview();
   saveProgress();
@@ -241,8 +292,11 @@ function updateTargetHighlight() {
 }
 
 // Shows what the current selection would fight, before Start commits to it.
+// A dungeon pick previews its first fight — the fight Start would actually
+// begin with.
 function updateMonsterPreview() {
-  const group = selectedGroupId ? MONSTER_GROUPS[selectedGroupId] : null;
+  const groupId = selectedGroupId ?? (selectedDungeonId ? DUNGEONS[selectedDungeonId].fightIds[0] : null);
+  const group = groupId ? MONSTER_GROUPS[groupId] : null;
   const monsters = group
     ? group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }))
     : [];
@@ -391,7 +445,12 @@ function applySkill(skillId) {
     saveProgress();
 
     if (activeMonsters.every((monster) => monster.hp <= 0)) {
-      endGame('You win!');
+      if (activeDungeonId && dungeonFightIndex < DUNGEONS[activeDungeonId].fightIds.length - 1) {
+        advanceDungeonFight();
+        return;
+      }
+
+      endGame(activeDungeonId ? `${DUNGEONS[activeDungeonId].label} cleared!` : 'You win!');
       return;
     }
 
@@ -532,7 +591,10 @@ function retreat() {
 function startGame() {
   fightActive = false;
   activeMonsters = [];
+  activeDungeonId = null;
+  dungeonFightIndex = 0;
   updateHealthBar();
+  updateDungeonProgress();
 
   renderMonsterSelect();
   updateMonsterPreview();
@@ -547,24 +609,29 @@ function startGame() {
   startButton.hidden = false;
 }
 
-function beginFight() {
-  if (!selectedGroupId) return;
+// Shows which dungeon fight is current, or hides the line entirely outside
+// a dungeon (a plain single-group fight has nothing to chain, so nothing to
+// show here).
+function updateDungeonProgress() {
+  if (!activeDungeonId) {
+    dungeonProgressEl.hidden = true;
+    return;
+  }
 
-  const group = MONSTER_GROUPS[selectedGroupId];
+  const dungeon = DUNGEONS[activeDungeonId];
+  dungeonProgressEl.hidden = false;
+  dungeonProgressEl.textContent = `${dungeon.label} — Fight ${dungeonFightIndex + 1}/${dungeon.fightIds.length}`;
+}
+
+// Populates activeMonsters for `groupId` and starts each monster's attack
+// interval. Shared by beginFight (the first fight of a pick) and
+// advanceDungeonFight (every fight after the first in a dungeon chain) —
+// both just mean "start fighting this group now".
+function startFightGroup(groupId) {
+  const group = MONSTER_GROUPS[groupId];
   activeMonsters = group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }));
   targetIndex = 0;
   renderMonsterList(activeMonsters, { interactive: true });
-
-  fightActive = true;
-  startButton.hidden = true;
-  monsterSelectEl.hidden = true;
-  skillBarEl.hidden = false;
-  retreatButton.hidden = false;
-
-  for (const skillId of equippedSkillIds()) {
-    if (SKILLS[skillId].auto) useSkill(skillId);
-    else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
-  }
 
   // Every monster starts attacking as soon as the fight begins, each on its
   // own cooldown.
@@ -573,6 +640,41 @@ function beginFight() {
     animateCooldownFill(monsterCards[index].cooldownFillEl, monster.cooldown);
     return setInterval(() => monsterAttackTick(index), monster.cooldown * 1000);
   });
+}
+
+function beginFight() {
+  if (!selectedGroupId && !selectedDungeonId) return;
+
+  if (selectedDungeonId) {
+    activeDungeonId = selectedDungeonId;
+    dungeonFightIndex = 0;
+  } else {
+    activeDungeonId = null;
+  }
+
+  fightActive = true;
+  startButton.hidden = true;
+  monsterSelectEl.hidden = true;
+  skillBarEl.hidden = false;
+  retreatButton.hidden = false;
+  updateDungeonProgress();
+
+  for (const skillId of equippedSkillIds()) {
+    if (SKILLS[skillId].auto) useSkill(skillId);
+    else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
+  }
+
+  startFightGroup(activeDungeonId ? DUNGEONS[activeDungeonId].fightIds[0] : selectedGroupId);
+}
+
+// Moves a dungeon on to its next fight in the chain, without returning to
+// the selection screen — HP carries over as-is (subject to normal passive
+// regen only, same as between any two fights).
+function advanceDungeonFight() {
+  dungeonFightIndex += 1;
+  updateDungeonProgress();
+  startFightGroup(DUNGEONS[activeDungeonId].fightIds[dungeonFightIndex]);
+  saveProgress();
 }
 
 function updateXpDisplay() {
@@ -840,7 +942,7 @@ function registerKill() {
 }
 
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedGroupId, totalKills, completedQuestIds }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedGroupId, selectedDungeonId, totalKills, completedQuestIds }));
 }
 
 function loadProgress() {
@@ -855,6 +957,7 @@ function loadProgress() {
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
   if (saved.skillLevels) Object.assign(skillLevels, saved.skillLevels);
   if (saved.selectedGroupId) selectedGroupId = saved.selectedGroupId;
+  if (saved.selectedDungeonId) selectedDungeonId = saved.selectedDungeonId;
   if (saved.totalKills) totalKills = saved.totalKills;
   if (saved.completedQuestIds) completedQuestIds = saved.completedQuestIds;
 }
