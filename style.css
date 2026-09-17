@@ -247,8 +247,50 @@ body {
   text-align: left;
 }
 
+.equip-status {
+  width: 5rem;
+  text-align: left;
+  color: #1b5e20;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
+.skill-row.draggable {
+  cursor: grab;
+}
+
+.skill-row.equipped {
+  background: #eef6ee;
+  border-radius: 4px;
+}
+
 .skill-entry {
   margin-bottom: 1.25rem;
+}
+
+.skill-slots-hint {
+  color: #555;
+  font-size: 0.85rem;
+  margin: 1.5rem auto 0;
+}
+
+#skill-slots {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 1rem auto 1.5rem;
+}
+
+.skill-slot {
+  cursor: default;
+}
+
+.skill-slot[draggable="true"] {
+  cursor: grab;
+}
+
+.skill-slot.drag-over {
+  outline: 2px dashed #333;
 }
 
 .skill-upgrades {
