@@ -370,6 +370,15 @@ function renderSkillBar() {
     const fill = document.createElement('span');
     fill.className = 'cooldown-fill';
 
+    // The fill starts covering the whole button and drains from the bottom
+    // up as the cooldown elapses (see animateCooldownFill), so its bottom
+    // edge reaches a given point at a fixed, known moment regardless of the
+    // cooldown's actual length — this marks exactly where that edge will be
+    // when the effect lands, a static line at (1 - triggerAt) from the top.
+    const triggerMarker = document.createElement('span');
+    triggerMarker.className = 'trigger-marker';
+    triggerMarker.style.top = `${(1 - skill.triggerAt) * 100}%`;
+
     const label = document.createElement('span');
     label.className = 'cooldown-label';
     label.textContent = skill.label;
@@ -378,7 +387,7 @@ function renderSkillBar() {
     button.className = 'cooldown-button';
     button.dataset.skill = skillId;
     button.disabled = true;
-    button.append(fill, label);
+    button.append(fill, triggerMarker, label);
 
     if (!skill.auto) {
       button.addEventListener('click', () => useSkill(skillId));

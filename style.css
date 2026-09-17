@@ -145,6 +145,19 @@ body {
   pointer-events: none;
 }
 
+/* A fixed line at the fill's known position when the skill's effect lands
+   (see triggerAt), so the button shows *when* it fires, not just that it's
+   on cooldown. */
+.trigger-marker {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  margin-top: -1px;
+  background: #c62828;
+  pointer-events: none;
+}
+
 .cooldown-label {
   position: relative;
 }

@@ -270,7 +270,7 @@ A pass over rough edges across the Skills tab and the Fight tab — not a new fe
 - **Skill-points shortfall message:** dropping a skill onto a slot when doing so would exceed the Skill Points budget currently just silently fails (`equipInSlot` returns early with no feedback). Replace that with a visible message.
 - **Group-kill XP bonus:** killing a monster that's part of a multi-monster group (Two Small Monsters, and any future multi-monster group) grants a compounding ×1.25 XP bonus per kill within that group — 1st kill in the group at normal XP, 2nd at ×1.25, 3rd at ×1.25² = ×1.5625, and so on. Single-monster fights are unaffected.
 - **Dungeon-clear bonus XP:** clearing every fight in a dungeon awards a bonus XP amount on top of what its monsters already paid out, defined per dungeon (`DUNGEONS.<id>.completionBonusXp`) — same data-object pattern as everything else, so tuning it later is a data edit.
-- **Fight-button jitter:** the skill buttons in the Fight tab visibly shift position during a fight. Root cause to be diagnosed when picked up (likely candidates: cooldown-countdown text changing width, or a disabled-state style changing padding/border) — the fix is whatever keeps each button's box a fixed size regardless of state.
+- ~~**Fight-button jitter:**~~ diagnosed, then skipped — see milestone 6.
 - **Trigger-point indicator:** draw a thin horizontal line across each combat skill button's cooldown fill at its `triggerAt` fraction, so the player can see at a glance *when* (not just whether) the effect will land as the button fills.
 
 ### v7 milestones
@@ -280,7 +280,7 @@ A pass over rough edges across the Skills tab and the Fight tab — not a new fe
 3. Skill-points shortfall message — report a visible message instead of silently refusing when a drop would exceed the Skill Points budget.
 4. Group-kill XP bonus — kills inside a multi-monster group compound ×1.25 per kill in that group; single-monster fights unaffected.
 5. Dungeon-clear bonus XP — add `completionBonusXp` per dungeon in `DUNGEONS`, paid out once alongside the dungeon-complete result.
-6. Fight-button layout stability — diagnose and fix whatever is shifting the skill buttons' position during a fight.
+6. ~~Fight-button layout stability~~ — **skipped.** The actual cause turned out not to be the buttons themselves (no jitter during a cooldown) but `#monster-select`'s whole options list (~6 rows) being removed outright when a fight starts, which shifts everything below it up to fill the gap. Fixing that for real means either an animated collapse (buttons still end up in a new spot, just eased into it) or overlaying the pre-fight and in-fight UI in a shared fixed-height area (no movement, but a real structural change — `hidden` swapped for `visibility` handling, pointer-events, and either dead space or matched heights between the two states). Arnoud decided it's not worth either cost for a learning project and to leave it as-is.
 7. Trigger-point indicator — draw a `triggerAt` marker line on each combat skill button's cooldown fill.
 
 ## v8 scope — prestige
