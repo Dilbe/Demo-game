@@ -19,6 +19,7 @@ const pointsTotalEl = document.getElementById('points-total');
 const skillListEl = document.getElementById('skill-list');
 const skillSlotsEl = document.getElementById('skill-slots');
 const skillDetailPanelEl = document.getElementById('skill-detail-panel');
+const skillEquipMessageEl = document.getElementById('skill-equip-message');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 const questTrackerEl = document.getElementById('quest-tracker');
@@ -740,10 +741,20 @@ function equipInSlot(skillId, slotIndex) {
   if (!skillId || !unlockedSkills.includes(skillId)) return;
   if (equippedSkills[slotIndex] === skillId) return;
 
+  hideSkillEquipMessage();
+
   const previousIndex = equippedSkills.indexOf(skillId);
   const otherIds = equippedSkills.filter((id, index) => id && index !== previousIndex && index !== slotIndex);
   const projectedPoints = otherIds.reduce((total, id) => total + SKILLS[id].pointCost, 0) + SKILLS[skillId].pointCost;
-  if (projectedPoints > statValue('skillPoints', stats.skillPoints)) return;
+  const budget = statValue('skillPoints', stats.skillPoints);
+  if (projectedPoints > budget) {
+    const shortfall = projectedPoints - budget;
+    showSkillEquipMessage(
+      `Not enough Skill Points to equip ${SKILLS[skillId].label} — needs ${shortfall} more `
+      + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Skill Points.`
+    );
+    return;
+  }
 
   if (previousIndex !== -1) equippedSkills[previousIndex] = null;
   equippedSkills[slotIndex] = skillId;
@@ -751,6 +762,23 @@ function equipInSlot(skillId, slotIndex) {
   updateXpDisplay();
   if (!fightActive) renderSkillBar();
   saveProgress();
+}
+
+// Transient feedback for a failed equip attempt — auto-hides after a few
+// seconds, or immediately at the start of the next equip attempt, so it
+// never lingers stale once the player has moved on.
+let skillEquipMessageTimeout = null;
+
+function showSkillEquipMessage(text) {
+  clearTimeout(skillEquipMessageTimeout);
+  skillEquipMessageEl.textContent = text;
+  skillEquipMessageEl.hidden = false;
+  skillEquipMessageTimeout = setTimeout(hideSkillEquipMessage, 4000);
+}
+
+function hideSkillEquipMessage() {
+  clearTimeout(skillEquipMessageTimeout);
+  skillEquipMessageEl.hidden = true;
 }
 
 function unequipSkill(skillId) {
