@@ -333,14 +333,27 @@ body {
   background: #eaf1fb;
 }
 
-/* inline-block (rather than a fixed max-width) so it hugs its content and
-   relies on body's text-align: center to center it — an upgrade row with
-   two tracks needs more width than a readable-paragraph max-width would
-   allow without wrapping awkwardly. */
+/* A two-column layout: the list/slots on the left, the detail panel as a
+   sidebar on the right. flex-wrap so the panel drops below on a narrow
+   window rather than forcing horizontal scroll. */
+#skills-layout {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+#skills-main {
+  flex: 0 0 auto;
+}
+
 #skill-detail-panel {
-  display: inline-block;
-  margin: 0 0 1.5rem;
-  padding: 1rem 1.5rem;
+  flex: 0 0 auto;
+  width: 16rem;
+  margin: 0;
+  padding: 1rem 1.25rem;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fafafa;
@@ -365,24 +378,23 @@ body {
   font-size: 0.9rem;
 }
 
+/* Stacked rather than side-by-side — buildUpgradeRow appends each track's
+   label/change/button in sequence, so a column direction naturally groups
+   them without changing how the row is built, and fits the sidebar's width. */
 .skill-upgrades {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   margin-top: 0.25rem;
 }
 
 .track-label {
-  width: 8rem;
-  text-align: right;
   color: #555;
   font-size: 0.9rem;
 }
 
 .track-change {
-  width: 9rem;
-  text-align: left;
   font-size: 0.9rem;
 }
 
