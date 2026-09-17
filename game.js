@@ -772,47 +772,54 @@ function renderSkills() {
     const unlocked = unlockedSkills.includes(skillId);
     const equipped = equippedSkills.includes(skillId);
 
-    const name = document.createElement('span');
-    name.className = 'skill-name';
-    name.textContent = skill.label;
-
-    const detail = document.createElement('span');
-    detail.className = 'skill-detail';
-    detail.textContent = describeSkill(skillId, skillLevels[skillId]);
-
-    const cost = document.createElement('span');
-    cost.className = 'skill-cost';
-    cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'}`;
-
-    const row = document.createElement('div');
-    row.className = 'skill-row';
+    const entry = document.createElement('div');
+    entry.className = 'skill-entry';
 
     if (unlocked) {
-      // Draggable so it can be dropped onto a slot to equip it, or (if
-      // already equipped) dragged back here to unequip it. See skill-slots.
-      row.classList.add('draggable');
-      row.classList.toggle('equipped', equipped);
-      row.draggable = true;
-      row.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+      // Styled like the in-combat skill button, so a skill looks the same
+      // here as it does on the Fight tab. Draggable so it can be dropped
+      // onto a slot to equip it, or (if already equipped) dragged back here
+      // to unequip it. See skill-slots.
+      const label = document.createElement('span');
+      label.className = 'cooldown-label';
+      label.textContent = skill.label;
 
-      const status = document.createElement('span');
-      status.className = 'equip-status';
-      status.textContent = equipped ? 'Equipped' : '';
-      row.append(name, detail, cost, status);
+      const square = document.createElement('button');
+      square.type = 'button';
+      square.className = 'cooldown-button skill-square';
+      square.classList.toggle('equipped', equipped);
+      square.draggable = true;
+      square.append(label);
+      square.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+
+      entry.append(square);
+      // Upgrade tracks only make sense once a skill is yours.
+      entry.append(buildUpgradeRow(skillId));
     } else {
+      const name = document.createElement('span');
+      name.className = 'skill-name';
+      name.textContent = skill.label;
+
+      const detail = document.createElement('span');
+      detail.className = 'skill-detail';
+      detail.textContent = describeSkill(skillId, skillLevels[skillId]);
+
+      const cost = document.createElement('span');
+      cost.className = 'skill-cost';
+      cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'}`;
+
       const action = document.createElement('button');
       action.className = 'unlock-button';
       action.textContent = `Unlock (${skill.unlockCost} XP)`;
       action.disabled = xp < skill.unlockCost;
       action.addEventListener('click', () => unlockSkill(skillId));
+
+      const row = document.createElement('div');
+      row.className = 'skill-row';
       row.append(name, detail, cost, action);
+      entry.append(row);
     }
 
-    const entry = document.createElement('div');
-    entry.className = 'skill-entry';
-    entry.append(row);
-    // Upgrade tracks only make sense once a skill is yours.
-    if (unlocked) entry.append(buildUpgradeRow(skillId));
     skillListEl.append(entry);
   }
 }
