@@ -45,6 +45,11 @@ let selectedDungeonId = null;
 let activeDungeonId = null;
 let dungeonFightIndex = 0;
 let activeMonsters = [];
+// How many monsters have died in the current group/fight so far — drives the
+// compounding ×1.25 group-kill XP bonus (see groupKillXp). Reset whenever a
+// new group starts (startFightGroup), including each fight within a dungeon,
+// so the bonus never carries over between them.
+let groupKillCount = 0;
 // Which entry of activeMonsters the player's own attacks hit — selectable by
 // clicking a card once more than one monster is active, defaulting to the
 // front.
@@ -445,7 +450,8 @@ function applySkill(skillId) {
   monsterCards[targetIndex].hpEl.textContent = target.hp;
 
   if (target.hp <= 0) {
-    xp += MONSTERS[target.monsterId].xp;
+    xp += groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount);
+    groupKillCount += 1;
     updateXpDisplay();
     registerKill();
     defeatMonster(targetIndex);
@@ -638,6 +644,7 @@ function startFightGroup(groupId) {
   const group = MONSTER_GROUPS[groupId];
   activeMonsters = group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }));
   targetIndex = 0;
+  groupKillCount = 0;
   renderMonsterList(activeMonsters, { interactive: true });
 
   // Every monster starts attacking as soon as the fight begins, each on its

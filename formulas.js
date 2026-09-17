@@ -145,6 +145,22 @@ function costForLevel(baseCost, costGrowth, level) {
   return Math.round(baseCost * Math.pow(costGrowth, level));
 }
 
+// XP for one kill inside a multi-monster group, rewarding clearing bigger
+// groups: `killIndex` is how many monsters in this same group/fight have
+// already died (0 for the first kill), and each kill compounds ×1.25 on top
+// of the last — 1st kill at the monster's own XP, 2nd at ×1.25, 3rd at
+// ×1.25² and so on. A single-monster fight only ever has a killIndex of 0,
+// so this is a no-op (×1 = its own XP) without needing a special case.
+//
+// Each call computes straight from baseXp and killIndex rather than chaining
+// off a previously-rounded result, so rounding one kill never drags down the
+// next kill's multiplier. Rounds up (rather than costForLevel's round-to-
+// nearest) so the bonus always gives at least +1 once it's non-zero, instead
+// of a small base XP (e.g. 1) rounding a fractional bonus away entirely.
+function groupKillXp(baseXp, killIndex) {
+  return Math.ceil(baseXp * Math.pow(1.25, killIndex));
+}
+
 // Basic Attack is the ability the Fight tab has always had, now described as
 // data. `unlockCost` is XP paid once; `pointCost` is Skill Points held for as
 // long as the skill stays equipped.
@@ -330,6 +346,14 @@ function describeMonster(monsterId) {
   return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${monster.xp} XP`;
 }
 
+// Total XP for clearing a group's monsters, including the ×1.25 compounding
+// kill bonus (see groupKillXp) — order matches monsterIds, which is fine as
+// long as a group stays homogeneous (see describeMonsterGroup's note): with
+// every monster worth the same XP, kill order doesn't change the total.
+function groupTotalXp(monsterIds) {
+  return monsterIds.reduce((sum, monsterId, index) => sum + groupKillXp(MONSTERS[monsterId].xp, index), 0);
+}
+
 // Assumes a homogeneous group (every monster the same type) — true of every
 // group defined so far. A mixed group would need a richer description.
 function describeMonsterGroup(groupId) {
@@ -339,7 +363,7 @@ function describeMonsterGroup(groupId) {
   if (monsterIds.length === 1) return describeMonster(firstId);
 
   const monster = MONSTERS[firstId];
-  const totalXp = monsterIds.reduce((sum, id) => sum + MONSTERS[id].xp, 0);
+  const totalXp = groupTotalXp(monsterIds);
   return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${totalXp} XP total`;
 }
 
@@ -380,14 +404,13 @@ function describeQuestProgress(quest, killCount) {
 
 // Chains describeMonsterGroup's summaries with the fight order, plus a
 // running total XP across the whole dungeon — mirrors describeMonsterGroup's
-// own total-XP line, just summed over every fight instead of every monster.
+// own total-XP line (bonus included), just summed over every fight instead
+// of every monster. Each fight is its own group for the bonus's purposes, so
+// this doesn't compound across fights, only within each one.
 function describeDungeon(dungeonId) {
   const { fightIds } = DUNGEONS[dungeonId];
   const labels = fightIds.map((groupId) => MONSTER_GROUPS[groupId].label);
-  const totalXp = fightIds.reduce((sum, groupId) => {
-    const { monsterIds } = MONSTER_GROUPS[groupId];
-    return sum + monsterIds.reduce((groupSum, monsterId) => groupSum + MONSTERS[monsterId].xp, 0);
-  }, 0);
+  const totalXp = fightIds.reduce((sum, groupId) => sum + groupTotalXp(MONSTER_GROUPS[groupId].monsterIds), 0);
   return `${labels.join(' → ')} · ${totalXp} XP total`;
 }
 
@@ -430,5 +453,6 @@ if (typeof module !== 'undefined') {
     skillPower, skillCooldown, skillUpgradeCost, describeSkill,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     activeQuest, questComplete, describeQuestProgress,
+    groupKillXp, groupTotalXp,
   };
 }

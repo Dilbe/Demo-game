@@ -6,6 +6,7 @@ const {
   skillPower, skillCooldown, skillUpgradeCost, describeSkill,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   activeQuest, questComplete, describeQuestProgress,
+  groupKillXp, groupTotalXp,
 } = require('./formulas.js');
 
 // --- Version ---------------------------------------------------------
@@ -288,7 +289,35 @@ test('describeMonsterGroup matches describeMonster for a single-monster group', 
 });
 
 test('describeMonsterGroup totals XP across a multi-monster group', () => {
-  assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 2 XP total');
+  assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 3 XP total');
+});
+
+test('groupKillXp does not change the first kill in a group', () => {
+  assert.strictEqual(groupKillXp(4, 0), 4);
+});
+
+test('groupKillXp compounds \u00d71.25 per kill already in the group, rounded up', () => {
+  assert.strictEqual(groupKillXp(4, 1), 5); // 4 * 1.25 = 5, exact
+  assert.strictEqual(groupKillXp(4, 2), 7); // 4 * 1.5625 = 6.25, rounded up
+});
+
+test('groupKillXp rounds up so a small base XP still gets a nonzero bonus', () => {
+  assert.strictEqual(groupKillXp(1, 1), 2); // 1 * 1.25 = 1.25, rounded up rather than away
+});
+
+test('groupKillXp computes each kill fresh from baseXp, not chained off the last rounded result', () => {
+  // If kill 2 rounded up to 2 and kill 3 compounded \u00d71.25 on *that*, it would
+  // be ceil(2 * 1.25) = 3. Compounding on the original baseXp instead gives
+  // ceil(1 * 1.25^2) = 2, so one rounding-up doesn't snowball into the next.
+  assert.strictEqual(groupKillXp(1, 2), 2);
+});
+
+test('groupTotalXp sums every kill in order, bonus included', () => {
+  assert.strictEqual(groupTotalXp(['medium', 'medium']), 4 + 5); // 4, then 4 * 1.25
+});
+
+test('groupTotalXp matches a monster\'s own XP for a single-monster group', () => {
+  assert.strictEqual(groupTotalXp(['small']), MONSTERS.small.xp);
 });
 
 // --- Dungeons --------------------------------------------------------------
