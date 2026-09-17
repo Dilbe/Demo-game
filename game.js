@@ -28,12 +28,16 @@ const SAVE_KEY = 'demo-game-save';
 // Derived from STATS so a new stat needs defining in one place only.
 const stats = Object.fromEntries(Object.keys(STATS).map((statId) => [statId, 0]));
 
-// The player's current pick from MONSTERS, chosen on the selection screen
-// below. `activeMonster` is only set once a fight actually starts, so it
-// stays null while a monster is merely selected but not yet fought.
-let selectedMonsterId = null;
-let activeMonster = null;
-let monsterHp;
+// The player's current pick from MONSTER_GROUPS, chosen on the selection
+// screen below. `activeMonsters` is only populated once a fight starts: one
+// entry ({ monsterId, hp }) per monster in the group, in queue order.
+//
+// Only the front entry (index 0) is shown or fights right now — full
+// multi-monster display, targeting, and independent attacks are the next
+// few milestones, so picking "Two Small Monsters" fights identically to
+// "Small Monster" until then, with the second monster waiting unseen.
+let selectedGroupId = null;
+let activeMonsters = [];
 let playerHp = null;
 let fightActive = false;
 const skillTimeouts = new Map();
@@ -72,27 +76,27 @@ function upgradeStat(statId) {
   saveProgress();
 }
 
-// One row per monster in the data, same pattern as renderStats/renderSkills.
+// One row per fight option, same pattern as renderStats/renderSkills.
 // Disabled entirely mid-fight — the opponent can't change once a fight starts.
 function renderMonsterSelect() {
   monsterSelectEl.replaceChildren();
 
-  for (const [monsterId, monster] of Object.entries(MONSTERS)) {
-    const selected = monsterId === selectedMonsterId;
+  for (const [groupId, group] of Object.entries(MONSTER_GROUPS)) {
+    const selected = groupId === selectedGroupId;
 
     const name = document.createElement('span');
     name.className = 'monster-name';
-    name.textContent = monster.label;
+    name.textContent = group.label;
 
     const detail = document.createElement('span');
     detail.className = 'monster-detail';
-    detail.textContent = describeMonster(monsterId);
+    detail.textContent = describeMonsterGroup(groupId);
 
     const button = document.createElement('button');
     button.className = 'monster-select-button';
     button.textContent = selected ? 'Selected' : 'Select';
     button.disabled = fightActive || selected;
-    button.addEventListener('click', () => selectMonster(monsterId));
+    button.addEventListener('click', () => selectMonsterGroup(groupId));
 
     const row = document.createElement('div');
     row.className = 'monster-row';
@@ -102,22 +106,29 @@ function renderMonsterSelect() {
   }
 }
 
-function selectMonster(monsterId) {
+function selectMonsterGroup(groupId) {
   if (fightActive) return;
 
-  selectedMonsterId = monsterId;
+  selectedGroupId = groupId;
   renderMonsterSelect();
   updateMonsterPreview();
   saveProgress();
 }
 
 // Shows what the current selection would fight, before Start commits to it.
+// Previews only the front monster, matching what a fight actually shows.
 function updateMonsterPreview() {
-  const monster = selectedMonsterId ? MONSTERS[selectedMonsterId] : null;
+  const group = selectedGroupId ? MONSTER_GROUPS[selectedGroupId] : null;
+  const monster = group ? MONSTERS[group.monsterIds[0]] : null;
   monsterNameEl.textContent = monster ? monster.label : 'No monster selected';
   monsterHpEl.textContent = monster ? monster.maxHp : '—';
   monsterMaxHpEl.textContent = monster ? monster.maxHp : '—';
-  startButton.disabled = !monster;
+  startButton.disabled = !group;
+}
+
+// The monster currently shown/fought — the front of the queue.
+function frontMonster() {
+  return activeMonsters.length ? MONSTERS[activeMonsters[0].monsterId] : null;
 }
 
 function renderStats() {
@@ -235,11 +246,12 @@ function applySkill(skillId) {
     return;
   }
 
-  monsterHp = Math.max(0, monsterHp - power);
-  monsterHpEl.textContent = monsterHp;
+  const target = activeMonsters[0];
+  target.hp = Math.max(0, target.hp - power);
+  monsterHpEl.textContent = target.hp;
 
-  if (monsterHp <= 0) {
-    xp += activeMonster.xp;
+  if (target.hp <= 0) {
+    xp += MONSTERS[target.monsterId].xp;
     updateXpDisplay();
     saveProgress();
     endGame('You win!');
@@ -288,7 +300,8 @@ function regenTick() {
 }
 
 function monsterAttackTick() {
-  playerHp = Math.max(0, playerHp - activeMonster.damage);
+  const monster = frontMonster();
+  playerHp = Math.max(0, playerHp - monster.damage);
   updateHealthBar();
   saveProgress();
 
@@ -297,7 +310,7 @@ function monsterAttackTick() {
     return;
   }
 
-  animateCooldownFill(monsterCooldownFillEl, activeMonster.cooldown);
+  animateCooldownFill(monsterCooldownFillEl, monster.cooldown);
 }
 
 function endGame(message) {
@@ -314,8 +327,7 @@ function endGame(message) {
 
 function startGame() {
   fightActive = false;
-  activeMonster = null;
-  monsterHp = null;
+  activeMonsters = [];
   updateHealthBar();
 
   renderMonsterSelect();
@@ -334,13 +346,15 @@ function startGame() {
 }
 
 function beginFight() {
-  if (!selectedMonsterId) return;
+  if (!selectedGroupId) return;
 
-  activeMonster = MONSTERS[selectedMonsterId];
-  monsterHp = activeMonster.maxHp;
-  monsterNameEl.textContent = activeMonster.label;
-  monsterHpEl.textContent = monsterHp;
-  monsterMaxHpEl.textContent = activeMonster.maxHp;
+  const group = MONSTER_GROUPS[selectedGroupId];
+  activeMonsters = group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }));
+
+  const monster = frontMonster();
+  monsterNameEl.textContent = monster.label;
+  monsterHpEl.textContent = activeMonsters[0].hp;
+  monsterMaxHpEl.textContent = monster.maxHp;
 
   fightActive = true;
   startButton.hidden = true;
@@ -352,8 +366,8 @@ function beginFight() {
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
 
-  animateCooldownFill(monsterCooldownFillEl, activeMonster.cooldown);
-  monsterAttackInterval = setInterval(monsterAttackTick, activeMonster.cooldown * 1000);
+  animateCooldownFill(monsterCooldownFillEl, monster.cooldown);
+  monsterAttackInterval = setInterval(monsterAttackTick, monster.cooldown * 1000);
 }
 
 function updateXpDisplay() {
@@ -494,7 +508,7 @@ function upgradeSkillTrack(skillId, track) {
 }
 
 function saveProgress() {
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedMonsterId }));
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels, selectedGroupId }));
 }
 
 function loadProgress() {
@@ -508,7 +522,7 @@ function loadProgress() {
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills;
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
   if (saved.skillLevels) Object.assign(skillLevels, saved.skillLevels);
-  if (saved.selectedMonsterId) selectedMonsterId = saved.selectedMonsterId;
+  if (saved.selectedGroupId) selectedGroupId = saved.selectedGroupId;
 }
 
 function resetCharacter() {

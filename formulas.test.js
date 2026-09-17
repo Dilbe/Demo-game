@@ -1,10 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  STATS, SKILLS, STARTING_SKILLS, MONSTERS,
+  STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
-  describeMonster,
+  describeMonster, describeMonsterGroup,
 } = require('./formulas.js');
 
 // --- Formula maths -----------------------------------------------------
@@ -230,4 +230,22 @@ test('Medium and Big monsters are tougher and worth more XP than Small', () => {
 
 test('describeMonster summarizes HP, damage, cooldown, and XP', () => {
   assert.strictEqual(describeMonster('small'), '5 HP \u00b7 1 damage every 3s \u00b7 1 XP');
+});
+
+test('the three single-monster groups mirror MONSTERS one-to-one', () => {
+  for (const monsterId of ['small', 'medium', 'big']) {
+    assert.deepStrictEqual(MONSTER_GROUPS[monsterId].monsterIds, [monsterId]);
+  }
+});
+
+test('twoSmall groups two Small monsters together', () => {
+  assert.deepStrictEqual(MONSTER_GROUPS.twoSmall.monsterIds, ['small', 'small']);
+});
+
+test('describeMonsterGroup matches describeMonster for a single-monster group', () => {
+  assert.strictEqual(describeMonsterGroup('small'), describeMonster('small'));
+});
+
+test('describeMonsterGroup totals XP across a multi-monster group', () => {
+  assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 2 XP total');
 });

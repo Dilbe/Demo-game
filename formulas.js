@@ -97,6 +97,18 @@ const MONSTERS = {
   },
 };
 
+// A fight option groups one or more monsters to fight together. Reuses the
+// MONSTERS templates — a group is just an ordered list of monster ids — so
+// adding one is still a data entry, matching the monster/stat/skill pattern.
+// The three single-monster groups mirror MONSTERS one-to-one; twoSmall is
+// the first multi-monster option.
+const MONSTER_GROUPS = {
+  small: { label: 'Small Monster', monsterIds: ['small'] },
+  medium: { label: 'Medium Monster', monsterIds: ['medium'] },
+  big: { label: 'Big Monster', monsterIds: ['big'] },
+  twoSmall: { label: 'Two Small Monsters', monsterIds: ['small', 'small'] },
+};
+
 // Basic Attack is the ability the Fight tab has always had, now described as
 // data. `unlockCost` is XP paid once; `pointCost` is Skill Points held for as
 // long as the skill stays equipped.
@@ -194,6 +206,19 @@ function describeMonster(monsterId) {
   return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${monster.xp} XP`;
 }
 
+// Assumes a homogeneous group (every monster the same type) — true of every
+// group defined so far. A mixed group would need a richer description.
+function describeMonsterGroup(groupId) {
+  const { monsterIds } = MONSTER_GROUPS[groupId];
+  const [firstId] = monsterIds;
+
+  if (monsterIds.length === 1) return describeMonster(firstId);
+
+  const monster = MONSTERS[firstId];
+  const totalXp = monsterIds.reduce((sum, id) => sum + MONSTERS[id].xp, 0);
+  return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${totalXp} XP total`;
+}
+
 function statValue(statId, level) {
   return STATS[statId].value(level);
 }
@@ -206,9 +231,9 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    STATS, SKILLS, STARTING_SKILLS, MONSTERS,
+    STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
-    describeMonster,
+    describeMonster, describeMonsterGroup,
   };
 }
