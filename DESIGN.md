@@ -187,6 +187,8 @@ Instead of always fighting the same fixed monster, the player picks an opponent 
 6. Multi-monster auto-attack — each active monster attacks the player on its own independent cooldown.
 7. Win condition update — a fight is won only once every active monster is defeated; losing still ends the fight immediately as before.
 
+**v4 status: done.** All 7 milestones complete. Monsters are data objects (Small/Medium/Big) selected before a fight, with a Two Small Monsters option exercising the first multi-monster case. A fight tracks a list of monsters rather than one: each gets its own combatant card, its own independent attack cooldown, and can be targeted individually by clicking its card (defaulting to the front one); a kill grants that monster's XP, marks its card "Defeated", and hands the target off to whichever monster is still standing, with the fight only ending in a win once none are left.
+
 ## Fight flow fixes
 
 Two small, standalone corrections to how an in-progress fight behaves — not tied to any of the scopes above, but worth doing before or alongside them since dungeons (below) build on top of this behavior.
