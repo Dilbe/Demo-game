@@ -200,6 +200,21 @@ Two small, standalone corrections to how an in-progress fight behaves — not ti
 
 **Fight flow fixes status: done.** Retreat is a button, visible only during an active fight, that stops every timer and returns straight to monster selection with HP untouched — no win/loss message. The second fix needed no code change: `setInterval`/`setTimeout` were already independent of a tab-panel's `hidden` attribute, so switching tabs never paused a fight; verified by watching a fight run to completion (win and loss) while the Fight tab was hidden. A comment now documents that the tab-switch handler must never touch fight timers, so this can't regress silently.
 
+## Skill improvements
+
+Another standalone pass, this time over the Skills tab — not tied to any of the scopes above. Skill upgrade tracks are still fixed to exactly Power and Speed, spread across constants (`powerPerLevel`, `speedPerLevel`, `upgradeBaseCost`, `upgradeCostGrowth`) rather than data the way stats and monsters already are. Effects also always land at the very end of a skill's cooldown, which doesn't suit every skill — a strong attack feels better landing immediately, a heal makes more sense landing partway through, ahead of the next hit. Equipping is also still two buttons per skill rather than something more direct.
+
+- **Upgrade tracks as data:** each skill gets an `upgrades` array instead of the two hardcoded track constants — same reasoning as the stat/monster data-object pattern. Every current skill still ends up with exactly a Power and a Speed track, with today's numbers unchanged; the shape now supports a different set, or count, of tracks per skill later, even though every skill happens to use the same two variables today.
+- **Upgrades show what they upgrade:** each upgrade row in the Skills tab shows its current → next value (e.g. "3 damage → 5 damage"), the same "outcome, not just level" format the Character tab's stat rows already use.
+- **Trigger point:** a new `triggerAt` value per skill (0–1, a fraction of its cooldown) says when its effect actually lands. Today everything is effectively `triggerAt: 1` (fires only once the cooldown finishes). Strong Attack moves to `triggerAt: 0` (lands immediately on press); Heal moves to `triggerAt: 0.5` (lands halfway through its cooldown). The cooldown bar still animates for the full duration either way, and the button/auto-retrigger still waits for the full cooldown — only the effect's own timing changes.
+- **Drag-and-drop loadout:** replaces the Equip/Unequip buttons with a row of skill slots at the bottom of the Skills tab, sized to the Skill Slots stat and styled like the in-combat skill bar. Dragging an unlocked skill onto a slot equips it (swapping out whatever was there, if anything); dragging a slotted skill off unequips it.
+
+### Skill improvements milestones
+
+1. Upgrade tracks as data — replace the two hardcoded Power/Speed constants with an `upgrades` array per skill, each entry carrying its own base effect, cost, and cost growth; the Skills tab's per-track row is generated from that array and shows the current → next value, matching the Character tab's stat-row format. No balance change — every skill keeps today's two tracks and numbers.
+2. Trigger point — add `triggerAt` to every skill (defaulting to today's end-of-cooldown behavior); move Strong Attack to fire immediately on press and Heal to fire halfway through its cooldown.
+3. Drag-and-drop skill slots — replace the per-skill Equip/Unequip buttons with a slot bar (sized to Skill Slots) at the bottom of the Skills tab, matching the in-combat skill bar's look; drag an unlocked skill onto a slot to equip it, drag a slotted skill off to unequip it.
+
 ## v5 scope — dungeons
 
 A dungeon is a chain of monster fights, fought back-to-back without returning to the selection screen in between. Builds directly on v4 (monster/multi-monster selection) and the Fight flow fixes above (Retreat needs to cleanly exit a whole dungeon, not just its current fight).

@@ -109,9 +109,28 @@ const MONSTER_GROUPS = {
   twoSmall: { label: 'Two Small Monsters', monsterIds: ['small', 'small'] },
 };
 
+// Rounds an upgrade/stat's cost the same way for all of them: compounding
+// baseCost by costGrowth per level, like statCost below.
+function costForLevel(baseCost, costGrowth, level) {
+  return Math.round(baseCost * Math.pow(costGrowth, level));
+}
+
 // Basic Attack is the ability the Fight tab has always had, now described as
 // data. `unlockCost` is XP paid once; `pointCost` is Skill Points held for as
 // long as the skill stays equipped.
+//
+// `upgrades` is an array rather than fixed fields so a skill isn't locked to
+// exactly a Power and a Speed track — same reasoning as the stat/monster
+// data-object pattern. Every skill happens to use the same two tracks today
+// (and the two variables — perLevel, baseCost, costGrowth — happen to line
+// up the same way), but nothing here assumes that stays true.
+//
+// `triggerAt` is a fraction (0–1) of the cooldown at which the skill's
+// effect actually lands: 0 fires immediately on press, 1 (today's default
+// for most skills) fires only once the cooldown finishes. The cooldown bar
+// still animates for the full duration, and the button/auto-retrigger still
+// waits for the full cooldown, either way — only the effect's own timing
+// moves.
 const SKILLS = {
   basicAttack: {
     label: 'Basic Attack',
@@ -120,10 +139,29 @@ const SKILLS = {
     unlockCost: 0,
     pointCost: 1,
     auto: false,
-    powerPerLevel: 1,
-    speedPerLevel: 0.2,
-    upgradeBaseCost: 5,
-    upgradeCostGrowth: 1.5,
+    triggerAt: 1,
+    upgrades: [
+      {
+        id: 'power',
+        label: 'Damage',
+        perLevel: 1,
+        baseCost: 5,
+        costGrowth: 1.5,
+        value(skill, level) { return skill.damage + level * this.perLevel; },
+        format(value) { return `${value} damage`; },
+      },
+      {
+        id: 'speed',
+        label: 'Speed',
+        // Divides rather than subtracts, so higher levels mean a shorter
+        // cooldown with diminishing returns, never reaching zero.
+        perLevel: 0.2,
+        baseCost: 5,
+        costGrowth: 1.5,
+        value(skill, level) { return skill.cooldown / (1 + level * this.perLevel); },
+        format(value) { return `${value.toFixed(1)}s cooldown`; },
+      },
+    ],
   },
 
   strongAttack: {
@@ -133,10 +171,30 @@ const SKILLS = {
     unlockCost: 15,
     pointCost: 2,
     auto: false,
-    powerPerLevel: 2,
-    speedPerLevel: 0.15,
-    upgradeBaseCost: 8,
-    upgradeCostGrowth: 1.5,
+    // Lands the instant it's pressed, rather than waiting out its (longer)
+    // cooldown like Basic Attack — the cooldown is what limits how often you
+    // can use it, not a delay on top of using it.
+    triggerAt: 0,
+    upgrades: [
+      {
+        id: 'power',
+        label: 'Damage',
+        perLevel: 2,
+        baseCost: 8,
+        costGrowth: 1.5,
+        value(skill, level) { return skill.damage + level * this.perLevel; },
+        format(value) { return `${value} damage`; },
+      },
+      {
+        id: 'speed',
+        label: 'Speed',
+        perLevel: 0.15,
+        baseCost: 8,
+        costGrowth: 1.5,
+        value(skill, level) { return skill.cooldown / (1 + level * this.perLevel); },
+        format(value) { return `${value.toFixed(1)}s cooldown`; },
+      },
+    ],
   },
 
   heal: {
@@ -146,10 +204,29 @@ const SKILLS = {
     unlockCost: 15,
     pointCost: 2,
     auto: false,
-    powerPerLevel: 2,
-    speedPerLevel: 0.15,
-    upgradeBaseCost: 8,
-    upgradeCostGrowth: 1.5,
+    // Lands halfway through its cooldown, ahead of whatever the next monster
+    // attack might be, rather than only once the cooldown is already over.
+    triggerAt: 0.5,
+    upgrades: [
+      {
+        id: 'power',
+        label: 'Healing',
+        perLevel: 2,
+        baseCost: 8,
+        costGrowth: 1.5,
+        value(skill, level) { return skill.healing + level * this.perLevel; },
+        format(value) { return `Heals ${value}`; },
+      },
+      {
+        id: 'speed',
+        label: 'Speed',
+        perLevel: 0.15,
+        baseCost: 8,
+        costGrowth: 1.5,
+        value(skill, level) { return skill.cooldown / (1 + level * this.perLevel); },
+        format(value) { return `${value.toFixed(1)}s cooldown`; },
+      },
+    ],
   },
 
   autoAttack: {
@@ -160,37 +237,54 @@ const SKILLS = {
     // Costs the most to hold: it deals damage without being clicked.
     pointCost: 3,
     auto: true,
-    powerPerLevel: 1,
-    speedPerLevel: 0.1,
-    upgradeBaseCost: 10,
-    upgradeCostGrowth: 1.6,
+    triggerAt: 1,
+    upgrades: [
+      {
+        id: 'power',
+        label: 'Damage',
+        perLevel: 1,
+        baseCost: 10,
+        costGrowth: 1.6,
+        value(skill, level) { return skill.damage + level * this.perLevel; },
+        format(value) { return `${value} damage`; },
+      },
+      {
+        id: 'speed',
+        label: 'Speed',
+        perLevel: 0.1,
+        baseCost: 10,
+        costGrowth: 1.6,
+        value(skill, level) { return skill.cooldown / (1 + level * this.perLevel); },
+        format(value) { return `${value.toFixed(1)}s cooldown`; },
+      },
+    ],
   },
 };
 
 // Unlocked from the start, so a new player always has something to attack with.
 const STARTING_SKILLS = ['basicAttack'];
 
-// A skill's two upgrade tracks. Power is damage, or healing for a healing
-// skill; speed divides the cooldown the way Health Regen divides its interval,
-// so it shrinks with diminishing returns and never reaches zero.
+function findUpgrade(skillId, upgradeId) {
+  return SKILLS[skillId].upgrades.find((upgrade) => upgrade.id === upgradeId);
+}
+
+// Game logic only ever needs "how hard does this skill currently hit" and
+// "how long is its cooldown right now" — regardless of how many upgrade
+// tracks a skill has, those two ideas are always the 'power' and 'speed'
+// upgrade ids by convention.
 function skillPower(skillId, level) {
   const skill = SKILLS[skillId];
-  const base = skill.healing ?? skill.damage;
-  return base + level * skill.powerPerLevel;
+  return findUpgrade(skillId, 'power').value(skill, level);
 }
 
 function skillCooldown(skillId, level) {
   const skill = SKILLS[skillId];
-  return skill.cooldown / (1 + level * skill.speedPerLevel);
+  return findUpgrade(skillId, 'speed').value(skill, level);
 }
 
-function skillUpgradeCost(skillId, level) {
-  const skill = SKILLS[skillId];
-  return Math.round(skill.upgradeBaseCost * Math.pow(skill.upgradeCostGrowth, level));
-}
-
-function powerLabel(skillId) {
-  return SKILLS[skillId].healing ? 'Healing' : 'Damage';
+function skillUpgradeCost(skillId, upgradeId, level) {
+  const upgrade = findUpgrade(skillId, upgradeId);
+  return costForLevel(upgrade.baseCost, upgrade.costGrowth, level);
 }
 
 function describeSkill(skillId, levels = { power: 0, speed: 0 }) {
@@ -247,7 +341,7 @@ function statValue(statId, level) {
 
 function statCost(statId, level) {
   const stat = STATS[statId];
-  return Math.round(stat.baseCost * Math.pow(stat.costGrowth, level));
+  return costForLevel(stat.baseCost, stat.costGrowth, level);
 }
 
 // Loaded as a plain <script> in the browser; required by the Node test runner.
@@ -255,7 +349,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
     statValue, statCost,
-    skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
+    skillPower, skillCooldown, skillUpgradeCost, describeSkill,
     describeMonster, describeMonsterGroup, advanceRegen,
   };
 }

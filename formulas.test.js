@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const {
   STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS,
   statValue, statCost,
-  skillPower, skillCooldown, skillUpgradeCost, powerLabel, describeSkill,
+  skillPower, skillCooldown, skillUpgradeCost, describeSkill,
   describeMonster, describeMonsterGroup, advanceRegen,
 } = require('./formulas.js');
 
@@ -97,19 +97,29 @@ test('every skill gets stronger and faster as its tracks level up', () => {
 });
 
 test('skill upgrades never get cheaper and cost whole XP', () => {
-  for (const skillId of Object.keys(SKILLS)) {
-    for (let level = 0; level < 10; level += 1) {
-      const cost = skillUpgradeCost(skillId, level);
-      assert.strictEqual(cost % 1, 0, `${skillId} level ${level} cost is fractional`);
-      assert.ok(skillUpgradeCost(skillId, level + 1) >= cost, `${skillId} got cheaper at level ${level + 1}`);
+  for (const [skillId, skill] of Object.entries(SKILLS)) {
+    for (const { id: upgradeId } of skill.upgrades) {
+      for (let level = 0; level < 10; level += 1) {
+        const cost = skillUpgradeCost(skillId, upgradeId, level);
+        assert.strictEqual(cost % 1, 0, `${skillId} ${upgradeId} level ${level} cost is fractional`);
+        assert.ok(skillUpgradeCost(skillId, upgradeId, level + 1) >= cost, `${skillId} ${upgradeId} got cheaper at level ${level + 1}`);
+      }
     }
   }
 });
 
-test('powerLabel says Healing for healing skills and Damage otherwise', () => {
-  assert.strictEqual(powerLabel('heal'), 'Healing');
-  assert.strictEqual(powerLabel('basicAttack'), 'Damage');
-  assert.strictEqual(powerLabel('autoAttack'), 'Damage');
+test('each upgrade\'s label and format describe what it changes', () => {
+  const heal = SKILLS.heal.upgrades.find((upgrade) => upgrade.id === 'power');
+  assert.strictEqual(heal.label, 'Healing');
+  assert.strictEqual(heal.format(9), 'Heals 9');
+
+  const basicAttackPower = SKILLS.basicAttack.upgrades.find((upgrade) => upgrade.id === 'power');
+  assert.strictEqual(basicAttackPower.label, 'Damage');
+  assert.strictEqual(basicAttackPower.format(4), '4 damage');
+
+  const speed = SKILLS.basicAttack.upgrades.find((upgrade) => upgrade.id === 'speed');
+  assert.strictEqual(speed.label, 'Speed');
+  assert.strictEqual(speed.format(1.5), '1.5s cooldown');
 });
 
 test('every stat defines the full data-object shape', () => {
@@ -127,13 +137,31 @@ test('every stat defines the full data-object shape', () => {
 
 test('every skill defines the full data-object shape', () => {
   for (const [skillId, skill] of Object.entries(SKILLS)) {
-    for (const field of ['label', 'cooldown', 'unlockCost', 'pointCost', 'auto', 'powerPerLevel', 'speedPerLevel', 'upgradeBaseCost', 'upgradeCostGrowth']) {
+    for (const field of ['label', 'cooldown', 'unlockCost', 'pointCost', 'auto', 'triggerAt']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
     assert.ok(skill.pointCost > 0, `${skillId} costs no skill points to equip`);
     assert.ok(skill.damage !== undefined || skill.healing !== undefined, `${skillId} does neither damage nor healing`);
     assert.ok(skill.cooldown > 0, `${skillId} has a non-positive cooldown`);
+    assert.ok(skill.triggerAt >= 0 && skill.triggerAt <= 1, `${skillId} triggerAt is not a fraction of its cooldown`);
+
+    assert.ok(Array.isArray(skill.upgrades) && skill.upgrades.length > 0, `${skillId} has no upgrades`);
+    for (const upgrade of skill.upgrades) {
+      for (const field of ['id', 'label', 'perLevel', 'baseCost', 'costGrowth']) {
+        assert.ok(upgrade[field] !== undefined, `${skillId}'s ${upgrade.id ?? '?'} upgrade is missing ${field}`);
+      }
+      assert.strictEqual(typeof upgrade.value, 'function', `${skillId}'s ${upgrade.id} upgrade is missing value()`);
+      assert.strictEqual(typeof upgrade.format, 'function', `${skillId}'s ${upgrade.id} upgrade is missing format()`);
+      assert.ok(upgrade.format(upgrade.value(skill, 0)).length > 0, `${skillId}'s ${upgrade.id} format() produced nothing`);
+    }
   }
+});
+
+test('Strong Attack triggers immediately, Heal triggers halfway, others at the end', () => {
+  assert.strictEqual(SKILLS.strongAttack.triggerAt, 0);
+  assert.strictEqual(SKILLS.heal.triggerAt, 0.5);
+  assert.strictEqual(SKILLS.basicAttack.triggerAt, 1);
+  assert.strictEqual(SKILLS.autoAttack.triggerAt, 1);
 });
 
 test('starting skills are real skills and cost nothing', () => {
@@ -195,8 +223,8 @@ test('BALANCE SNAPSHOT: current tuning', () => {
   assert.strictEqual(skillCooldown('basicAttack', 0), 2);
   assert.strictEqual(skillCooldown('basicAttack', 5), 1);
 
-  assert.strictEqual(skillUpgradeCost('basicAttack', 0), 5);
-  assert.strictEqual(skillUpgradeCost('basicAttack', 1), 8);
+  assert.strictEqual(skillUpgradeCost('basicAttack', 'power', 0), 5);
+  assert.strictEqual(skillUpgradeCost('basicAttack', 'power', 1), 8);
 
   assert.strictEqual(statValue('healthRegen', 0), 60);
   assert.strictEqual(statValue('healthRegen', 1), 48);
