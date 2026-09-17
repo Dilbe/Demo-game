@@ -4,8 +4,17 @@ body {
   margin-top: 3rem;
 }
 
-.combatant {
+#monster-list {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1.5rem;
   margin: 1.5rem auto;
+}
+
+.combatant {
+  margin: 0;
 }
 
 #monster-select {
