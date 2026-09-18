@@ -477,6 +477,65 @@ body {
   font-size: 0.9rem;
 }
 
+.skill-locked-message {
+  flex: 1 1 8rem;
+  text-align: left;
+  color: #555;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* One-time-unlock, then on/off — a separate block from .skill-upgrades'
+   continuously-leveled tracks, with a top border so the two read as
+   distinct groups inside the same detail panel. */
+.skill-toggles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #ddd;
+}
+
+.toggles-locked-message {
+  margin: 0 0 0.25rem;
+  color: #555;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.toggle-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.toggle-label {
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.toggle-description {
+  color: #555;
+  font-size: 0.8rem;
+  max-width: 15rem;
+}
+
+.toggle-switch,
+.toggle-unlock-button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+}
+
+.toggle-switch.active {
+  background: #1b5e20;
+  color: #fff;
+  border-color: #1b5e20;
+}
+
 #reset-character-button {
   margin-top: 1.5rem;
 }

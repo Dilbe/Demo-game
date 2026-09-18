@@ -73,6 +73,11 @@ const skillTimeouts = new Map();
 // One interval per monster in activeMonsters — each attacks the player on
 // its own cooldown, independently of the others.
 let monsterAttackIntervals = [];
+// Active Heal-over-Time payouts in progress (see startHealOverTime) — one
+// interval per cast, so overlapping casts each run their own ticks
+// independently. Cleared by stopFightTimers, same as every other in-fight
+// timer.
+let hotIntervals = [];
 let regenProgress = 0;
 let unlockedSkills = [...STARTING_SKILLS];
 // One entry per skill slot, in slot order — a skillId, or null/undefined for
@@ -112,6 +117,18 @@ let totalKills = 0;
 // Quest ids completed so far, in the order they were completed (which is
 // always QUESTS order, since quests only ever complete sequentially).
 let completedQuestIds = [];
+// Objective ids completed so far (see OBJECTIVES) — unlike QUESTS, these can
+// complete in any order, since nothing gates one behind another.
+let completedObjectiveIds = [];
+// Gates the whole toggle system (see SKILLS.*.toggles): false until the
+// 'winDungeon' objective completes, at which point every skill's toggle list
+// becomes purchasable/switchable rather than just visible.
+let togglesUnlocked = false;
+// Flat "skillId:toggleId" lists (see toggleKey) — unlockedToggleIds is a
+// one-time XP purchase per toggle, activeToggleIds (always a subset of it)
+// is which of those are currently switched on.
+let unlockedToggleIds = [];
+let activeToggleIds = [];
 
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
 function animateCooldownFill(fillEl, durationSeconds) {
@@ -383,11 +400,19 @@ function equippedSkillIds() {
   return equippedSkills.filter((skillId) => skillId);
 }
 
-// One button per unlocked skill. Automatic skills get a button too, but only
-// as a cooldown indicator — they fire themselves rather than being clicked.
-// Passive skills get no button at all: they have no cooldown to show and
-// nothing to click, just a stat boost that applies for as long as they stay
-// equipped (see applySkill/effectiveSecondsPerHp).
+// True if `skillId` should fire itself as soon as its cooldown allows,
+// rather than waiting for a click — the Auto-Trigger toggle (see
+// SKILLS.basicAttack/strongAttack.toggles), checked live rather than frozen
+// at fight start, same as every other toggle/upgrade-level lookup here.
+function isAutoTriggering(skillId) {
+  return isToggleActive(skillId, 'autoTrigger');
+}
+
+// One button per unlocked skill. Auto-triggering skills get a button too, but
+// only as a cooldown indicator — they fire themselves rather than being
+// clicked. Passive skills get no button at all: they have no cooldown to
+// show and nothing to click, just a stat boost that applies for as long as
+// they stay equipped (see applySkill/effectiveSecondsPerHp).
 function renderSkillBar() {
   skillBarEl.replaceChildren();
 
@@ -416,11 +441,12 @@ function renderSkillBar() {
     button.disabled = true;
     button.append(fill, triggerMarker, label);
 
-    if (!skill.auto) {
+    if (!isAutoTriggering(skillId)) {
       button.addEventListener('click', () => useSkill(skillId));
 
       // Numbered by position in the bar, so the hint stays correct however the
-      // bar is filled. Automatic skills get no number — they cannot be triggered.
+      // bar is filled. Auto-triggering skills get no number — they cannot be
+      // triggered by hand.
       const hotkey = document.createElement('span');
       hotkey.className = 'hotkey-hint';
       hotkey.textContent = index + 1;
@@ -463,11 +489,15 @@ function useSkill(skillId) {
     skillTimeouts.delete(skillId);
 
     if (!fightActive) return;
-    if (skill.auto) useSkill(skillId);
+    if (isAutoTriggering(skillId)) useSkill(skillId);
     else button.disabled = false;
   }, cooldown * 1000);
 
   skillTimeouts.set(skillId, [effectTimeout, cooldownTimeout]);
+}
+
+function isToggleActive(skillId, toggleId) {
+  return activeToggleIds.includes(toggleKey(skillId, toggleId));
 }
 
 function applySkill(skillId) {
@@ -478,51 +508,112 @@ function applySkill(skillId) {
   const power = skill.healing ? basePower : Math.round(basePower * passiveMultiplier(equippedSkillIds(), 'damage'));
 
   if (skill.healing) {
-    playerHp = Math.min(statValue('maxHp', stats.maxHp), playerHp + power);
-    updateHealthBar();
+    if (isToggleActive(skillId, 'healOverTime')) {
+      startHealOverTime(power);
+    } else {
+      healPlayer(power);
+    }
     saveProgress();
     return;
   }
 
-  const target = activeMonsters[targetIndex];
-  target.hp = Math.max(0, target.hp - power);
-  monsterCards[targetIndex].hpEl.textContent = target.hp;
+  // Multi Attack (a Basic Attack toggle) hits every monster still standing
+  // instead of just the current target, each for the same full damage.
+  const targets = isToggleActive(skillId, 'multiAttack')
+    ? activeMonsters.map((monster, index) => (monster.hp > 0 ? index : null)).filter((index) => index !== null)
+    : [targetIndex];
 
-  if (target.hp <= 0) {
-    awardXp(groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount));
-    groupKillCount += 1;
+  const anyKilled = targets.reduce((killed, index) => damageMonster(index, power) || killed, false);
+  if (anyKilled) {
+    saveProgress();
+    resolveFightProgress();
+  }
+}
+
+// Applies damage to one monster, handling its kill (XP, quest/objective
+// progress, defeat) if that's what the hit did. Returns whether it killed —
+// applySkill uses that to decide whether anything needs re-checking
+// afterwards (win condition, retargeting), whether it hit one monster or,
+// with Multi Attack, several at once.
+function damageMonster(index, power) {
+  const target = activeMonsters[index];
+  target.hp = Math.max(0, target.hp - power);
+  monsterCards[index].hpEl.textContent = target.hp;
+  if (target.hp > 0) return false;
+
+  awardXp(groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount));
+  groupKillCount += 1;
+  updateXpDisplay();
+  registerKill();
+  registerObjectiveEvent({ type: 'killMonster', monsterId: target.monsterId });
+  defeatMonster(index);
+  return true;
+}
+
+// Checks the fight's state after one or more monsters were just damaged:
+// ends/advances the fight if every monster is down, otherwise retargets away
+// from a target that just died so the player doesn't have to reselect one
+// just to keep attacking.
+function resolveFightProgress() {
+  if (!activeMonsters.every((monster) => monster.hp <= 0)) {
+    if (activeMonsters[targetIndex].hp <= 0) {
+      targetIndex = activeMonsters.findIndex((monster) => monster.hp > 0);
+      updateTargetHighlight();
+    }
+    return;
+  }
+
+  if (activeDungeonId && dungeonFightIndex < DUNGEONS[activeDungeonId].fightIds.length - 1) {
+    advanceDungeonFight();
+    return;
+  }
+
+  if (activeDungeonId) {
+    // Paid once, only here — reaching this point already means every fight
+    // in the chain is cleared. Retreat and a loss both end the dungeon
+    // elsewhere, without ever reaching this branch.
+    const bonus = DUNGEONS[activeDungeonId].completionBonusXp;
+    awardXp(bonus);
+    registerObjectiveEvent({ type: 'winDungeon' });
     updateXpDisplay();
-    registerKill();
-    defeatMonster(targetIndex);
+    saveProgress();
+    endGame(`${DUNGEONS[activeDungeonId].label} cleared! (+${bonus} bonus XP)`);
+    return;
+  }
+
+  endGame('You win!');
+}
+
+function healPlayer(amount) {
+  playerHp = Math.min(statValue('maxHp', stats.maxHp), playerHp + amount);
+  updateHealthBar();
+}
+
+// Heal over Time (a Heal toggle): spreads `totalAmount` over 10 one-second
+// ticks instead of landing it all at once. Each tick's amount is the
+// difference between successive *rounded* running totals (rather than a
+// flat totalAmount/10 every tick) so small, uneven totals still add up to
+// exactly totalAmount rather than losing a fraction to rounding each tick.
+const HOT_DURATION_SECONDS = 10;
+
+function startHealOverTime(totalAmount) {
+  let paidSoFar = 0;
+  let tick = 0;
+
+  const intervalId = setInterval(() => {
+    tick += 1;
+    const target = Math.round((totalAmount * tick) / HOT_DURATION_SECONDS);
+    healPlayer(target - paidSoFar);
+    paidSoFar = target;
     saveProgress();
 
-    if (activeMonsters.every((monster) => monster.hp <= 0)) {
-      if (activeDungeonId && dungeonFightIndex < DUNGEONS[activeDungeonId].fightIds.length - 1) {
-        advanceDungeonFight();
-        return;
-      }
-
-      if (activeDungeonId) {
-        // Paid once, only here — reaching this point already means every
-        // fight in the chain is cleared. Retreat and a loss both end the
-        // dungeon elsewhere, without ever reaching this branch.
-        const bonus = DUNGEONS[activeDungeonId].completionBonusXp;
-        awardXp(bonus);
-        updateXpDisplay();
-        saveProgress();
-        endGame(`${DUNGEONS[activeDungeonId].label} cleared! (+${bonus} bonus XP)`);
-        return;
-      }
-
-      endGame('You win!');
-      return;
+    if (tick >= HOT_DURATION_SECONDS) {
+      clearInterval(intervalId);
+      hotIntervals = hotIntervals.filter((id) => id !== intervalId);
     }
+  }, 1000);
 
-    // Move the fight on to whichever monster is still standing, so the
-    // player doesn't have to reselect a target just to keep attacking.
-    targetIndex = activeMonsters.findIndex((monster) => monster.hp > 0);
-    updateTargetHighlight();
-  }
+  hotIntervals.push(intervalId);
 }
 
 // A defeated monster stops attacking and can no longer be targeted, but its
@@ -628,6 +719,8 @@ function stopFightTimers() {
   // still land after the fight is already over.
   for (const timeouts of skillTimeouts.values()) timeouts.forEach(clearTimeout);
   skillTimeouts.clear();
+  hotIntervals.forEach(clearInterval);
+  hotIntervals = [];
 }
 
 function endGame(message) {
@@ -735,7 +828,7 @@ function beginFight() {
   for (const skillId of equippedSkillIds()) {
     const skill = SKILLS[skillId];
     if (skill.type === 'passive') continue;
-    if (skill.auto) useSkill(skillId);
+    if (isAutoTriggering(skillId)) useSkill(skillId);
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
 
@@ -816,25 +909,37 @@ function prestige() {
 }
 
 function unlockSkill(skillId) {
+  // Objective-gated skills (Strong Attack, Heal) have no XP price at all —
+  // they unlock only via applyObjectiveReward, never through this button.
+  if (SKILLS[skillId].unlockObjectiveId) return;
+
   const cost = SKILLS[skillId].unlockCost;
   if (unlockedSkills.includes(skillId) || xp < cost) return;
 
   xp -= cost;
-  unlockedSkills.push(skillId);
-  // Equip straight away when it fits, so buying a skill does something visible
-  // rather than needing a second click to matter.
-  const slot = firstEmptySlotIndex();
-  if (slot !== -1 && canEquip(skillId)) equippedSkills[slot] = skillId;
-
+  markSkillUnlocked(skillId);
   updateXpDisplay();
-  // Rebuilding mid-fight would discard buttons with cooldowns already running,
-  // so a skill bought during a fight joins the bar on the next one.
-  if (!fightActive) renderSkillBar();
   saveProgress();
 }
 
+// Marks a skill unlocked and, when it fits, equips it straight away — shared
+// by unlockSkill (an XP purchase) and applyObjectiveReward's 'unlockSkill'
+// reward (free), so buying or earning a skill does something visible right
+// away rather than needing a second click to matter either way.
+function markSkillUnlocked(skillId) {
+  if (unlockedSkills.includes(skillId)) return;
+
+  unlockedSkills.push(skillId);
+  const slot = firstEmptySlotIndex();
+  if (slot !== -1 && canEquip(skillId)) equippedSkills[slot] = skillId;
+
+  // Rebuilding mid-fight would discard buttons with cooldowns already running,
+  // so a skill unlocked during a fight joins the bar on the next one.
+  if (!fightActive) renderSkillBar();
+}
+
 function pointsUsed() {
-  return equippedSkillIds().reduce((total, skillId) => total + SKILLS[skillId].pointCost, 0);
+  return equippedSkillIds().reduce((total, skillId) => total + effectivePointCost(skillId, activeToggleIds), 0);
 }
 
 // The lowest-index slot (within today's Skill Slots count) that's empty, or
@@ -851,7 +956,7 @@ function firstEmptySlotIndex() {
 // points cap how strong that combination is.
 function canEquip(skillId) {
   return equippedSkillIds().length < statValue('skillSlots', stats.skillSlots)
-    && pointsUsed() + SKILLS[skillId].pointCost <= statValue('skillPoints', stats.skillPoints);
+    && pointsUsed() + effectivePointCost(skillId, activeToggleIds) <= statValue('skillPoints', stats.skillPoints);
 }
 
 // Equips `skillId` into `slotIndex`, moving it there if it's already
@@ -867,7 +972,8 @@ function equipInSlot(skillId, slotIndex) {
 
   const previousIndex = equippedSkills.indexOf(skillId);
   const otherIds = equippedSkills.filter((id, index) => id && index !== previousIndex && index !== slotIndex);
-  const projectedPoints = otherIds.reduce((total, id) => total + SKILLS[id].pointCost, 0) + SKILLS[skillId].pointCost;
+  const projectedPoints = otherIds.reduce((total, id) => total + effectivePointCost(id, activeToggleIds), 0)
+    + effectivePointCost(skillId, activeToggleIds);
   const budget = statValue('skillPoints', stats.skillPoints);
   if (projectedPoints > budget) {
     const shortfall = projectedPoints - budget;
@@ -908,6 +1014,57 @@ function unequipSkill(skillId) {
   if (index === -1) return;
 
   equippedSkills[index] = null;
+
+  updateXpDisplay();
+  if (!fightActive) renderSkillBar();
+  saveProgress();
+}
+
+// A one-time XP purchase, independent of switching the toggle on/off
+// afterwards (see setToggleActive). Locked entirely (like every toggle)
+// until the 'winDungeon' objective completes.
+function unlockToggle(skillId, toggleId) {
+  if (!togglesUnlocked) return;
+
+  const key = toggleKey(skillId, toggleId);
+  if (unlockedToggleIds.includes(key)) return;
+
+  const cost = findToggle(skillId, toggleId).unlockCost;
+  if (xp < cost) return;
+
+  xp -= cost;
+  unlockedToggleIds.push(key);
+  updateXpDisplay();
+  saveProgress();
+}
+
+// Switches an already-unlocked toggle on or off. Turning one on adds its
+// pointSurcharge to the skill's Skill Point cost while equipped — refused,
+// with the same shortfall message equipInSlot shows, if that would exceed
+// the budget.
+function setToggleActive(skillId, toggleId, active) {
+  if (!togglesUnlocked) return;
+
+  const key = toggleKey(skillId, toggleId);
+  if (!unlockedToggleIds.includes(key) || activeToggleIds.includes(key) === active) return;
+
+  if (active && equippedSkills.includes(skillId)) {
+    const toggle = findToggle(skillId, toggleId);
+    const projectedPoints = pointsUsed() + toggle.pointSurcharge;
+    const budget = statValue('skillPoints', stats.skillPoints);
+    if (projectedPoints > budget) {
+      const shortfall = projectedPoints - budget;
+      showSkillEquipMessage(
+        `Not enough Skill Points to turn on ${toggle.label} — needs ${shortfall} more `
+        + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Skill Points.`
+      );
+      return;
+    }
+  }
+
+  activeToggleIds = active
+    ? [...activeToggleIds, key]
+    : activeToggleIds.filter((id) => id !== key);
 
   updateXpDisplay();
   if (!fightActive) renderSkillBar();
@@ -965,11 +1122,20 @@ function renderSkills() {
       cost.className = 'skill-cost';
       cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'}`;
 
-      const action = document.createElement('button');
-      action.className = 'unlock-button';
-      action.textContent = `Unlock (${skill.unlockCost} XP)`;
-      action.disabled = xp < skill.unlockCost;
-      action.addEventListener('click', () => unlockSkill(skillId));
+      // Objective-gated skills (Strong Attack, Heal) have no XP price at
+      // all — they show what unlocks them instead of a buyable button.
+      const action = skill.unlockObjectiveId
+        ? document.createElement('span')
+        : document.createElement('button');
+      if (skill.unlockObjectiveId) {
+        action.className = 'skill-locked-message';
+        action.textContent = `Locked — ${OBJECTIVES[skill.unlockObjectiveId].description}`;
+      } else {
+        action.className = 'unlock-button';
+        action.textContent = `Unlock (${skill.unlockCost} XP)`;
+        action.disabled = xp < skill.unlockCost;
+        action.addEventListener('click', () => unlockSkill(skillId));
+      }
 
       const row = document.createElement('div');
       row.className = 'skill-row';
@@ -1058,12 +1224,76 @@ function renderSkillDetail() {
   summary.className = 'skill-detail-summary';
   summary.textContent = describeSkill(skillId, skillLevels[skillId]);
 
+  const effectiveCost = effectivePointCost(skillId, activeToggleIds);
   const cost = document.createElement('p');
   cost.className = 'skill-detail-cost';
-  cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'} while equipped`;
+  cost.textContent = `${effectiveCost} ${effectiveCost === 1 ? 'pt' : 'pts'} while equipped`;
 
-  skillDetailPanelEl.replaceChildren(heading, summary, cost, buildEquipControls(skillId), buildUpgradeRow(skillId));
+  const children = [heading, summary, cost, buildEquipControls(skillId), buildUpgradeRow(skillId)];
+  const toggleRow = buildToggleRow(skillId);
+  if (toggleRow) children.push(toggleRow);
+
+  skillDetailPanelEl.replaceChildren(...children);
   skillDetailPanelEl.hidden = false;
+}
+
+// One row per entry in the skill's `toggles` array (see SKILLS.*.toggles) —
+// separate from buildUpgradeRow's continuous tracks, since a toggle is a
+// one-time unlock that then switches on/off rather than leveling up.
+// Visible even when togglesUnlocked is false (so a player knows the system
+// exists and what unlocks it), but every control stays disabled until then.
+function buildToggleRow(skillId) {
+  const skill = SKILLS[skillId];
+  if (skill.toggles.length === 0) return null;
+
+  const container = document.createElement('div');
+  container.className = 'skill-toggles';
+
+  if (!togglesUnlocked) {
+    const lockedMessage = document.createElement('p');
+    lockedMessage.className = 'toggles-locked-message';
+    lockedMessage.textContent = `Toggles are locked — ${OBJECTIVES.winDungeon.description} to unlock them.`;
+    container.append(lockedMessage);
+  }
+
+  for (const toggle of skill.toggles) {
+    const key = toggleKey(skillId, toggle.id);
+    const unlocked = unlockedToggleIds.includes(key);
+    const active = activeToggleIds.includes(key);
+
+    const label = document.createElement('span');
+    label.className = 'toggle-label';
+    label.textContent = toggle.label;
+
+    const description = document.createElement('span');
+    description.className = 'toggle-description';
+    description.textContent = `${toggle.description} (+${toggle.pointSurcharge} ${toggle.pointSurcharge === 1 ? 'pt' : 'pts'} while on)`;
+
+    const row = document.createElement('div');
+    row.className = 'toggle-row';
+    row.append(label, description);
+
+    if (unlocked) {
+      const button = document.createElement('button');
+      button.className = 'toggle-switch';
+      button.classList.toggle('active', active);
+      button.textContent = active ? 'On' : 'Off';
+      button.disabled = !togglesUnlocked;
+      button.addEventListener('click', () => setToggleActive(skillId, toggle.id, !active));
+      row.append(button);
+    } else {
+      const button = document.createElement('button');
+      button.className = 'toggle-unlock-button';
+      button.textContent = `Unlock (${toggle.unlockCost} XP)`;
+      button.disabled = !togglesUnlocked || xp < toggle.unlockCost;
+      button.addEventListener('click', () => unlockToggle(skillId, toggle.id));
+      row.append(button);
+    }
+
+    container.append(row);
+  }
+
+  return container;
 }
 
 // Tap-based equip/move/unequip, standing alongside the drag-and-drop on the
@@ -1195,12 +1425,58 @@ function registerKill() {
   updateQuestTracker();
 }
 
+// Applies an objective's reward (see OBJECTIVES) — a switch on `reward.type`,
+// same pattern as applyQuestReward, so a future reward kind is a new case
+// here rather than a change to how completion is detected.
+function applyObjectiveReward(reward) {
+  if (reward.type === 'unlockSkill') {
+    markSkillUnlocked(reward.skillId);
+  } else if (reward.type === 'unlockToggles') {
+    togglesUnlocked = true;
+  }
+
+  updateXpDisplay();
+  saveProgress();
+}
+
+// Re-applies every already-completed objective's reward — used on load, same
+// reasoning as applyCompletedQuestRewards.
+function applyCompletedObjectiveRewards() {
+  for (const objectiveId of completedObjectiveIds) {
+    const objective = OBJECTIVES[objectiveId];
+    if (objective) applyObjectiveReward(objective.reward);
+  }
+}
+
+// Checks `event` (e.g. `{ type: 'killMonster', monsterId: 'medium' }`)
+// against every not-yet-completed objective. Unlike registerKill's quest
+// chain, objectives aren't sequential — more than one can match the same
+// event in principle, and any can complete in any order, so this loops over
+// all of them rather than checking only "the" active one.
+function registerObjectiveEvent(event) {
+  for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
+    if (completedObjectiveIds.includes(objectiveId)) continue;
+    if (!objectiveMatches(objective.condition, event)) continue;
+
+    completedObjectiveIds.push(objectiveId);
+    applyObjectiveReward(objective.reward);
+  }
+}
+
 function saveProgress() {
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
     selectedGroupId, selectedDungeonId, totalKills, completedQuestIds,
     lifetimeXp, prestigeProgress,
+    completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
   }));
+}
+
+// A skill id from an older save that no longer exists in SKILLS (e.g. Auto
+// Attack, retired in v9) — dropped everywhere it could appear, rather than
+// left dangling as a dead reference nothing ever cleans up.
+function isRemovedSkillId(skillId) {
+  return skillId && !SKILLS[skillId];
 }
 
 function loadProgress() {
@@ -1216,15 +1492,25 @@ function loadProgress() {
   xp = saved.xp;
   Object.assign(stats, saved.stats);
   if (saved.hp !== undefined) playerHp = saved.hp;
-  if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills;
-  if (saved.equippedSkills) equippedSkills = saved.equippedSkills;
-  if (saved.skillLevels) Object.assign(skillLevels, saved.skillLevels);
+  if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills.filter((id) => !isRemovedSkillId(id));
+  if (saved.equippedSkills) equippedSkills = saved.equippedSkills.map((id) => (isRemovedSkillId(id) ? null : id));
+  // Merged key-by-key against today's SKILLS, rather than Object.assign, so a
+  // removed skill's stray levels (e.g. autoAttack's) don't tag along.
+  if (saved.skillLevels) {
+    for (const skillId of Object.keys(SKILLS)) {
+      if (saved.skillLevels[skillId]) skillLevels[skillId] = saved.skillLevels[skillId];
+    }
+  }
   if (saved.selectedGroupId) selectedGroupId = saved.selectedGroupId;
   if (saved.selectedDungeonId) selectedDungeonId = saved.selectedDungeonId;
   if (saved.totalKills) totalKills = saved.totalKills;
   if (saved.completedQuestIds) completedQuestIds = saved.completedQuestIds;
   if (saved.lifetimeXp) lifetimeXp = saved.lifetimeXp;
   if (saved.prestigeProgress) prestigeProgress = saved.prestigeProgress;
+  if (saved.completedObjectiveIds) completedObjectiveIds = saved.completedObjectiveIds;
+  if (saved.togglesUnlocked) togglesUnlocked = saved.togglesUnlocked;
+  if (saved.unlockedToggleIds) unlockedToggleIds = saved.unlockedToggleIds;
+  if (saved.activeToggleIds) activeToggleIds = saved.activeToggleIds;
 }
 
 function resetCharacter() {
@@ -1243,6 +1529,7 @@ startGame();
 updateXpDisplay();
 updateRegenIndicator();
 applyCompletedQuestRewards();
+applyCompletedObjectiveRewards();
 updateQuestTracker();
 // The placeholder only ever ships from deploy.yml having stamped a real SHA
 // in; any other copy (local dev, `node --test`, a clone) shows this instead
