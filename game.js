@@ -10,8 +10,7 @@ const resultMessageEl = document.getElementById('result-message');
 const restartButton = document.getElementById('restart-button');
 const retreatButton = document.getElementById('retreat-button');
 const startButton = document.getElementById('start-button');
-const xpTotalEl = document.getElementById('xp-total');
-const skillsXpTotalEl = document.getElementById('skills-xp-total');
+const xpValueEl = document.getElementById('xp-value');
 const slotsUsedEl = document.getElementById('slots-used');
 const slotsTotalEl = document.getElementById('slots-total');
 const pointsUsedEl = document.getElementById('points-used');
@@ -185,26 +184,9 @@ function renderMonsterSelect() {
 
   for (const [groupId, group] of Object.entries(MONSTER_GROUPS)) {
     const selected = groupId === selectedGroupId;
-
-    const name = document.createElement('span');
-    name.className = 'monster-name';
-    name.textContent = group.label;
-
-    const detail = document.createElement('span');
-    detail.className = 'monster-detail';
-    detail.textContent = describeMonsterGroup(groupId);
-
-    const button = document.createElement('button');
-    button.className = 'monster-select-button';
-    button.textContent = selected ? 'Selected' : 'Select';
-    button.disabled = fightActive || selected;
-    button.addEventListener('click', () => selectMonsterGroup(groupId));
-
-    const row = document.createElement('div');
-    row.className = 'monster-row';
-    row.classList.toggle('selected', selected);
-    row.append(name, detail, button);
-    monsterSelectEl.append(row);
+    monsterSelectEl.append(
+      buildMonsterSelectRow(group.label, describeMonsterGroup(groupId), selected, () => selectMonsterGroup(groupId))
+    );
   }
 
   const dungeonsLabel = document.createElement('div');
@@ -214,27 +196,36 @@ function renderMonsterSelect() {
 
   for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
     const selected = dungeonId === selectedDungeonId;
-
-    const name = document.createElement('span');
-    name.className = 'monster-name';
-    name.textContent = dungeon.label;
-
-    const detail = document.createElement('span');
-    detail.className = 'monster-detail';
-    detail.textContent = describeDungeon(dungeonId);
-
-    const button = document.createElement('button');
-    button.className = 'monster-select-button';
-    button.textContent = selected ? 'Selected' : 'Select';
-    button.disabled = fightActive || selected;
-    button.addEventListener('click', () => selectDungeon(dungeonId));
-
-    const row = document.createElement('div');
-    row.className = 'monster-row';
-    row.classList.toggle('selected', selected);
-    row.append(name, detail, button);
-    monsterSelectEl.append(row);
+    monsterSelectEl.append(
+      buildMonsterSelectRow(dungeon.label, describeDungeon(dungeonId), selected, () => selectDungeon(dungeonId))
+    );
   }
+}
+
+// One card per fight option (a monster group or a dungeon) — the whole card
+// is the select control, no separate button. selectMonsterGroup/
+// selectDungeon already refuse mid-fight, so the only thing guarded here is
+// re-clicking the already-selected card, which would otherwise just re-render
+// and re-save for no change.
+function buildMonsterSelectRow(label, detailText, selected, onSelect) {
+  const name = document.createElement('span');
+  name.className = 'monster-name';
+  name.textContent = label;
+
+  const detail = document.createElement('span');
+  detail.className = 'monster-detail';
+  detail.textContent = detailText;
+
+  const row = document.createElement('div');
+  row.className = 'monster-row';
+  row.classList.toggle('selected', selected);
+  row.append(name, detail);
+  row.addEventListener('click', () => {
+    if (selected) return;
+    onSelect();
+  });
+
+  return row;
 }
 
 function selectMonsterGroup(groupId) {
@@ -355,6 +346,26 @@ function updateMonsterPreview() {
     : [];
   renderMonsterList(monsters);
   startButton.disabled = !group;
+  fitMonsterSelectHeight();
+}
+
+// Keeps Start (and everything else below the fight-option list) in view
+// without the whole page needing to scroll to reach it — only the list
+// itself scrolls, via #monster-select's own overflow-y (see style.css).
+// Measured rather than guessed, since how much room the monster preview and
+// Start need varies with how many monsters are in the selected group and how
+// narrow the viewport is (more/taller wrapped rows on a phone).
+function fitMonsterSelectHeight() {
+  if (monsterSelectEl.hidden) return; // hidden mid-fight; nothing to fit
+
+  monsterSelectEl.style.maxHeight = 'none'; // measure the fully unconstrained layout first
+  const naturalHeight = monsterSelectEl.getBoundingClientRect().height;
+  const overflow = startButton.getBoundingClientRect().bottom - window.innerHeight;
+
+  const MIN_LIST_HEIGHT = 128; // never shrink the list below a usable size
+  monsterSelectEl.style.maxHeight = overflow > 0
+    ? `${Math.max(naturalHeight - overflow, MIN_LIST_HEIGHT)}px`
+    : '';
 }
 
 function renderStats() {
@@ -864,8 +875,7 @@ function awardXp(amount) {
 }
 
 function updateXpDisplay() {
-  xpTotalEl.textContent = xp;
-  skillsXpTotalEl.textContent = xp;
+  xpValueEl.textContent = xp;
   renderStats();
   renderSkills();
   renderSkillSlots();
@@ -1555,7 +1565,13 @@ tabButtons.forEach((button) => {
     tabButtons.forEach((btn) => {
       btn.classList.toggle('active', btn === button);
     });
+    // #monster-select is unmeasurable (0-height) while the Fight tab is
+    // hidden, so re-fit it on the way back in rather than only when its own
+    // content last changed — covers a window resize that happened meanwhile.
+    if (targetId === 'fight-tab') fitMonsterSelectHeight();
   });
 });
 
 document.querySelector('[data-tab="fight-tab"]').classList.add('active');
+
+window.addEventListener('resize', fitMonsterSelectHeight);
