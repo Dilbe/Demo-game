@@ -157,10 +157,11 @@ test('every stat defines the full data-object shape', () => {
 
 test('every skill defines the full data-object shape', () => {
   for (const [skillId, skill] of Object.entries(SKILLS)) {
-    for (const field of ['label', 'type', 'pointCost']) {
+    for (const field of ['label', 'type', 'pointCost', 'icon']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
     assert.ok(skill.pointCost > 0, `${skillId} costs no skill points to equip`);
+    assert.match(skill.icon, /^<svg viewBox="0 0 24 24">.*<\/svg>$/, `${skillId}'s icon is not a well-formed 24x24 SVG string`);
 
     // A skill unlocks either by spending XP or by completing a gameplay
     // objective (see OBJECTIVES) — never both, never neither.
@@ -354,6 +355,12 @@ test('BALANCE SNAPSHOT: current tuning', () => {
   assert.strictEqual(statCost('maxHp', 1), 7);
 });
 
+test('every monster defines a well-formed sprite', () => {
+  for (const [monsterId, monster] of Object.entries(MONSTERS)) {
+    assert.match(monster.sprite, /^<svg viewBox="0 0 40 40">.*<\/svg>$/, `${monsterId}'s sprite is not a well-formed 40x40 SVG string`);
+  }
+});
+
 test('Small monster matches the game\'s original fixed monster', () => {
   assert.strictEqual(MONSTERS.small.maxHp, 5);
   assert.strictEqual(MONSTERS.small.damage, 1);
@@ -448,7 +455,7 @@ test('describeDungeon lists every fight in order and totals their XP, completion
   assert.strictEqual(DUNGEONS.goblinGauntlet.completionBonusXp, 5);
   assert.strictEqual(
     describeDungeon('goblinGauntlet'),
-    'Small Monster → Small Monster → Medium Monster · 11 XP total', // 1 + 1 + 4 monster XP + 5 bonus
+    'Small Slime → Small Slime → Goblin · 11 XP total', // 1 + 1 + 4 monster XP + 5 bonus
   );
 });
 

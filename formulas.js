@@ -1,7 +1,7 @@
 // Low-ceremony versioning: matches the `vN` milestone-scope naming DESIGN.md
 // already uses (v1 stats/skills, ..., v6 quests) rather than inventing a
 // separate scheme. Bump it by hand whenever the next `vN` scope ships.
-const VERSION = 'v9';
+const VERSION = 'v12';
 
 // Which exact commit is live, for tracing "what code is running" without a
 // separate build-number counter or git tag — the commit SHA already is that
@@ -84,29 +84,44 @@ const STATS = {
 // always had — 5 HP, 1 damage every 3 seconds, 1 XP — now described as data.
 // `xp` is part of the template because otherwise a tougher monster would be
 // strictly worse to pick: more HP to chew through for the same reward.
+//
+// `sprite` is a small inline SVG string, not an image file — simple geometric
+// shapes rather than illustrated art, so there's no external asset pipeline
+// or image-generation tool involved (see v10 in DESIGN.md). Rendered as raw
+// markup (see game.js's buildSprite) into a fixed viewBox, so every monster's
+// sprite lines up the same way regardless of its own shape's proportions.
 const MONSTERS = {
   small: {
-    label: 'Small Monster',
+    label: 'Small Slime',
     maxHp: 5,
     damage: 1,
     cooldown: 3,
     xp: 1,
+    // A squat blob with a lighter highlight and two dot eyes — no limbs, the
+    // simplest silhouette of the three.
+    sprite: '<svg viewBox="0 0 40 40"><ellipse cx="20" cy="27" rx="16" ry="11" fill="#4caf50"/><ellipse cx="20" cy="21" rx="12" ry="9" fill="#81c784"/><circle cx="15" cy="21" r="2" fill="#1b3a1b"/><circle cx="25" cy="21" r="2" fill="#1b3a1b"/></svg>',
   },
 
   medium: {
-    label: 'Medium Monster',
+    label: 'Goblin',
     maxHp: 15,
     damage: 2,
     cooldown: 3,
     xp: 4,
+    // A round head with pointed ears over a small body — reads as a
+    // humanoid, distinct from the slime's limbless blob.
+    sprite: '<svg viewBox="0 0 40 40"><polygon points="10,13 3,5 13,11" fill="#7a9d54"/><polygon points="30,13 37,5 27,11" fill="#7a9d54"/><rect x="12" y="25" width="16" height="12" rx="4" fill="#5c7a3d"/><circle cx="20" cy="16" r="9" fill="#7a9d54"/><circle cx="16" cy="15" r="1.6" fill="#1b1b1b"/><circle cx="24" cy="15" r="1.6" fill="#1b1b1b"/></svg>',
   },
 
   big: {
-    label: 'Big Monster',
+    label: 'Orc',
     maxHp: 40,
     damage: 4,
     cooldown: 4,
     xp: 12,
+    // Bigger head and broader body than the Goblin, plus two tusks, so it
+    // reads as the toughest of the three at a glance.
+    sprite: '<svg viewBox="0 0 40 40"><rect x="7" y="21" width="26" height="16" rx="5" fill="#6b7d4a"/><circle cx="20" cy="14" r="11" fill="#7d8f57"/><circle cx="15" cy="13" r="1.8" fill="#1b1b1b"/><circle cx="25" cy="13" r="1.8" fill="#1b1b1b"/><polygon points="15,19 17,24 19,19" fill="#f1f1f1"/><polygon points="25,19 23,24 21,19" fill="#f1f1f1"/></svg>',
   },
 };
 
@@ -116,10 +131,10 @@ const MONSTERS = {
 // The three single-monster groups mirror MONSTERS one-to-one; twoSmall is
 // the first multi-monster option.
 const MONSTER_GROUPS = {
-  small: { label: 'Small Monster', monsterIds: ['small'] },
-  medium: { label: 'Medium Monster', monsterIds: ['medium'] },
-  big: { label: 'Big Monster', monsterIds: ['big'] },
-  twoSmall: { label: 'Two Small Monsters', monsterIds: ['small', 'small'] },
+  small: { label: 'Small Slime', monsterIds: ['small'] },
+  medium: { label: 'Goblin', monsterIds: ['medium'] },
+  big: { label: 'Orc', monsterIds: ['big'] },
+  twoSmall: { label: 'Two Small Slimes', monsterIds: ['small', 'small'] },
 };
 
 // A dungeon chains several fights back-to-back, fought without returning to
@@ -221,9 +236,15 @@ function groupKillXp(baseXp, killIndex) {
 // all of that: no cooldown, no combat button, no `upgrades`/`toggles` track —
 // instead a flat `boost` applies for as long as the skill stays equipped.
 // Every other skill is `type: 'active'` and keeps the shape described above.
+//
+// `icon` is a small inline SVG string, same reasoning as MONSTERS' `sprite`
+// — simple geometric shapes, drawn with `currentColor` so an icon matches
+// whatever text color the button/square/slot it's rendered into already
+// uses, rather than a fixed color of its own.
 const SKILLS = {
   basicAttack: {
     label: 'Basic Attack',
+    icon: '<svg viewBox="0 0 24 24"><rect x="11" y="2" width="2" height="13" fill="currentColor"/><rect x="8" y="15" width="8" height="2" fill="currentColor"/><rect x="10.5" y="17" width="3" height="5" fill="currentColor"/></svg>',
     damage: 1,
     cooldown: 2,
     unlockCost: 0,
@@ -272,6 +293,7 @@ const SKILLS = {
 
   strongAttack: {
     label: 'Strong Attack',
+    icon: '<svg viewBox="0 0 24 24"><rect x="10" y="1" width="4" height="15" fill="currentColor"/><rect x="6" y="16" width="12" height="2.5" fill="currentColor"/><rect x="9.5" y="18.5" width="5" height="4.5" fill="currentColor"/></svg>',
     damage: 3,
     cooldown: 5,
     unlockObjectiveId: 'killMedium',
@@ -314,6 +336,7 @@ const SKILLS = {
 
   heal: {
     label: 'Heal',
+    icon: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="18" rx="1.5" fill="currentColor"/><rect x="3" y="9" width="18" height="6" rx="1.5" fill="currentColor"/></svg>',
     healing: 5,
     cooldown: 8,
     unlockObjectiveId: 'killBig',
@@ -361,6 +384,7 @@ const SKILLS = {
   // skills into the combined multiplier for a given stat.
   regen: {
     label: 'Regen',
+    icon: '<svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-6.93 4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polygon points="4,4 4,10 9,7" fill="currentColor"/></svg>',
     type: 'passive',
     unlockCost: 20,
     pointCost: 2,
@@ -371,6 +395,7 @@ const SKILLS = {
 
   strength: {
     label: 'Strength',
+    icon: '<svg viewBox="0 0 24 24"><rect x="6" y="8" width="12" height="10" rx="4" fill="currentColor"/><rect x="9" y="16" width="6" height="6" rx="2" fill="currentColor"/></svg>',
     type: 'passive',
     unlockCost: 20,
     pointCost: 2,
@@ -391,13 +416,13 @@ const SKILLS = {
 // a skill.
 const OBJECTIVES = {
   killMedium: {
-    description: 'Kill a Medium Monster',
+    description: 'Kill a Goblin',
     condition: { type: 'killMonster', monsterId: 'medium' },
     reward: { type: 'unlockSkill', skillId: 'strongAttack' },
   },
 
   killBig: {
-    description: 'Kill a Big Monster',
+    description: 'Kill an Orc',
     condition: { type: 'killMonster', monsterId: 'big' },
     reward: { type: 'unlockSkill', skillId: 'heal' },
   },
