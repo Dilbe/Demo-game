@@ -29,13 +29,18 @@ const prestigeBarFillEl = document.getElementById('prestige-bar-fill');
 const prestigeProgressValueEl = document.getElementById('prestige-progress-value');
 const prestigeTargetValueEl = document.getElementById('prestige-target-value');
 const prestigeButton = document.getElementById('prestige-button');
+const perkPointsValueEl = document.getElementById('perk-points-value');
+const perkListEl = document.getElementById('perk-list');
 
 const REGEN_TICK_SECONDS = 1;
 
 const SAVE_KEY = 'demo-game-save';
 // Separate from SAVE_KEY so a prestige reset (which wipes SAVE_KEY back to a
-// fresh game) can raise Max XP without needing to special-case it inside
-// whatever shape the main save happens to be — it simply isn't in there.
+// fresh game) can raise Max XP, and award Perk Points, without needing to
+// special-case either inside whatever shape the main save happens to be —
+// neither is in there. Holds maxXp, perkPoints, and purchasedPerkIds
+// together (see savePermanentProgress/loadProgress) — everything that must
+// survive a prestige rather than being wiped by one.
 const MAX_XP_KEY = 'demo-game-max-xp';
 
 // Derived from STATS so a new stat needs defining in one place only.
@@ -110,6 +115,12 @@ let maxXp = STARTING_MAX_XP;
 // (see awardXp) — needs prestigeTarget(maxXp) to fill before the Prestige
 // button appears. Reset to 0 alongside lifetimeXp on prestige.
 let prestigeProgress = 0;
+// Perk Points balance and every purchased perk id (see PERKS) — earned only
+// on prestige (prestigeCount) and, unlike everything above, never wiped by
+// one. Live alongside maxXp in its own storage (MAX_XP_KEY), same reasoning
+// as maxXp itself: a prestige resets the main save, never this.
+let perkPoints = 0;
+let purchasedPerkIds = [];
 // Total enemies defeated across every fight, ever — separate from XP because
 // quests key off it directly rather than off however XP happens to convert.
 let totalKills = 0;
@@ -513,7 +524,11 @@ function isToggleActive(skillId, toggleId) {
 
 function applySkill(skillId) {
   const skill = SKILLS[skillId];
-  const basePower = skillPower(skillId, skillLevels[skillId].power);
+  // Any Basic-Attack-damage-style perk (see PERKS) adds flat damage on top of
+  // the skill's own Power track, before Strength's percentage applies to the
+  // total — never healing, which perks of this kind don't target.
+  const basePower = skillPower(skillId, skillLevels[skillId].power)
+    + (skill.healing ? 0 : perkSkillDamageBonus(purchasedPerkIds, skillId));
   // Strength (a passive skill) boosts attacks only, never healing. Rounded
   // so a boosted hit still deals a whole number of damage.
   const power = skill.healing ? basePower : Math.round(basePower * passiveMultiplier(equippedSkillIds(), 'damage'));
@@ -595,8 +610,16 @@ function resolveFightProgress() {
   endGame('You win!');
 }
 
+// Max HP stat's own XP-funded value, plus any permanent bonus from purchased
+// Max HP perks (see PERKS) — a perk applies as an independent layer on top,
+// never by mutating the stat itself, so buying one never raises what the
+// stat's next XP-funded level costs.
+function effectiveMaxHp() {
+  return statValue('maxHp', stats.maxHp) + perkMaxHpBonus(purchasedPerkIds);
+}
+
 function healPlayer(amount) {
-  playerHp = Math.min(statValue('maxHp', stats.maxHp), playerHp + amount);
+  playerHp = Math.min(effectiveMaxHp(), playerHp + amount);
   updateHealthBar();
 }
 
@@ -641,22 +664,25 @@ function defeatMonster(index) {
 }
 
 function updateHealthBar() {
-  const maxHp = statValue('maxHp', stats.maxHp);
+  const maxHp = effectiveMaxHp();
   playerHpEl.textContent = playerHp;
   playerMaxHpEl.textContent = maxHp;
   healthBarFillEl.style.width = `${(playerHp / maxHp) * 100}%`;
 }
 
 // The Health Regen stat's own seconds-per-HP, sped up by Regen (a passive
-// skill) for as long as it stays equipped — divided, since a higher
+// skill) for as long as it stays equipped, and by any purchased Healing
+// Speed perk (see PERKS) on top of that — both divide, since a higher
 // multiplier means less time per HP, same relationship the stat's own
 // perLevel already has.
 function effectiveSecondsPerHp() {
-  return statValue('healthRegen', stats.healthRegen) / passiveMultiplier(equippedSkillIds(), 'healthRegen');
+  return statValue('healthRegen', stats.healthRegen)
+    / passiveMultiplier(equippedSkillIds(), 'healthRegen')
+    / perkHealingSpeedMultiplier(purchasedPerkIds);
 }
 
 function updateRegenIndicator() {
-  const pending = playerHp < statValue('maxHp', stats.maxHp);
+  const pending = playerHp < effectiveMaxHp();
   const secondsPerHp = effectiveSecondsPerHp();
   // Clamped because upgrading Health Regen can leave progress above the new
   // requirement until the next tick collects it.
@@ -685,7 +711,7 @@ function regenTick() {
 
   const result = advanceRegen({
     hp: playerHp,
-    maxHp: statValue('maxHp', stats.maxHp),
+    maxHp: effectiveMaxHp(),
     progress: regenProgress,
     secondsPerHp: effectiveSecondsPerHp(),
   }, elapsedSeconds);
@@ -881,6 +907,7 @@ function updateXpDisplay() {
   renderSkillSlots();
   renderSkillDetail();
   renderPrestige();
+  renderPerks();
 }
 
 // Hidden until lifetime XP reaches maxXp; once visible, fills toward
@@ -911,11 +938,74 @@ function prestige() {
   if (prestigeProgress < target) return;
 
   const newMaxXp = maxXp + PRESTIGE_BONUS_PER_CYCLE;
-  if (!confirm(`Prestige now? This resets your XP, stats, skills, quests, and kill count back to a fresh start, but raises Max XP from ${maxXp} to ${newMaxXp}.`)) return;
+  // The prestige count this cycle completes is what pays out — see
+  // prestigeCount: derived from the post-prestige maxXp, so the 1st prestige
+  // pays 1 Perk Point, the 2nd pays 2, and so on with no separate counter.
+  const perkPointsAwarded = prestigeCount(newMaxXp);
+  const perkPointsLabel = `${perkPointsAwarded} Perk Point${perkPointsAwarded === 1 ? '' : 's'}`;
+  if (!confirm(`Prestige now? This resets your XP, stats, skills, quests, and kill count back to a fresh start, but raises Max XP from ${maxXp} to ${newMaxXp} and awards ${perkPointsLabel}.`)) return;
 
-  localStorage.setItem(MAX_XP_KEY, String(newMaxXp));
+  maxXp = newMaxXp;
+  perkPoints += perkPointsAwarded;
+  savePermanentProgress();
   localStorage.removeItem(SAVE_KEY);
   location.reload();
+}
+
+// One row per PERKS entry — bought once with Perk Points, then just shown as
+// owned (no further levels, no on/off switch, unlike a stat or a skill
+// toggle). Every perk is always visible, even before a player's first
+// prestige, so it's clear up front what prestiging eventually buys.
+function renderPerks() {
+  perkPointsValueEl.textContent = perkPoints;
+  perkListEl.replaceChildren();
+
+  for (const [perkId, perk] of Object.entries(PERKS)) {
+    const owned = purchasedPerkIds.includes(perkId);
+
+    const name = document.createElement('span');
+    name.className = 'perk-name';
+    name.textContent = perk.label;
+
+    const description = document.createElement('span');
+    description.className = 'perk-description';
+    description.textContent = perk.description;
+
+    const action = document.createElement('button');
+    action.className = 'perk-buy-button';
+    if (owned) {
+      action.textContent = 'Owned';
+      action.disabled = true;
+    } else {
+      action.textContent = `Buy (${perk.cost} ${perk.cost === 1 ? 'pt' : 'pts'})`;
+      action.disabled = perkPoints < perk.cost;
+      action.addEventListener('click', () => buyPerk(perkId));
+    }
+
+    const row = document.createElement('div');
+    row.className = 'perk-row';
+    row.classList.toggle('owned', owned);
+    row.append(name, description, action);
+    perkListEl.append(row);
+  }
+}
+
+function buyPerk(perkId) {
+  if (purchasedPerkIds.includes(perkId)) return;
+
+  const cost = PERKS[perkId].cost;
+  if (perkPoints < cost) return;
+
+  perkPoints -= cost;
+  purchasedPerkIds.push(perkId);
+  savePermanentProgress();
+
+  // A perk can change effective Max HP or the regen rate immediately, not
+  // just future gains, so both need an explicit refresh alongside the
+  // Perks list itself (updateXpDisplay doesn't touch either).
+  updateHealthBar();
+  updateRegenIndicator();
+  updateXpDisplay();
 }
 
 function unlockSkill(skillId) {
@@ -1216,7 +1306,7 @@ function renderSkillDetail() {
 
   const summary = document.createElement('p');
   summary.className = 'skill-detail-summary';
-  summary.textContent = describeSkill(skillId, skillLevels[skillId]);
+  summary.textContent = describeSkill(skillId, skillLevels[skillId], perkSkillDamageBonus(purchasedPerkIds, skillId));
 
   if (!unlockedSkills.includes(skillId)) {
     // A locked skill has no cost/equip/upgrades/toggles of its own yet —
@@ -1492,6 +1582,13 @@ function registerObjectiveEvent(event) {
   }
 }
 
+// maxXp, perkPoints, and purchasedPerkIds all live in MAX_XP_KEY rather than
+// SAVE_KEY — see MAX_XP_KEY's own comment for why none of them should be
+// touched by a prestige wiping the main save.
+function savePermanentProgress() {
+  localStorage.setItem(MAX_XP_KEY, JSON.stringify({ maxXp, perkPoints, purchasedPerkIds }));
+}
+
 function saveProgress() {
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
@@ -1509,10 +1606,23 @@ function isRemovedSkillId(skillId) {
 }
 
 function loadProgress() {
-  // maxXp lives outside SAVE_KEY (see MAX_XP_KEY) specifically so it
-  // survives a prestige wiping everything else back to a fresh game.
-  const savedMaxXp = Number(localStorage.getItem(MAX_XP_KEY));
-  if (savedMaxXp) maxXp = savedMaxXp;
+  // maxXp, perkPoints, and purchasedPerkIds all live outside SAVE_KEY (see
+  // MAX_XP_KEY) specifically so they survive a prestige wiping everything
+  // else back to a fresh game. A save from before Perk Points existed has
+  // this key holding a plain number rather than the object shape below —
+  // JSON.parse still succeeds on that (returning a number), so it's handled
+  // without a version flag of its own.
+  const rawPermanent = localStorage.getItem(MAX_XP_KEY);
+  if (rawPermanent) {
+    const savedPermanent = JSON.parse(rawPermanent);
+    if (typeof savedPermanent === 'number') {
+      maxXp = savedPermanent;
+    } else {
+      maxXp = savedPermanent.maxXp;
+      perkPoints = savedPermanent.perkPoints ?? 0;
+      purchasedPerkIds = savedPermanent.purchasedPerkIds ?? [];
+    }
+  }
 
   const raw = localStorage.getItem(SAVE_KEY);
   if (!raw) return;
@@ -1553,7 +1663,7 @@ function resetCharacter() {
 }
 
 loadProgress();
-if (playerHp === null) playerHp = statValue('maxHp', stats.maxHp);
+if (playerHp === null) playerHp = effectiveMaxHp();
 startGame();
 updateXpDisplay();
 updateRegenIndicator();

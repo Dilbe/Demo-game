@@ -160,6 +160,14 @@ function prestigeTarget(maxXp) {
   return Math.round(maxXp * 0.1);
 }
 
+// How many times the player has already prestiged, derived from maxXp
+// instead of a separate stored counter — it's fully determined by how many
+// PRESTIGE_BONUS_PER_CYCLE steps maxXp has climbed above its starting value.
+// 0 for a fresh game, 1 right after the first prestige, and so on.
+function prestigeCount(maxXp) {
+  return (maxXp - STARTING_MAX_XP) / PRESTIGE_BONUS_PER_CYCLE;
+}
+
 // Rounds an upgrade/stat's cost the same way for all of them: compounding
 // baseCost by costGrowth per level, like statCost below.
 function costForLevel(baseCost, costGrowth, level) {
@@ -425,6 +433,80 @@ function passiveMultiplier(equippedSkillIds, statId) {
   }, 1);
 }
 
+// Perk Points are earned only by prestiging (see prestigeCount) and, unlike
+// XP/stats/skills, survive every future prestige — see game.js's MAX_XP_KEY
+// storage. Each perk is bought once, permanently, with no further levels or
+// on/off switch, unlike a stat's XP-funded levels or a skill's toggles.
+//
+// A perk's `effect` is an independent bonus layered on top of whatever the
+// thing it boosts already computes to — the same architectural pattern
+// SKILLS' own passive `boost` already uses (see passiveMultiplier) — never
+// applied by mutating a STATS level or a skill's `upgrades` value directly,
+// since that would make the next XP-funded upgrade of the same thing cost
+// more, defeating the point of Perk Points being a separate currency.
+const PERKS = {
+  basicAttackDamage: {
+    label: 'Basic Attack damage +1',
+    description: "Adds flat damage on top of Basic Attack's own Power track",
+    cost: 2,
+    effect: { type: 'skillDamage', skillId: 'basicAttack', amount: 1 },
+  },
+
+  maxHp10: {
+    label: 'Max HP +10',
+    description: 'Adds 10 to your effective Max HP',
+    cost: 1,
+    effect: { type: 'maxHp', amount: 10 },
+  },
+
+  // A separate perk from maxHp10, not a bigger tier of it — buying both
+  // stacks to +35 Max HP total.
+  maxHp25: {
+    label: 'Max HP +25',
+    description: 'Adds 25 to your effective Max HP',
+    cost: 5,
+    effect: { type: 'maxHp', amount: 25 },
+  },
+
+  healingSpeed25: {
+    label: 'Healing Speed +25%',
+    description: 'Speeds up HP regen by 25%, stacking multiplicatively with every other source of the same boost',
+    cost: 3,
+    effect: { type: 'healingSpeedPercent', amount: 25 },
+  },
+};
+
+// Flat Max HP bonus summed across every purchased perk — perks of this kind
+// stack additively with each other (each one is a flat amount, unlike the
+// percentage perks below).
+function perkMaxHpBonus(purchasedPerkIds) {
+  return purchasedPerkIds.reduce((total, perkId) => {
+    const perk = PERKS[perkId];
+    return perk.effect.type === 'maxHp' ? total + perk.effect.amount : total;
+  }, 0);
+}
+
+// Same multiplicative-stacking pattern as passiveMultiplier, so a second
+// future Healing Speed perk would compound with this one (and with Regen's
+// own passive boost) rather than the percentages just adding.
+function perkHealingSpeedMultiplier(purchasedPerkIds) {
+  return purchasedPerkIds.reduce((multiplier, perkId) => {
+    const perk = PERKS[perkId];
+    return perk.effect.type === 'healingSpeedPercent' ? multiplier * (1 + perk.effect.amount / 100) : multiplier;
+  }, 1);
+}
+
+// Flat damage bonus from every purchased perk that targets `skillId`
+// specifically (see PERKS.basicAttackDamage) — added on top of the skill's
+// own Power-track value, before any passive multiplier (e.g. Strength)
+// applies to the total.
+function perkSkillDamageBonus(purchasedPerkIds, skillId) {
+  return purchasedPerkIds.reduce((total, perkId) => {
+    const perk = PERKS[perkId];
+    return (perk.effect.type === 'skillDamage' && perk.effect.skillId === skillId) ? total + perk.effect.amount : total;
+  }, 0);
+}
+
 // Unlocked from the start, so a new player always has something to attack with.
 const STARTING_SKILLS = ['basicAttack'];
 
@@ -474,14 +556,14 @@ function effectivePointCost(skillId, activeToggleIds) {
   return skill.pointCost + surcharge;
 }
 
-function describeSkill(skillId, levels = { power: 0, speed: 0 }) {
+function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus = 0) {
   const skill = SKILLS[skillId];
 
   if (skill.type === 'passive') {
     return `+${skill.boost.percent}% ${skill.boost.label} while equipped`;
   }
 
-  const power = skillPower(skillId, levels.power);
+  const power = skillPower(skillId, levels.power) + (skill.healing ? 0 : perkDamageBonus);
   const effect = skill.healing ? `Heals ${power}` : `${power} damage`;
   const cooldown = skillCooldown(skillId, levels.speed).toFixed(1);
   return `${effect}, ${cooldown}s cooldown`;
@@ -597,7 +679,7 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS, OBJECTIVES,
+    VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS, OBJECTIVES, PERKS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost,
@@ -605,6 +687,7 @@ if (typeof module !== 'undefined') {
     activeQuest, questComplete, describeQuestProgress,
     objectiveMatches,
     groupKillXp, groupTotalXp,
-    STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget,
+    STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount,
+    perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,
   };
 }
