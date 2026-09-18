@@ -50,8 +50,17 @@ body {
   cursor: default;
 }
 
+/* Bounded and independently scrollable so a long list of fight options never
+   pushes the Start button (and everything after it) below the fold — only
+   this list scrolls, never the whole page. */
+/* max-height is set inline by fitMonsterSelectHeight (game.js), computed
+   from the actual layout rather than guessed here, since how much the
+   monster preview below it needs varies with how many monsters are in the
+   selected group and how narrow the viewport is. */
 #monster-select {
   margin: 0 auto 1.5rem;
+  overflow-y: auto;
+  padding: 0.25rem;
 }
 
 .select-section-label {
@@ -68,6 +77,9 @@ body {
   display: none;
 }
 
+/* The whole card is the select control (see buildMonsterSelectRow) — a gray
+   rectangle normally, a green one for the current pick, instead of a
+   separate Select/Selected button. */
 .monster-row {
   display: flex;
   flex-wrap: wrap;
@@ -75,10 +87,18 @@ body {
   justify-content: center;
   gap: 1rem;
   margin: 0.75rem auto;
+  border: 2px solid #999;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  background: #fafafa;
 }
 
 .monster-row.selected {
   font-weight: bold;
+  border-color: #1b5e20;
+  background: #eef6ee;
+  cursor: default;
 }
 
 .monster-name {
@@ -91,12 +111,6 @@ body {
   max-width: 16rem;
   text-align: left;
   color: #555;
-}
-
-.monster-select-button {
-  font-size: 1rem;
-  padding: 0.65rem 1.25rem;
-  min-height: 2.75rem;
 }
 
 #health-bar {
@@ -204,6 +218,14 @@ body {
 /* display:block would otherwise override the hidden attribute. */
 #retreat-button[hidden] {
   display: none;
+}
+
+/* Always visible below the health bar, on every tab, so the current XP
+   balance never needs a tab switch to check. */
+#xp-display {
+  margin: 0 auto 1rem;
+  font-size: 0.9rem;
+  color: #333;
 }
 
 #quest-tracker {
