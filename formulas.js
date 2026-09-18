@@ -1,7 +1,7 @@
 // Low-ceremony versioning: matches the `vN` milestone-scope naming DESIGN.md
 // already uses (v1 stats/skills, ..., v6 quests) rather than inventing a
 // separate scheme. Bump it by hand whenever the next `vN` scope ships.
-const VERSION = 'v7';
+const VERSION = 'v8';
 
 // Which exact commit is live, for tracing "what code is running" without a
 // separate build-number counter or git tag — the commit SHA already is that
