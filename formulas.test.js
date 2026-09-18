@@ -7,6 +7,7 @@ const {
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   activeQuest, questComplete, describeQuestProgress,
   groupKillXp, groupTotalXp,
+  STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget,
 } = require('./formulas.js');
 
 // --- Version ---------------------------------------------------------
@@ -424,4 +425,19 @@ test('advanceRegen stops at maxHp and does not carry leftover progress past full
 test('advanceRegen is a no-op once already at maxHp', () => {
   const result = advanceRegen({ hp: 20, maxHp: 20, progress: 45, secondsPerHp: 60 }, 100);
   assert.deepStrictEqual(result, { hp: 20, progress: 0 });
+});
+
+// --- Prestige --------------------------------------------------------------
+
+test('STARTING_MAX_XP is the Max XP a new game starts with', () => {
+  assert.strictEqual(STARTING_MAX_XP, 100);
+});
+
+test('prestigeTarget is 10% of maxXp', () => {
+  assert.strictEqual(prestigeTarget(100), 10);
+  assert.strictEqual(prestigeTarget(200), 20);
+});
+
+test('prestiging raises maxXp by PRESTIGE_BONUS_PER_CYCLE', () => {
+  assert.strictEqual(STARTING_MAX_XP + PRESTIGE_BONUS_PER_CYCLE, 200);
 });

@@ -301,6 +301,8 @@ A reset-for-a-permanent-bonus loop, picking up the "Prestige mechanic" idea park
 3. Prestige button + reset — appears when the bar is full; pressing it wipes every other piece of saved state and raises `maxXp` by 100 for the new game.
 4. Persistence — save `maxXp` and lifetime-XP-earned alongside existing save data, surviving a reload mid-way through filling the bar.
 
+**v8 status: done.** All 4 milestones complete, shipped together in one PR rather than one at a time. `maxXp` (`STARTING_MAX_XP` = 100) lives in its own `localStorage` key, separate from the main save, specifically so a prestige can wipe the main save back to a fresh game without also erasing the one number the whole mechanic exists to preserve. `lifetimeXp` tracks total XP ever earned (never reduced by spending) via a new `awardXp` helper that every XP-earning moment routes through instead of touching `xp` directly; once it reaches `maxXp`, the same awards also fill `prestigeProgress` toward `prestigeTarget(maxXp)` (10%, rounded), revealing a gold progress bar and, once full, a Prestige button on the Character tab. Pressing it resets everything the main save holds and raises `maxXp` by `PRESTIGE_BONUS_PER_CYCLE` (100) for the next cycle. Verified live: crossing the threshold reveals the bar, spending XP on upgrades doesn't move it, prestiging wipes progress but persists the new Max XP, and a reload mid-fill restores the exact partial progress.
+
 ## v9 scope — skills: passives, objective unlocks, and optional upgrades
 
 Three related changes to how skills work: a first passive skill, unlocking skills through gameplay objectives instead of XP, and a new kind of skill upgrade that's toggled on/off rather than leveled continuously.
