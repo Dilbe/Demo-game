@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const {
   VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
   statValue, statCost,
-  skillPower, skillCooldown, skillUpgradeCost, describeSkill,
+  skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   activeQuest, questComplete, describeQuestProgress,
   groupKillXp, groupTotalXp,
@@ -101,6 +101,8 @@ test('healthRegen shortens its interval but never reaches zero', () => {
 
 test('every skill gets stronger and faster as its tracks level up', () => {
   for (const skillId of Object.keys(SKILLS)) {
+    if (SKILLS[skillId].type === 'passive') continue; // no power/speed tracks to level
+
     for (let level = 0; level < 10; level += 1) {
       assert.ok(skillPower(skillId, level + 1) > skillPower(skillId, level), `${skillId} power did not grow at level ${level + 1}`);
       assert.ok(skillCooldown(skillId, level + 1) < skillCooldown(skillId, level), `${skillId} cooldown did not shorten at level ${level + 1}`);
@@ -152,10 +154,23 @@ test('every stat defines the full data-object shape', () => {
 
 test('every skill defines the full data-object shape', () => {
   for (const [skillId, skill] of Object.entries(SKILLS)) {
-    for (const field of ['label', 'cooldown', 'unlockCost', 'pointCost', 'auto', 'triggerAt']) {
+    for (const field of ['label', 'type', 'unlockCost', 'pointCost']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
     assert.ok(skill.pointCost > 0, `${skillId} costs no skill points to equip`);
+
+    if (skill.type === 'passive') {
+      assert.ok(skill.boost, `${skillId} is passive but has no boost`);
+      for (const field of ['stat', 'percent', 'label']) {
+        assert.ok(skill.boost[field] !== undefined, `${skillId}'s boost is missing ${field}`);
+      }
+      assert.ok(skill.boost.percent > 0, `${skillId}'s boost does nothing`);
+      continue;
+    }
+
+    for (const field of ['cooldown', 'auto', 'triggerAt']) {
+      assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
+    }
     assert.ok(skill.damage !== undefined || skill.healing !== undefined, `${skillId} does neither damage nor healing`);
     assert.ok(skill.cooldown > 0, `${skillId} has a non-positive cooldown`);
     assert.ok(skill.triggerAt >= 0 && skill.triggerAt <= 1, `${skillId} triggerAt is not a fraction of its cooldown`);
@@ -221,6 +236,25 @@ test('describeSkill reflects upgrade levels', () => {
   const base = describeSkill('basicAttack', { power: 0, speed: 0 });
   const faster = describeSkill('basicAttack', { power: 0, speed: 4 });
   assert.notStrictEqual(base, faster, 'speed levels did not change the description');
+});
+
+// --- Passive skills ------------------------------------------------------
+
+test('describeSkill reports a passive skill\'s boost instead of damage/cooldown', () => {
+  assert.strictEqual(describeSkill('regen'), '+100% HP regen rate while equipped');
+  assert.strictEqual(describeSkill('strength'), '+25% damage while equipped');
+});
+
+test('passiveMultiplier is 1 with no matching passive equipped', () => {
+  assert.strictEqual(passiveMultiplier([], 'damage'), 1);
+  assert.strictEqual(passiveMultiplier(['basicAttack'], 'damage'), 1);
+  assert.strictEqual(passiveMultiplier(['regen'], 'damage'), 1);
+});
+
+test('passiveMultiplier applies an equipped passive\'s boost to its own stat', () => {
+  assert.strictEqual(passiveMultiplier(['strength'], 'damage'), 1.25);
+  assert.strictEqual(passiveMultiplier(['regen'], 'healthRegen'), 2);
+  assert.strictEqual(passiveMultiplier(['strength', 'regen', 'basicAttack'], 'damage'), 1.25);
 });
 
 // --- Balance snapshot --------------------------------------------------

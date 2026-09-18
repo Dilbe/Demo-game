@@ -198,6 +198,11 @@ function groupKillXp(baseXp, killIndex) {
 // still animates for the full duration, and the button/auto-retrigger still
 // waits for the full cooldown, either way — only the effect's own timing
 // moves.
+//
+// `type: 'passive'` (see Regen/Strength below) is the one kind that skips
+// all of that: no cooldown, no combat button, no `upgrades` track — instead
+// a flat `boost` applies for as long as the skill stays equipped. Every
+// other skill is `type: 'active'` and keeps the shape described above.
 const SKILLS = {
   basicAttack: {
     label: 'Basic Attack',
@@ -206,6 +211,7 @@ const SKILLS = {
     unlockCost: 0,
     pointCost: 1,
     auto: false,
+    type: 'active',
     triggerAt: 1,
     upgrades: [
       {
@@ -238,6 +244,7 @@ const SKILLS = {
     unlockCost: 15,
     pointCost: 2,
     auto: false,
+    type: 'active',
     // Lands the instant it's pressed, rather than waiting out its (longer)
     // cooldown like Basic Attack — the cooldown is what limits how often you
     // can use it, not a delay on top of using it.
@@ -271,6 +278,7 @@ const SKILLS = {
     unlockCost: 15,
     pointCost: 2,
     auto: false,
+    type: 'active',
     // Lands halfway through its cooldown, ahead of whatever the next monster
     // attack might be, rather than only once the cooldown is already over.
     triggerAt: 0.5,
@@ -304,6 +312,7 @@ const SKILLS = {
     // Costs the most to hold: it deals damage without being clicked.
     pointCost: 3,
     auto: true,
+    type: 'active',
     triggerAt: 1,
     upgrades: [
       {
@@ -326,7 +335,43 @@ const SKILLS = {
       },
     ],
   },
+
+  // Passive skills carry no combat button and no cooldown — while equipped
+  // (using a slot and Skill Points like any other skill), `boost` just
+  // applies for as long as that stays true. `boost.stat` names what it
+  // affects ('damage' for anything an attack skill deals, or a STATS id like
+  // 'healthRegen'); `passiveMultiplier` below turns a set of equipped
+  // skills into the combined multiplier for a given stat.
+  regen: {
+    label: 'Regen',
+    type: 'passive',
+    unlockCost: 20,
+    pointCost: 2,
+    boost: { stat: 'healthRegen', percent: 100, label: 'HP regen rate' },
+    upgrades: [],
+  },
+
+  strength: {
+    label: 'Strength',
+    type: 'passive',
+    unlockCost: 20,
+    pointCost: 2,
+    boost: { stat: 'damage', percent: 25, label: 'damage' },
+    upgrades: [],
+  },
 };
+
+// The combined multiplier every equipped passive skill with a matching
+// `boost.stat` contributes — 1 (no change) if none apply. Stacks
+// multiplicatively rather than adding percentages, so a second future source
+// of the same boost compounds instead of just summing.
+function passiveMultiplier(equippedSkillIds, statId) {
+  return equippedSkillIds.reduce((multiplier, skillId) => {
+    const skill = SKILLS[skillId];
+    if (skill.type !== 'passive' || skill.boost.stat !== statId) return multiplier;
+    return multiplier * (1 + skill.boost.percent / 100);
+  }, 1);
+}
 
 // Unlocked from the start, so a new player always has something to attack with.
 const STARTING_SKILLS = ['basicAttack'];
@@ -356,6 +401,11 @@ function skillUpgradeCost(skillId, upgradeId, level) {
 
 function describeSkill(skillId, levels = { power: 0, speed: 0 }) {
   const skill = SKILLS[skillId];
+
+  if (skill.type === 'passive') {
+    return `+${skill.boost.percent}% ${skill.boost.label} while equipped`;
+  }
+
   const power = skillPower(skillId, levels.power);
   const effect = skill.healing ? `Heals ${power}` : `${power} damage`;
   const cooldown = skillCooldown(skillId, levels.speed).toFixed(1);
@@ -474,7 +524,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
     statValue, statCost,
-    skillPower, skillCooldown, skillUpgradeCost, describeSkill,
+    skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     activeQuest, questComplete, describeQuestProgress,
     groupKillXp, groupTotalXp,

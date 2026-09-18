@@ -385,10 +385,13 @@ function equippedSkillIds() {
 
 // One button per unlocked skill. Automatic skills get a button too, but only
 // as a cooldown indicator — they fire themselves rather than being clicked.
+// Passive skills get no button at all: they have no cooldown to show and
+// nothing to click, just a stat boost that applies for as long as they stay
+// equipped (see applySkill/effectiveSecondsPerHp).
 function renderSkillBar() {
   skillBarEl.replaceChildren();
 
-  equippedSkillIds().forEach((skillId, index) => {
+  equippedSkillIds().filter((skillId) => SKILLS[skillId].type !== 'passive').forEach((skillId, index) => {
     const skill = SKILLS[skillId];
 
     const fill = document.createElement('span');
@@ -469,7 +472,10 @@ function useSkill(skillId) {
 
 function applySkill(skillId) {
   const skill = SKILLS[skillId];
-  const power = skillPower(skillId, skillLevels[skillId].power);
+  const basePower = skillPower(skillId, skillLevels[skillId].power);
+  // Strength (a passive skill) boosts attacks only, never healing. Rounded
+  // so a boosted hit still deals a whole number of damage.
+  const power = skill.healing ? basePower : Math.round(basePower * passiveMultiplier(equippedSkillIds(), 'damage'));
 
   if (skill.healing) {
     playerHp = Math.min(statValue('maxHp', stats.maxHp), playerHp + power);
@@ -539,9 +545,17 @@ function updateHealthBar() {
   healthBarFillEl.style.width = `${(playerHp / maxHp) * 100}%`;
 }
 
+// The Health Regen stat's own seconds-per-HP, sped up by Regen (a passive
+// skill) for as long as it stays equipped — divided, since a higher
+// multiplier means less time per HP, same relationship the stat's own
+// perLevel already has.
+function effectiveSecondsPerHp() {
+  return statValue('healthRegen', stats.healthRegen) / passiveMultiplier(equippedSkillIds(), 'healthRegen');
+}
+
 function updateRegenIndicator() {
   const pending = playerHp < statValue('maxHp', stats.maxHp);
-  const secondsPerHp = statValue('healthRegen', stats.healthRegen);
+  const secondsPerHp = effectiveSecondsPerHp();
   // Clamped because upgrading Health Regen can leave progress above the new
   // requirement until the next tick collects it.
   const percent = Math.min(100, (regenProgress / secondsPerHp) * 100);
@@ -571,7 +585,7 @@ function regenTick() {
     hp: playerHp,
     maxHp: statValue('maxHp', stats.maxHp),
     progress: regenProgress,
-    secondsPerHp: statValue('healthRegen', stats.healthRegen),
+    secondsPerHp: effectiveSecondsPerHp(),
   }, elapsedSeconds);
 
   const healed = result.hp !== playerHp;
@@ -719,7 +733,9 @@ function beginFight() {
   updateDungeonProgress();
 
   for (const skillId of equippedSkillIds()) {
-    if (SKILLS[skillId].auto) useSkill(skillId);
+    const skill = SKILLS[skillId];
+    if (skill.type === 'passive') continue;
+    if (skill.auto) useSkill(skillId);
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }
 
