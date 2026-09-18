@@ -9,7 +9,8 @@ const {
   activeQuest, questComplete, describeQuestProgress,
   objectiveMatches,
   groupKillXp, groupTotalXp,
-  STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget,
+  STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount,
+  PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,
 } = require('./formulas.js');
 
 // --- Version ---------------------------------------------------------
@@ -255,6 +256,11 @@ test('describeSkill reflects upgrade levels', () => {
   const base = describeSkill('basicAttack', { power: 0, speed: 0 });
   const faster = describeSkill('basicAttack', { power: 0, speed: 4 });
   assert.notStrictEqual(base, faster, 'speed levels did not change the description');
+});
+
+test('describeSkill adds a perk damage bonus to a damage skill but not to healing', () => {
+  assert.match(describeSkill('basicAttack', { power: 0, speed: 0 }, 1), /^2 damage/);
+  assert.match(describeSkill('heal', { power: 0, speed: 0 }, 1), /^Heals 5/);
 });
 
 // --- Passive skills ------------------------------------------------------
@@ -571,4 +577,46 @@ test('prestigeTarget is 10% of maxXp', () => {
 
 test('prestiging raises maxXp by PRESTIGE_BONUS_PER_CYCLE', () => {
   assert.strictEqual(STARTING_MAX_XP + PRESTIGE_BONUS_PER_CYCLE, 200);
+});
+
+test('prestigeCount is 0 at the starting maxXp and counts up by cycle after that', () => {
+  assert.strictEqual(prestigeCount(STARTING_MAX_XP), 0);
+  assert.strictEqual(prestigeCount(STARTING_MAX_XP + PRESTIGE_BONUS_PER_CYCLE), 1);
+  assert.strictEqual(prestigeCount(STARTING_MAX_XP + PRESTIGE_BONUS_PER_CYCLE * 2), 2);
+});
+
+// --- Perks -------------------------------------------------------------
+
+test('every perk costs Perk Points and defines a targeted effect', () => {
+  for (const perk of Object.values(PERKS)) {
+    assert.ok(perk.cost > 0);
+    assert.ok(perk.effect.type);
+    assert.ok(perk.effect.amount > 0);
+  }
+});
+
+test('perkMaxHpBonus is 0 with no Max HP perk purchased', () => {
+  assert.strictEqual(perkMaxHpBonus([]), 0);
+  assert.strictEqual(perkMaxHpBonus(['basicAttackDamage']), 0);
+});
+
+test('perkMaxHpBonus adds flat Max HP perks together', () => {
+  assert.strictEqual(perkMaxHpBonus(['maxHp10']), 10);
+  assert.strictEqual(perkMaxHpBonus(['maxHp25']), 25);
+  assert.strictEqual(perkMaxHpBonus(['maxHp10', 'maxHp25']), 35);
+});
+
+test('perkHealingSpeedMultiplier is 1 with no Healing Speed perk purchased', () => {
+  assert.strictEqual(perkHealingSpeedMultiplier([]), 1);
+  assert.strictEqual(perkHealingSpeedMultiplier(['maxHp10']), 1);
+});
+
+test('perkHealingSpeedMultiplier applies a purchased Healing Speed perk', () => {
+  assert.strictEqual(perkHealingSpeedMultiplier(['healingSpeed25']), 1.25);
+});
+
+test('perkSkillDamageBonus only applies to the skill a perk targets', () => {
+  assert.strictEqual(perkSkillDamageBonus([], 'basicAttack'), 0);
+  assert.strictEqual(perkSkillDamageBonus(['basicAttackDamage'], 'basicAttack'), 1);
+  assert.strictEqual(perkSkillDamageBonus(['basicAttackDamage'], 'strongAttack'), 0);
 });

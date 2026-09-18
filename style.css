@@ -296,7 +296,8 @@ body {
 .upgrade-button,
 .unlock-button,
 .equip-slot-button,
-.unequip-button {
+.unequip-button,
+.perk-buy-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -569,6 +570,39 @@ body {
 
 #reset-character-button {
   margin-top: 1.5rem;
+}
+
+/* Same row shape as .stat-row/.skill-row, since a perk is bought (once)
+   rather than leveled, same visual family as the Character tab's other
+   upgrade rows. */
+#perks-section {
+  margin: 1.5rem auto 0;
+}
+
+.perk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0.75rem auto;
+}
+
+.perk-row.owned {
+  opacity: 0.7;
+}
+
+.perk-name {
+  width: 10rem;
+  text-align: right;
+  font-weight: bold;
+}
+
+.perk-description {
+  flex: 1 1 16rem;
+  max-width: 16rem;
+  text-align: left;
+  color: #555;
 }
 
 /* Hidden until lifetime XP reaches Max XP (see renderPrestige) — matches
