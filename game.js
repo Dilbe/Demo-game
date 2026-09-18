@@ -1091,6 +1091,12 @@ function setToggleActive(skillId, toggleId, active) {
   saveProgress();
 }
 
+// Every skill — locked or not — renders as the same square, in one
+// horizontal row (matching #skill-slots' look), so a locked skill's box
+// lines up with an unlocked one instead of sitting in a differently-shaped
+// row of its own. A locked square is dimmed and not draggable, but still
+// clickable: its cost/requirement moved into the detail panel (see
+// renderSkillDetail) rather than being crammed into the square itself.
 function renderSkills() {
   skillListEl.replaceChildren();
 
@@ -1105,65 +1111,27 @@ function renderSkills() {
     const unlocked = unlockedSkills.includes(skillId);
     const equipped = equippedSkills.includes(skillId);
 
-    const entry = document.createElement('div');
-    entry.className = 'skill-entry';
+    const label = document.createElement('span');
+    label.className = 'cooldown-label';
+    label.textContent = skill.label;
+
+    const square = document.createElement('button');
+    square.type = 'button';
+    square.className = 'cooldown-button skill-square';
+    square.classList.toggle('equipped', equipped);
+    square.classList.toggle('inspected', inspectedSkillId === skillId);
+    square.classList.toggle('locked', !unlocked);
+    square.append(label);
+    square.addEventListener('click', () => inspectSkill(skillId));
 
     if (unlocked) {
-      // Styled like the in-combat skill button, so a skill looks the same
-      // here as it does on the Fight tab. Draggable so it can be dropped
-      // onto a slot to equip it, or (if already equipped) dragged back here
-      // to unequip it (see skill-slots); clicking it (rather than dragging)
-      // opens its stats/upgrades in the detail panel below.
-      const label = document.createElement('span');
-      label.className = 'cooldown-label';
-      label.textContent = skill.label;
-
-      const square = document.createElement('button');
-      square.type = 'button';
-      square.className = 'cooldown-button skill-square';
-      square.classList.toggle('equipped', equipped);
-      square.classList.toggle('inspected', inspectedSkillId === skillId);
+      // Draggable so it can be dropped onto a slot to equip it, or (if
+      // already equipped) dragged back here to unequip it (see skill-slots).
       square.draggable = true;
-      square.append(label);
       square.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
-      square.addEventListener('click', () => inspectSkill(skillId));
-
-      entry.append(square);
-    } else {
-      const name = document.createElement('span');
-      name.className = 'skill-name';
-      name.textContent = skill.label;
-
-      const detail = document.createElement('span');
-      detail.className = 'skill-detail';
-      detail.textContent = describeSkill(skillId, skillLevels[skillId]);
-
-      const cost = document.createElement('span');
-      cost.className = 'skill-cost';
-      cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'}`;
-
-      // Objective-gated skills (Strong Attack, Heal) have no XP price at
-      // all — they show what unlocks them instead of a buyable button.
-      const action = skill.unlockObjectiveId
-        ? document.createElement('span')
-        : document.createElement('button');
-      if (skill.unlockObjectiveId) {
-        action.className = 'skill-locked-message';
-        action.textContent = `Locked — ${OBJECTIVES[skill.unlockObjectiveId].description}`;
-      } else {
-        action.className = 'unlock-button';
-        action.textContent = `Unlock (${skill.unlockCost} XP)`;
-        action.disabled = xp < skill.unlockCost;
-        action.addEventListener('click', () => unlockSkill(skillId));
-      }
-
-      const row = document.createElement('div');
-      row.className = 'skill-row';
-      row.append(name, detail, cost, action);
-      entry.append(row);
     }
 
-    skillListEl.append(entry);
+    skillListEl.append(square);
   }
 }
 
@@ -1222,14 +1190,20 @@ function inspectSkill(skillId) {
   renderSkillDetail();
 }
 
-// The stats/upgrades panel for whichever skill was last clicked — hidden
-// when nothing is selected. Reused by updateXpDisplay so it stays current
-// (e.g. an upgrade bought while the panel is open updates its cost/preview)
-// without the click handlers needing to know about that themselves.
+// The stats/upgrades panel for whichever skill was last clicked. Never
+// actually hidden — with nothing inspected it shows a placeholder instead —
+// so it always claims the same layout space; toggling it via the `hidden`
+// attribute used to make the whole two-column row recenter the instant it
+// appeared, visibly shifting the skill list sideways on the very click that
+// opened it. Reused by updateXpDisplay so it stays current (e.g. an upgrade
+// bought while the panel is open updates its cost/preview) without the click
+// handlers needing to know about that themselves.
 function renderSkillDetail() {
   if (!inspectedSkillId) {
-    skillDetailPanelEl.hidden = true;
-    skillDetailPanelEl.replaceChildren();
+    const placeholder = document.createElement('p');
+    placeholder.className = 'skill-detail-placeholder';
+    placeholder.textContent = 'Tap a skill to see its stats and upgrades.';
+    skillDetailPanelEl.replaceChildren(placeholder);
     return;
   }
 
@@ -1243,6 +1217,29 @@ function renderSkillDetail() {
   const summary = document.createElement('p');
   summary.className = 'skill-detail-summary';
   summary.textContent = describeSkill(skillId, skillLevels[skillId]);
+
+  if (!unlockedSkills.includes(skillId)) {
+    // A locked skill has no cost/equip/upgrades/toggles of its own yet —
+    // just what unlocks it: an objective to complete, or an XP price.
+    const lockInfo = skill.unlockObjectiveId
+      ? (() => {
+        const message = document.createElement('p');
+        message.className = 'skill-detail-cost';
+        message.textContent = `Locked — ${OBJECTIVES[skill.unlockObjectiveId].description}`;
+        return message;
+      })()
+      : (() => {
+        const button = document.createElement('button');
+        button.className = 'unlock-button';
+        button.textContent = `Unlock (${skill.unlockCost} XP)`;
+        button.disabled = xp < skill.unlockCost;
+        button.addEventListener('click', () => unlockSkill(skillId));
+        return button;
+      })();
+
+    skillDetailPanelEl.replaceChildren(heading, summary, lockInfo);
+    return;
+  }
 
   const effectiveCost = effectivePointCost(skillId, activeToggleIds);
   const cost = document.createElement('p');
@@ -1267,7 +1264,6 @@ function renderSkillDetail() {
   if (toggleRow) children.push(toggleRow);
 
   skillDetailPanelEl.replaceChildren(...children);
-  skillDetailPanelEl.hidden = false;
 }
 
 // One row per entry in the skill's `toggles` array (see SKILLS.*.toggles) —
