@@ -459,6 +459,15 @@ body {
   font-size: 0.9rem;
 }
 
+/* Mirrors #skill-equip-message inline (see renderSkillDetail) so a shortfall
+   from this panel's own tap-equip buttons or toggle switches shows up right
+   here, not just in the shared slot below the skill list. */
+.skill-detail-message {
+  color: #b71c1c;
+  font-size: 0.85rem;
+  margin: 0 0 0.75rem;
+}
+
 .skill-equip-controls {
   margin: 0 0 0.75rem;
   padding-bottom: 0.75rem;
