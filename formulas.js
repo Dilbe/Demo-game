@@ -1,7 +1,7 @@
 // Low-ceremony versioning: matches the `vN` milestone-scope naming DESIGN.md
 // already uses (v1 stats/skills, ..., v6 quests) rather than inventing a
 // separate scheme. Bump it by hand whenever the next `vN` scope ships.
-const VERSION = 'v8';
+const VERSION = 'v9';
 
 // Which exact commit is live, for tracing "what code is running" without a
 // separate build-number counter or git tag — the commit SHA already is that
@@ -184,7 +184,9 @@ function groupKillXp(baseXp, killIndex) {
 
 // Basic Attack is the ability the Fight tab has always had, now described as
 // data. `unlockCost` is XP paid once; `pointCost` is Skill Points held for as
-// long as the skill stays equipped.
+// long as the skill stays equipped. Strong Attack and Heal instead carry
+// `unlockObjectiveId` (see OBJECTIVES below) — completing that objective
+// unlocks them directly, free of charge, so they have no `unlockCost` at all.
 //
 // `upgrades` is an array rather than fixed fields so a skill isn't locked to
 // exactly a Power and a Speed track — same reasoning as the stat/monster
@@ -199,10 +201,18 @@ function groupKillXp(baseXp, killIndex) {
 // waits for the full cooldown, either way — only the effect's own timing
 // moves.
 //
+// `toggles` is a second, separate kind of upgrade from `upgrades`: each
+// entry unlocks once for a flat XP cost, then can be switched on/off freely
+// (see toggleKey/effectivePointCost) — unlike `upgrades`, which level up
+// continuously and can't be turned back off. Turning one on adds its
+// `pointSurcharge` to the skill's Skill Point cost while equipped. Gated as a
+// whole behind the 'winDungeon' objective (see OBJECTIVES) — visible even
+// before that, but not purchasable or switchable until it completes.
+//
 // `type: 'passive'` (see Regen/Strength below) is the one kind that skips
-// all of that: no cooldown, no combat button, no `upgrades` track — instead
-// a flat `boost` applies for as long as the skill stays equipped. Every
-// other skill is `type: 'active'` and keeps the shape described above.
+// all of that: no cooldown, no combat button, no `upgrades`/`toggles` track —
+// instead a flat `boost` applies for as long as the skill stays equipped.
+// Every other skill is `type: 'active'` and keeps the shape described above.
 const SKILLS = {
   basicAttack: {
     label: 'Basic Attack',
@@ -210,7 +220,6 @@ const SKILLS = {
     cooldown: 2,
     unlockCost: 0,
     pointCost: 1,
-    auto: false,
     type: 'active',
     triggerAt: 1,
     upgrades: [
@@ -235,15 +244,30 @@ const SKILLS = {
         format(value) { return `${value.toFixed(1)}s cooldown`; },
       },
     ],
+    toggles: [
+      {
+        id: 'multiAttack',
+        label: 'Multi Attack',
+        description: 'Hits every active monster for full damage instead of just the target',
+        unlockCost: 30,
+        pointSurcharge: 1,
+      },
+      {
+        id: 'autoTrigger',
+        label: 'Auto-Trigger',
+        description: 'Fires automatically as soon as the cooldown is ready, with no click needed',
+        unlockCost: 20,
+        pointSurcharge: 1,
+      },
+    ],
   },
 
   strongAttack: {
     label: 'Strong Attack',
     damage: 3,
     cooldown: 5,
-    unlockCost: 15,
+    unlockObjectiveId: 'killMedium',
     pointCost: 2,
-    auto: false,
     type: 'active',
     // Lands the instant it's pressed, rather than waiting out its (longer)
     // cooldown like Basic Attack — the cooldown is what limits how often you
@@ -269,15 +293,23 @@ const SKILLS = {
         format(value) { return `${value.toFixed(1)}s cooldown`; },
       },
     ],
+    toggles: [
+      {
+        id: 'autoTrigger',
+        label: 'Auto-Trigger',
+        description: 'Fires automatically as soon as the cooldown is ready, with no click needed',
+        unlockCost: 25,
+        pointSurcharge: 1,
+      },
+    ],
   },
 
   heal: {
     label: 'Heal',
     healing: 5,
     cooldown: 8,
-    unlockCost: 15,
+    unlockObjectiveId: 'killBig',
     pointCost: 2,
-    auto: false,
     type: 'active',
     // Lands halfway through its cooldown, ahead of whatever the next monster
     // attack might be, rather than only once the cooldown is already over.
@@ -302,36 +334,13 @@ const SKILLS = {
         format(value) { return `${value.toFixed(1)}s cooldown`; },
       },
     ],
-  },
-
-  autoAttack: {
-    label: 'Auto Attack',
-    damage: 1,
-    cooldown: 6,
-    unlockCost: 25,
-    // Costs the most to hold: it deals damage without being clicked.
-    pointCost: 3,
-    auto: true,
-    type: 'active',
-    triggerAt: 1,
-    upgrades: [
+    toggles: [
       {
-        id: 'power',
-        label: 'Damage',
-        perLevel: 1,
-        baseCost: 10,
-        costGrowth: 1.6,
-        value(skill, level) { return skill.damage + level * this.perLevel; },
-        format(value) { return `${value} damage`; },
-      },
-      {
-        id: 'speed',
-        label: 'Speed',
-        perLevel: 0.1,
-        baseCost: 10,
-        costGrowth: 1.6,
-        value(skill, level) { return skill.cooldown / (1 + level * this.perLevel); },
-        format(value) { return `${value.toFixed(1)}s cooldown`; },
+        id: 'healOverTime',
+        label: 'Heal over Time',
+        description: 'Spreads the same total healing evenly over 10 seconds instead of landing it all at once',
+        unlockCost: 30,
+        pointSurcharge: 1,
       },
     ],
   },
@@ -349,6 +358,7 @@ const SKILLS = {
     pointCost: 2,
     boost: { stat: 'healthRegen', percent: 100, label: 'HP regen rate' },
     upgrades: [],
+    toggles: [],
   },
 
   strength: {
@@ -358,8 +368,50 @@ const SKILLS = {
     pointCost: 2,
     boost: { stat: 'damage', percent: 25, label: 'damage' },
     upgrades: [],
+    toggles: [],
   },
 };
+
+// A skill can unlock either by spending XP (`unlockCost`) or by completing a
+// gameplay objective (`unlockObjectiveId`, matching a key here) — see
+// SKILLS.strongAttack/heal. Kept separate from QUESTS (which award tab
+// unlocks and progress strictly in sequence): these objectives can complete
+// in any order relative to each other and to the quest chain, since nothing
+// gates one behind another. `condition` is a small data-object describing
+// what event completes it (see objectiveMatches); `reward` is generic like
+// QUESTS' own reward shape, so a future objective isn't limited to unlocking
+// a skill.
+const OBJECTIVES = {
+  killMedium: {
+    description: 'Kill a Medium Monster',
+    condition: { type: 'killMonster', monsterId: 'medium' },
+    reward: { type: 'unlockSkill', skillId: 'strongAttack' },
+  },
+
+  killBig: {
+    description: 'Kill a Big Monster',
+    condition: { type: 'killMonster', monsterId: 'big' },
+    reward: { type: 'unlockSkill', skillId: 'heal' },
+  },
+
+  // Gates the toggle system itself (see SKILLS.*.toggles) rather than a
+  // single skill — reward is applied as a global flag, not a skill unlock.
+  winDungeon: {
+    description: 'Win a dungeon',
+    condition: { type: 'winDungeon' },
+    reward: { type: 'unlockToggles' },
+  },
+};
+
+// True if `event` (something that just happened in the game, e.g.
+// `{ type: 'killMonster', monsterId: 'medium' }`) satisfies an objective's
+// `condition`. A condition with nothing beyond `type` (like winDungeon's)
+// matches any event of that type.
+function objectiveMatches(condition, event) {
+  if (condition.type !== event.type) return false;
+  if (condition.type === 'killMonster') return condition.monsterId === event.monsterId;
+  return true;
+}
 
 // The combined multiplier every equipped passive skill with a matching
 // `boost.stat` contributes — 1 (no change) if none apply. Stacks
@@ -399,6 +451,29 @@ function skillUpgradeCost(skillId, upgradeId, level) {
   return costForLevel(upgrade.baseCost, upgrade.costGrowth, level);
 }
 
+function findToggle(skillId, toggleId) {
+  return SKILLS[skillId].toggles.find((toggle) => toggle.id === toggleId);
+}
+
+// The flat id a toggle is tracked and persisted under — unique across every
+// skill's toggles, since two different skills can each have their own
+// 'autoTrigger' toggle.
+function toggleKey(skillId, toggleId) {
+  return `${skillId}:${toggleId}`;
+}
+
+// A skill's Skill Point cost while equipped, including the surcharge of
+// whichever of its own toggles are currently switched on. `activeToggleIds`
+// is the flat list of every currently-on toggle in the game (see
+// toggleKey) — filtered down here to the ones that belong to this skill.
+function effectivePointCost(skillId, activeToggleIds) {
+  const skill = SKILLS[skillId];
+  const surcharge = skill.toggles.reduce((total, toggle) => {
+    return activeToggleIds.includes(toggleKey(skillId, toggle.id)) ? total + toggle.pointSurcharge : total;
+  }, 0);
+  return skill.pointCost + surcharge;
+}
+
 function describeSkill(skillId, levels = { power: 0, speed: 0 }) {
   const skill = SKILLS[skillId];
 
@@ -409,7 +484,7 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }) {
   const power = skillPower(skillId, levels.power);
   const effect = skill.healing ? `Heals ${power}` : `${power} damage`;
   const cooldown = skillCooldown(skillId, levels.speed).toFixed(1);
-  return `${effect}, ${cooldown}s cooldown${skill.auto ? ', automatic' : ''}`;
+  return `${effect}, ${cooldown}s cooldown`;
 }
 
 function describeMonster(monsterId) {
@@ -522,11 +597,13 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
+    VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS, OBJECTIVES,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
+    findToggle, toggleKey, effectivePointCost,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     activeQuest, questComplete, describeQuestProgress,
+    objectiveMatches,
     groupKillXp, groupTotalXp,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget,
   };

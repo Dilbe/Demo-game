@@ -1,11 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS,
+  VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS, OBJECTIVES,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
+  findToggle, toggleKey, effectivePointCost,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   activeQuest, questComplete, describeQuestProgress,
+  objectiveMatches,
   groupKillXp, groupTotalXp,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget,
 } = require('./formulas.js');
@@ -154,10 +156,20 @@ test('every stat defines the full data-object shape', () => {
 
 test('every skill defines the full data-object shape', () => {
   for (const [skillId, skill] of Object.entries(SKILLS)) {
-    for (const field of ['label', 'type', 'unlockCost', 'pointCost']) {
+    for (const field of ['label', 'type', 'pointCost']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
     assert.ok(skill.pointCost > 0, `${skillId} costs no skill points to equip`);
+
+    // A skill unlocks either by spending XP or by completing a gameplay
+    // objective (see OBJECTIVES) — never both, never neither.
+    assert.notStrictEqual(
+      skill.unlockCost !== undefined, skill.unlockObjectiveId !== undefined,
+      `${skillId} must define exactly one of unlockCost/unlockObjectiveId`
+    );
+    if (skill.unlockObjectiveId !== undefined) {
+      assert.ok(OBJECTIVES[skill.unlockObjectiveId], `${skillId}'s unlockObjectiveId does not match a real objective`);
+    }
 
     if (skill.type === 'passive') {
       assert.ok(skill.boost, `${skillId} is passive but has no boost`);
@@ -168,7 +180,7 @@ test('every skill defines the full data-object shape', () => {
       continue;
     }
 
-    for (const field of ['cooldown', 'auto', 'triggerAt']) {
+    for (const field of ['cooldown', 'triggerAt']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
     assert.ok(skill.damage !== undefined || skill.healing !== undefined, `${skillId} does neither damage nor healing`);
@@ -184,6 +196,15 @@ test('every skill defines the full data-object shape', () => {
       assert.strictEqual(typeof upgrade.format, 'function', `${skillId}'s ${upgrade.id} upgrade is missing format()`);
       assert.ok(upgrade.format(upgrade.value(skill, 0)).length > 0, `${skillId}'s ${upgrade.id} format() produced nothing`);
     }
+
+    assert.ok(Array.isArray(skill.toggles), `${skillId} has no toggles array`);
+    for (const toggle of skill.toggles) {
+      for (const field of ['id', 'label', 'description', 'unlockCost', 'pointSurcharge']) {
+        assert.ok(toggle[field] !== undefined, `${skillId}'s ${toggle.id ?? '?'} toggle is missing ${field}`);
+      }
+      assert.ok(toggle.unlockCost > 0, `${skillId}'s ${toggle.id} toggle unlocks for free`);
+      assert.ok(toggle.pointSurcharge > 0, `${skillId}'s ${toggle.id} toggle costs no extra Skill Points`);
+    }
   }
 });
 
@@ -191,7 +212,6 @@ test('Strong Attack triggers immediately, Heal triggers halfway, others at the e
   assert.strictEqual(SKILLS.strongAttack.triggerAt, 0);
   assert.strictEqual(SKILLS.heal.triggerAt, 0.5);
   assert.strictEqual(SKILLS.basicAttack.triggerAt, 1);
-  assert.strictEqual(SKILLS.autoAttack.triggerAt, 1);
 });
 
 test('starting skills are real skills and cost nothing', () => {
@@ -215,18 +235,17 @@ test('the cheapest skill always fits a new player budget', () => {
   assert.ok(cheapest <= statValue('skillPoints', 0), 'no skill is affordable at skillPoints level 0');
 });
 
-test('every skill that must be bought costs something', () => {
+test('every skill that must be bought with XP costs something', () => {
   for (const [skillId, skill] of Object.entries(SKILLS)) {
     if (STARTING_SKILLS.includes(skillId)) continue;
+    if (skill.unlockObjectiveId !== undefined) continue; // objective-gated, not XP-priced
     assert.ok(skill.unlockCost > 0, `${skillId} is not a starting skill but is free`);
   }
 });
 
-test('describeSkill reports damage, healing and automatic skills', () => {
+test('describeSkill reports damage and healing', () => {
   assert.match(describeSkill('basicAttack'), /1 damage, 2.0s cooldown/);
   assert.match(describeSkill('heal'), /^Heals 5/);
-  assert.match(describeSkill('autoAttack'), /automatic$/);
-  assert.doesNotMatch(describeSkill('strongAttack'), /automatic/);
 });
 
 test('describeSkill reflects upgrade levels', () => {
@@ -255,6 +274,46 @@ test('passiveMultiplier applies an equipped passive\'s boost to its own stat', (
   assert.strictEqual(passiveMultiplier(['strength'], 'damage'), 1.25);
   assert.strictEqual(passiveMultiplier(['regen'], 'healthRegen'), 2);
   assert.strictEqual(passiveMultiplier(['strength', 'regen', 'basicAttack'], 'damage'), 1.25);
+});
+
+// --- Toggles ---------------------------------------------------------------
+// Optional per-skill upgrades: unlocked once with XP, then switched on/off
+// freely, adding a Skill Point surcharge only while on.
+
+test('toggleKey is unique per skill even for toggles sharing an id', () => {
+  // Basic Attack and Strong Attack both have an 'autoTrigger' toggle — the
+  // key must still tell them apart.
+  assert.notStrictEqual(toggleKey('basicAttack', 'autoTrigger'), toggleKey('strongAttack', 'autoTrigger'));
+});
+
+test('findToggle looks up a skill\'s own toggle by id', () => {
+  assert.strictEqual(findToggle('basicAttack', 'multiAttack').label, 'Multi Attack');
+  assert.strictEqual(findToggle('heal', 'healOverTime').label, 'Heal over Time');
+});
+
+test('effectivePointCost is the base pointCost with no toggles active', () => {
+  assert.strictEqual(effectivePointCost('basicAttack', []), SKILLS.basicAttack.pointCost);
+});
+
+test('effectivePointCost adds only the active toggle\'s own surcharge', () => {
+  const surcharge = findToggle('basicAttack', 'multiAttack').pointSurcharge;
+  assert.strictEqual(
+    effectivePointCost('basicAttack', [toggleKey('basicAttack', 'multiAttack')]),
+    SKILLS.basicAttack.pointCost + surcharge
+  );
+  // An active toggle on a different skill must not leak into this one's cost.
+  assert.strictEqual(
+    effectivePointCost('basicAttack', [toggleKey('heal', 'healOverTime')]),
+    SKILLS.basicAttack.pointCost
+  );
+});
+
+test('effectivePointCost stacks every active toggle a skill has', () => {
+  const both = [toggleKey('basicAttack', 'multiAttack'), toggleKey('basicAttack', 'autoTrigger')];
+  const expected = SKILLS.basicAttack.pointCost
+    + findToggle('basicAttack', 'multiAttack').pointSurcharge
+    + findToggle('basicAttack', 'autoTrigger').pointSurcharge;
+  assert.strictEqual(effectivePointCost('basicAttack', both), expected);
 });
 
 // --- Balance snapshot --------------------------------------------------
@@ -431,6 +490,44 @@ test('describeQuestProgress reports progress capped at the target', () => {
   const quest = { description: 'Kill 5 enemies', target: 5 };
   assert.strictEqual(describeQuestProgress(quest, 3), 'Kill 5 enemies (3/5)');
   assert.strictEqual(describeQuestProgress(quest, 9), 'Kill 5 enemies (5/5)');
+});
+
+// --- Objectives ------------------------------------------------------------
+// Unlike QUESTS, these can complete in any order — nothing gates one behind
+// another, so there's no single "active" one to track.
+
+test('every objective defines the full data-object shape', () => {
+  for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
+    for (const field of ['description', 'condition', 'reward']) {
+      assert.ok(objective[field] !== undefined, `${objectiveId} is missing ${field}`);
+    }
+    assert.ok(objective.condition.type, `${objectiveId}'s condition has no type`);
+    assert.ok(objective.reward.type, `${objectiveId}'s reward has no type`);
+  }
+});
+
+test('killMedium and killBig unlock Strong Attack and Heal', () => {
+  assert.deepStrictEqual(OBJECTIVES.killMedium.reward, { type: 'unlockSkill', skillId: 'strongAttack' });
+  assert.deepStrictEqual(OBJECTIVES.killBig.reward, { type: 'unlockSkill', skillId: 'heal' });
+});
+
+test('winDungeon unlocks the toggle system rather than a specific skill', () => {
+  assert.deepStrictEqual(OBJECTIVES.winDungeon.reward, { type: 'unlockToggles' });
+});
+
+test('objectiveMatches requires the event type to match the condition type', () => {
+  assert.strictEqual(objectiveMatches({ type: 'killMonster', monsterId: 'medium' }, { type: 'winDungeon' }), false);
+  assert.strictEqual(objectiveMatches({ type: 'winDungeon' }, { type: 'killMonster', monsterId: 'medium' }), false);
+});
+
+test('objectiveMatches checks monsterId for a killMonster condition', () => {
+  const condition = OBJECTIVES.killMedium.condition;
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'medium' }), true);
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small' }), false);
+});
+
+test('objectiveMatches matches any event of a type-only condition', () => {
+  assert.strictEqual(objectiveMatches(OBJECTIVES.winDungeon.condition, { type: 'winDungeon' }), true);
 });
 
 // --- advanceRegen --------------------------------------------------------
