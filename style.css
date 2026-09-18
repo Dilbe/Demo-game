@@ -417,6 +417,26 @@ body {
   font-size: 0.9rem;
 }
 
+.skill-equip-controls {
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.skill-equip-slots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.equip-slot-button,
+.unequip-button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+}
+
 /* Stacked rather than side-by-side — buildUpgradeRow appends each track's
    label/change/button in sequence, so a column direction naturally groups
    them without changing how the row is built, and fits the sidebar's width. */
