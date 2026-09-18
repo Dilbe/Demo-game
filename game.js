@@ -140,6 +140,17 @@ let togglesUnlocked = false;
 let unlockedToggleIds = [];
 let activeToggleIds = [];
 
+// Wraps a MONSTERS `sprite` or SKILLS `icon` SVG string (see formulas.js) in
+// a span so it can sit alongside a label/other elements. `innerHTML` is fine
+// here — every sprite/icon is our own hardcoded data, never anything a
+// player could influence.
+function buildSprite(svgMarkup, className) {
+  const wrapper = document.createElement('span');
+  wrapper.className = className;
+  wrapper.innerHTML = svgMarkup;
+  return wrapper;
+}
+
 // Reset a cooldown fill to full instantly, then animate it down to 0 over `durationSeconds`.
 function animateCooldownFill(fillEl, durationSeconds) {
   fillEl.style.transition = 'none';
@@ -195,8 +206,12 @@ function renderMonsterSelect() {
 
   for (const [groupId, group] of Object.entries(MONSTER_GROUPS)) {
     const selected = groupId === selectedGroupId;
+    // The group's first monster represents the whole group — every group
+    // defined so far is homogeneous (see describeMonsterGroup's own note),
+    // so Two Small Slimes' card just shows one Small Slime sprite.
+    const sprite = MONSTERS[group.monsterIds[0]].sprite;
     monsterSelectEl.append(
-      buildMonsterSelectRow(group.label, describeMonsterGroup(groupId), selected, () => selectMonsterGroup(groupId))
+      buildMonsterSelectRow(group.label, describeMonsterGroup(groupId), selected, () => selectMonsterGroup(groupId), sprite)
     );
   }
 
@@ -217,8 +232,9 @@ function renderMonsterSelect() {
 // is the select control, no separate button. selectMonsterGroup/
 // selectDungeon already refuse mid-fight, so the only thing guarded here is
 // re-clicking the already-selected card, which would otherwise just re-render
-// and re-save for no change.
-function buildMonsterSelectRow(label, detailText, selected, onSelect) {
+// and re-save for no change. `spriteMarkup` is omitted for a dungeon row —
+// a chain of different fights has no single monster to represent it.
+function buildMonsterSelectRow(label, detailText, selected, onSelect, spriteMarkup) {
   const name = document.createElement('span');
   name.className = 'monster-name';
   name.textContent = label;
@@ -230,6 +246,7 @@ function buildMonsterSelectRow(label, detailText, selected, onSelect) {
   const row = document.createElement('div');
   row.className = 'monster-row';
   row.classList.toggle('selected', selected);
+  if (spriteMarkup) row.append(buildSprite(spriteMarkup, 'monster-sprite'));
   row.append(name, detail);
   row.addEventListener('click', () => {
     if (selected) return;
@@ -283,6 +300,8 @@ function renderMonsterList(monsters, { interactive = false } = {}) {
   monsterCards = monsters.map(({ monsterId, hp }, index) => {
     const monster = MONSTERS[monsterId];
 
+    const sprite = buildSprite(monster.sprite, 'monster-sprite');
+
     const name = document.createElement('h2');
     name.textContent = monster.label;
 
@@ -316,7 +335,7 @@ function renderMonsterList(monsters, { interactive = false } = {}) {
 
     const card = document.createElement('div');
     card.className = 'combatant';
-    card.append(name, hpLine, button);
+    card.append(sprite, name, hpLine, button);
 
     if (targetable) {
       card.classList.add('targetable');
@@ -453,6 +472,8 @@ function renderSkillBar() {
     triggerMarker.className = 'trigger-marker';
     triggerMarker.style.top = `${(1 - skill.triggerAt) * 100}%`;
 
+    const icon = buildSprite(skill.icon, 'skill-icon');
+
     const label = document.createElement('span');
     label.className = 'cooldown-label';
     label.textContent = skill.label;
@@ -461,7 +482,7 @@ function renderSkillBar() {
     button.className = 'cooldown-button';
     button.dataset.skill = skillId;
     button.disabled = true;
-    button.append(fill, triggerMarker, label);
+    button.append(fill, triggerMarker, icon, label);
 
     if (!isAutoTriggering(skillId)) {
       button.addEventListener('click', () => useSkill(skillId));
@@ -1201,6 +1222,8 @@ function renderSkills() {
     const unlocked = unlockedSkills.includes(skillId);
     const equipped = equippedSkills.includes(skillId);
 
+    const icon = buildSprite(skill.icon, 'skill-icon');
+
     const label = document.createElement('span');
     label.className = 'cooldown-label';
     label.textContent = skill.label;
@@ -1211,7 +1234,7 @@ function renderSkills() {
     square.classList.toggle('equipped', equipped);
     square.classList.toggle('inspected', inspectedSkillId === skillId);
     square.classList.toggle('locked', !unlocked);
-    square.append(label);
+    square.append(icon, label);
     square.addEventListener('click', () => inspectSkill(skillId));
 
     if (unlocked) {
@@ -1247,6 +1270,7 @@ function renderSkillSlots() {
     box.type = 'button';
     box.className = 'cooldown-button skill-slot';
     box.classList.toggle('inspected', Boolean(skillId) && inspectedSkillId === skillId);
+    if (skillId) box.append(buildSprite(SKILLS[skillId].icon, 'skill-icon'));
     box.append(label);
 
     if (skillId) {
