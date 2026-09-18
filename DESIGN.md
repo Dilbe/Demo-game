@@ -370,6 +370,28 @@ Everything so far has only been shaped for desktop mouse/keyboard use — no vie
 
 **v11 status: done.** All 3 milestones complete — the game now renders at device width, every skill-equipping action works over touch as well as mouse, and every interactive control is comfortably tappable on a phone-sized screen.
 
+## v12 scope — perks
+
+A second permanent-progression currency, earned only by prestiging — the "additional permanent rewards for prestiging" idea v8 parked for later. Where Max XP only ever raises the prestige bar's own target, **Perk Points** buy **Perks**: one-time, permanent bonuses that survive every future prestige (and the reset that comes with it) rather than being wiped like XP, stats, and skills are.
+
+- **Perk Points are earned only on prestige**, not any other way. The amount is the prestige count itself: the 1st prestige pays 1 Perk Point, the 2nd pays 2, the 3rd pays 3, and so on — so the reward for prestiging again keeps growing the more times it's already been done, same spirit as Max XP's own +100-per-cycle growth. The prestige count doesn't need a new counter of its own: it's `(maxXp - STARTING_MAX_XP) / PRESTIGE_BONUS_PER_CYCLE`, already fully determined by the existing Max XP value.
+- **Perk Points and every purchased Perk persist through a prestige.** They live alongside `maxXp` in its own storage, outside the main save a prestige resets — that's the whole point of them being the "permanent" reward, as opposed to XP/stats/skills/quests/kill count, which a prestige wipes same as always.
+- **Perks are defined as data** — a `PERKS` map (id, label, description, Perk Point cost, effect), same data-object pattern as STATS/SKILLS/MONSTERS/etc. Each perk is bought once with Perk Points and owned forever after — there's no leveling a perk further or switching it off, unlike a stat's XP-funded levels or a skill's toggles.
+- **A perk's effect never touches the thing it boosts.** A perk that adds +5 Max HP does not increment the Max HP *stat level* — if it did, the next Max HP upgrade bought with XP would cost more, which defeats the point of Perk Points being a separate currency from XP. Instead, a perk's bonus applies as an independent layer on top of whatever the stat/skill's own XP-funded value already is, the same architectural pattern passive skills already use for their `boost` (see `passiveMultiplier` in v9) — never by mutating `stats`/`skillLevels` themselves.
+- **The first four perks:**
+  - Basic Attack damage +1 — 2 Perk Points. Adds flat damage on top of Basic Attack's own Power track.
+  - Max HP +10 — 1 Perk Point.
+  - Max HP +25 — 5 Perk Points. A separate perk from the one above, not a bigger tier of it — buying both stacks to +35 Max HP total.
+  - Healing Speed +25% — 3 Perk Points. A percentage multiplier on the Health Regen rate, stacking *multiplicatively* with every other source of the same boost (today, that's just the Regen passive skill's own +100%; a future second Healing Speed perk would multiply in too, rather than the percentages just adding).
+
+### v12 milestones
+
+1. Perk Points resource + prestige award — on every prestige, award Perk Points equal to the new prestige count (1st → 1, 2nd → 2, ...), derived from the post-prestige `maxXp` rather than a new stored counter.
+2. `PERKS` data — define the data-object shape (id, label, description, cost, effect) and the four starting perks above. No wiring into gameplay yet at this milestone — just the data and its shape.
+3. Perks UI — a place to spend Perk Points on a not-yet-bought perk (showing its cost and what it does), buyable once, then shown as owned; disabled while unaffordable or already bought.
+4. Wire perk effects into gameplay — Max HP perks add to effective Max HP everywhere it's read (health bar, Heal's cap, regen math); the Healing Speed perk folds into the same regen-rate calculation the Regen passive skill already multiplies into; the Basic Attack damage perk adds to Basic Attack's effective power wherever its damage is actually dealt and displayed. Verify a perk's stat/skill never costs more XP to upgrade afterward.
+5. Persistence — save Perk Points balance and purchased perk ids alongside Max XP's own storage key, surviving both a prestige reset and a normal reload.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
