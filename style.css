@@ -1,7 +1,14 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   font-family: sans-serif;
   text-align: center;
   margin-top: 3rem;
+  padding: 0 1rem;
 }
 
 #monster-list {
@@ -63,6 +70,7 @@ body {
 
 .monster-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 1rem;
@@ -79,19 +87,22 @@ body {
 }
 
 .monster-detail {
-  width: 16rem;
+  flex: 1 1 16rem;
+  max-width: 16rem;
   text-align: left;
   color: #555;
 }
 
 .monster-select-button {
   font-size: 1rem;
-  padding: 0.4rem 1rem;
+  padding: 0.65rem 1.25rem;
+  min-height: 2.75rem;
 }
 
 #health-bar {
   position: relative;
-  width: 16rem;
+  width: 100%;
+  max-width: 16rem;
   height: 1.75rem;
   margin: 0 auto 1.5rem;
   border: 1px solid #999;
@@ -178,9 +189,11 @@ body {
 
 #restart-button,
 #start-button,
-#retreat-button {
+#retreat-button,
+#reset-character-button {
   font-size: 1rem;
-  padding: 0.5rem 1.5rem;
+  padding: 0.75rem 1.5rem;
+  min-height: 2.75rem;
 }
 
 #retreat-button {
@@ -194,7 +207,8 @@ body {
 }
 
 #quest-tracker {
-  width: 16rem;
+  width: 100%;
+  max-width: 16rem;
   margin: 0 auto 1.5rem;
   font-size: 0.9rem;
   color: #333;
@@ -206,12 +220,17 @@ body {
 }
 
 #tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
   margin-bottom: 1.5rem;
 }
 
 .tab-button {
   font-size: 1rem;
-  padding: 0.5rem 1.5rem;
+  padding: 0.75rem 1.5rem;
+  min-height: 2.75rem;
   cursor: pointer;
 }
 
@@ -222,6 +241,7 @@ body {
 
 .stat-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
@@ -239,18 +259,33 @@ body {
 }
 
 .stat-description {
-  width: 11.5rem;
+  flex: 1 1 11.5rem;
+  max-width: 11.5rem;
   text-align: left;
   color: #555;
 }
 
 .stat-change {
-  width: 8rem;
+  flex: 1 1 8rem;
+  max-width: 8rem;
   text-align: left;
+}
+
+.upgrade-button,
+.unlock-button,
+.equip-slot-button,
+.unequip-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
 }
 
 #skill-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 0.75rem;
   margin: 1.5rem auto;
@@ -263,6 +298,7 @@ body {
 
 .skill-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 1rem;
@@ -276,7 +312,8 @@ body {
 }
 
 .skill-detail {
-  width: 16rem;
+  flex: 1 1 16rem;
+  max-width: 16rem;
   text-align: left;
   color: #555;
 }
@@ -331,6 +368,7 @@ body {
 
 #skill-slots {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 0.75rem;
   margin: 1rem auto 1.5rem;
@@ -366,12 +404,13 @@ body {
 }
 
 #skills-main {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 #skill-detail-panel {
-  flex: 0 0 auto;
-  width: 16rem;
+  flex: 1 1 16rem;
+  max-width: 16rem;
   margin: 0;
   padding: 1rem 1.25rem;
   border: 1px solid #ccc;
@@ -398,6 +437,26 @@ body {
   font-size: 0.9rem;
 }
 
+.skill-equip-controls {
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.skill-equip-slots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.equip-slot-button,
+.unequip-button {
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+}
+
 /* Stacked rather than side-by-side — buildUpgradeRow appends each track's
    label/change/button in sequence, so a column direction naturally groups
    them without changing how the row is built, and fits the sidebar's width. */
@@ -420,8 +479,6 @@ body {
 
 #reset-character-button {
   margin-top: 1.5rem;
-  font-size: 1rem;
-  padding: 0.5rem 1.5rem;
 }
 
 .about-blurb {

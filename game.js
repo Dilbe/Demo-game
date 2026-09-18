@@ -968,8 +968,52 @@ function renderSkillDetail() {
   cost.className = 'skill-detail-cost';
   cost.textContent = `${skill.pointCost} ${skill.pointCost === 1 ? 'pt' : 'pts'} while equipped`;
 
-  skillDetailPanelEl.replaceChildren(heading, summary, cost, buildUpgradeRow(skillId));
+  skillDetailPanelEl.replaceChildren(heading, summary, cost, buildEquipControls(skillId), buildUpgradeRow(skillId));
   skillDetailPanelEl.hidden = false;
+}
+
+// Tap-based equip/move/unequip, standing alongside the drag-and-drop on the
+// squares themselves — iOS Safari and most mobile browsers never fire HTML5
+// drag events over touch, so this is the only way a touch player can equip a
+// skill at all. One button per slot ("here" for wherever the skill already
+// sits, disabled; otherwise the slot's current occupant, or "Empty") calls
+// the same equipInSlot used by dropping a square on a slot, so a tap and a
+// drag land on identical logic (budget check, message on shortfall, save).
+function buildEquipControls(skillId) {
+  const container = document.createElement('div');
+  container.className = 'skill-equip-controls';
+
+  const slotCount = statValue('skillSlots', stats.skillSlots);
+  const currentIndex = equippedSkills.indexOf(skillId);
+
+  const slotsRow = document.createElement('div');
+  slotsRow.className = 'skill-equip-slots';
+
+  for (let index = 0; index < slotCount; index += 1) {
+    const occupantId = equippedSkills[index];
+
+    const button = document.createElement('button');
+    button.className = 'equip-slot-button';
+    button.textContent = index === currentIndex
+      ? `Slot ${index + 1} (here)`
+      : `Slot ${index + 1} (${occupantId ? SKILLS[occupantId].label : 'Empty'})`;
+    button.disabled = index === currentIndex;
+    button.addEventListener('click', () => equipInSlot(skillId, index));
+
+    slotsRow.append(button);
+  }
+
+  container.append(slotsRow);
+
+  if (currentIndex !== -1) {
+    const unequipButton = document.createElement('button');
+    unequipButton.className = 'unequip-button';
+    unequipButton.textContent = 'Unequip';
+    unequipButton.addEventListener('click', () => unequipSkill(skillId));
+    container.append(unequipButton);
+  }
+
+  return container;
 }
 
 // One row per entry in the skill's `upgrades` array, whatever tracks that
