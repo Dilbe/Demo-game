@@ -4,6 +4,15 @@
   box-sizing: border-box;
 }
 
+/* Reserves the scrollbar's width always, rather than only once a tall page
+   actually needs one — otherwise a scrollbar appearing (e.g. the Skills
+   tab's detail panel growing much taller once it has real content) narrows
+   the viewport by a few pixels and visibly nudges centered content sideways
+   at the exact moment it happens. */
+html {
+  overflow-y: scroll;
+}
+
 body {
   font-family: sans-serif;
   text-align: center;
@@ -319,52 +328,19 @@ body {
   display: none;
 }
 
-.skill-row {
+/* Every skill (locked or not) is one of these squares, laid out in a single
+   horizontal row like #skill-slots below — see renderSkills. A locked one is
+   just dimmed; its cost/requirement lives in the detail panel instead of on
+   the square itself, matching an unlocked skill's square in the same row. */
+#skill-list {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   justify-content: center;
-  gap: 1rem;
-  margin: 0.75rem auto;
-}
-
-.skill-name {
-  width: 8rem;
-  text-align: right;
-  font-weight: bold;
-}
-
-.skill-detail {
-  flex: 1 1 16rem;
-  max-width: 16rem;
-  text-align: left;
-  color: #555;
-}
-
-.skill-cost {
-  width: 3.5rem;
-  text-align: left;
-}
-
-.equip-status {
-  width: 5rem;
-  text-align: left;
-  color: #1b5e20;
-  font-weight: bold;
-  font-size: 0.85rem;
-}
-
-.skill-row.draggable {
-  cursor: grab;
-}
-
-.skill-row.equipped {
-  background: #eef6ee;
-  border-radius: 4px;
+  gap: 0.75rem;
+  margin: 1rem auto;
 }
 
 .skill-square {
-  margin: 0 0 0.5rem;
   cursor: grab;
 }
 
@@ -372,8 +348,9 @@ body {
   outline: 2px solid #1b5e20;
 }
 
-.skill-entry {
-  margin-bottom: 1.25rem;
+.skill-square.locked {
+  cursor: pointer;
+  opacity: 0.5;
 }
 
 .skill-slots-hint {
@@ -442,10 +419,6 @@ body {
   text-align: center;
 }
 
-#skill-detail-panel[hidden] {
-  display: none;
-}
-
 .skill-detail-heading {
   margin: 0 0 0.5rem;
 }
@@ -457,6 +430,16 @@ body {
 
 .skill-detail-cost {
   margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* Shown instead of real content while nothing is inspected — the panel
+   always renders something (see renderSkillDetail) so it always claims the
+   same layout space, rather than appearing/disappearing and shifting the
+   skill list sideways as the two-column row recenters. */
+.skill-detail-placeholder {
+  margin: 0;
+  color: #555;
   font-size: 0.9rem;
 }
 
@@ -507,14 +490,6 @@ body {
 
 .track-change {
   font-size: 0.9rem;
-}
-
-.skill-locked-message {
-  flex: 1 1 8rem;
-  text-align: left;
-  color: #555;
-  font-size: 0.85rem;
-  font-style: italic;
 }
 
 /* One-time-unlock, then on/off — a separate block from .skill-upgrades'
