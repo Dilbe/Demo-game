@@ -981,6 +981,10 @@ function equipInSlot(skillId, slotIndex) {
       `Not enough Skill Points to equip ${SKILLS[skillId].label} — needs ${shortfall} more `
       + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Skill Points.`
     );
+    // Mirrors the message inline if the detail panel is open — see there —
+    // since a tap-to-equip attempt (unlike a drag) is triggered from inside
+    // that panel, nowhere near the shared message slot below the skill list.
+    renderSkillDetail();
     return;
   }
 
@@ -1048,6 +1052,8 @@ function setToggleActive(skillId, toggleId, active) {
   const key = toggleKey(skillId, toggleId);
   if (!unlockedToggleIds.includes(key) || activeToggleIds.includes(key) === active) return;
 
+  hideSkillEquipMessage();
+
   if (active && equippedSkills.includes(skillId)) {
     const toggle = findToggle(skillId, toggleId);
     const projectedPoints = pointsUsed() + toggle.pointSurcharge;
@@ -1058,6 +1064,10 @@ function setToggleActive(skillId, toggleId, active) {
         `Not enough Skill Points to turn on ${toggle.label} — needs ${shortfall} more `
         + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Skill Points.`
       );
+      // The toggle switch lives inside the detail panel, not near the shared
+      // message slot below the skill list — mirror it inline (see there) so
+      // turning a toggle on doesn't look like it silently did nothing.
+      renderSkillDetail();
       return;
     }
   }
@@ -1229,7 +1239,20 @@ function renderSkillDetail() {
   cost.className = 'skill-detail-cost';
   cost.textContent = `${effectiveCost} ${effectiveCost === 1 ? 'pt' : 'pts'} while equipped`;
 
-  const children = [heading, summary, cost, buildEquipControls(skillId), buildUpgradeRow(skillId)];
+  const children = [heading, summary, cost];
+
+  // Mirrors #skill-equip-message inline, right where the tap-to-equip
+  // buttons and toggle switches that can trigger it actually live — the
+  // shared message slot sits below the skill list in a separate column on
+  // desktop, easy to miss entirely otherwise (see equipInSlot/setToggleActive).
+  if (!skillEquipMessageEl.hidden) {
+    const message = document.createElement('p');
+    message.className = 'skill-detail-message';
+    message.textContent = skillEquipMessageEl.textContent;
+    children.push(message);
+  }
+
+  children.push(buildEquipControls(skillId), buildUpgradeRow(skillId));
   const toggleRow = buildToggleRow(skillId);
   if (toggleRow) children.push(toggleRow);
 
