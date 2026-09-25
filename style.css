@@ -256,7 +256,7 @@ body {
 #retreat-button,
 #reset-character-button {
   font-size: 1rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem clamp(0.5rem, 3vw, 1.5rem);
   min-height: 2.75rem;
 }
 
@@ -291,17 +291,20 @@ body {
   display: none;
 }
 
+/* One row always: About sits to the right of the other tabs rather than
+   wrapping below them on narrow screens, so padding and gap shrink with the
+   viewport instead. */
 #tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 0.6rem;
+  gap: clamp(0.3rem, 1.5vw, 0.6rem);
   margin-bottom: 1.5rem;
 }
 
 .tab-button {
   font-size: 1rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem clamp(0.5rem, 3vw, 1.5rem);
   min-height: 2.75rem;
   cursor: pointer;
 }
