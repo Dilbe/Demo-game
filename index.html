@@ -21,6 +21,7 @@
 
   <nav id="tabs">
     <button class="tab-button" data-tab="fight-tab">Fight</button>
+    <button class="tab-button" data-tab="objectives-tab">Objectives</button>
     <button class="tab-button" data-tab="character-tab" hidden>Character</button>
     <button class="tab-button" data-tab="skills-tab" hidden>Skills</button>
     <button class="tab-button" data-tab="about-tab">About</button>
@@ -53,6 +54,14 @@
       <div id="monster-select"></div>
       <button id="close-picker-button">Back</button>
     </div>
+  </section>
+
+  <section id="objectives-tab" class="tab-panel" hidden>
+    <label id="show-completed-label">
+      <input type="checkbox" id="show-completed-objectives"> Show completed
+    </label>
+
+    <div id="objective-list" class="frame"></div>
   </section>
 
   <section id="character-tab" class="tab-panel" hidden>
