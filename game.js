@@ -28,6 +28,8 @@ const skillEquipMessageEl = document.getElementById('skill-equip-message');
 const statListEl = document.getElementById('stat-list');
 const resetCharacterButton = document.getElementById('reset-character-button');
 const questTrackerEl = document.getElementById('quest-tracker');
+const objectiveListEl = document.getElementById('objective-list');
+const showCompletedObjectivesEl = document.getElementById('show-completed-objectives');
 const versionValueEl = document.getElementById('version-value');
 const maxXpValueEl = document.getElementById('max-xp-value');
 const prestigeSectionEl = document.getElementById('prestige-section');
@@ -128,13 +130,11 @@ let prestigeProgress = 0;
 let perkPoints = 0;
 let purchasedPerkIds = [];
 // Total enemies defeated across every fight, ever — separate from XP because
-// quests key off it directly rather than off however XP happens to convert.
+// 'killCount' objectives key off it directly rather than off however XP
+// happens to convert.
 let totalKills = 0;
-// Quest ids completed so far, in the order they were completed (which is
-// always QUESTS order, since quests only ever complete sequentially).
-let completedQuestIds = [];
-// Objective ids completed so far (see OBJECTIVES) — unlike QUESTS, these can
-// complete in any order, since nothing gates one behind another.
+// Objective ids completed so far (see OBJECTIVES), in the order they were
+// completed.
 let completedObjectiveIds = [];
 // Gates the whole toggle system (see SKILLS.*.toggles): false until the
 // 'winDungeon' objective completes, at which point every skill's toggle list
@@ -182,6 +182,7 @@ closePickerButton.addEventListener('click', closeFightPicker);
 retreatButton.addEventListener('click', retreat);
 resetCharacterButton.addEventListener('click', resetCharacter);
 prestigeButton.addEventListener('click', prestige);
+showCompletedObjectivesEl.addEventListener('change', renderObjectives);
 
 // Dropping a skill back onto the list unequips it — the list itself is a
 // fixed element (only its rows get rebuilt), so this is wired up once here
@@ -604,8 +605,8 @@ function applySkill(skillId) {
   }
 }
 
-// Applies damage to one monster, handling its kill (XP, quest/objective
-// progress, defeat) if that's what the hit did. Returns whether it killed —
+// Applies damage to one monster, handling its kill (XP, objective progress,
+// defeat) if that's what the hit did. Returns whether it killed —
 // applySkill uses that to decide whether anything needs re-checking
 // afterwards (win condition, retargeting), whether it hit one monster or,
 // with Multi Attack, several at once.
@@ -618,8 +619,8 @@ function damageMonster(index, power) {
   awardXp(groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount));
   groupKillCount += 1;
   updateXpDisplay();
-  registerKill();
-  registerObjectiveEvent({ type: 'killMonster', monsterId: target.monsterId });
+  totalKills += 1;
+  registerObjectiveEvent({ type: 'killMonster', monsterId: target.monsterId, totalKills });
   defeatMonster(index);
   return true;
 }
@@ -1553,54 +1554,13 @@ function upgradeSkillTrack(skillId, upgradeId) {
   saveProgress();
 }
 
-// Applies a quest's reward. Only `unlockTab` exists today, but this stays a
-// switch on `reward.type` so a future reward kind (e.g. unlocking a monster)
-// is a new case here, not a change to how completion is detected.
-function applyQuestReward(reward) {
+// Applies an objective's reward (see OBJECTIVES) — a switch on `reward.type`,
+// so a future reward kind is a new case here rather than a change to how
+// completion is detected.
+function applyObjectiveReward(reward) {
   if (reward.type === 'unlockTab') {
     document.querySelector(`.tab-button[data-tab="${reward.tabId}"]`).hidden = false;
-  }
-}
-
-// Re-applies every already-completed quest's reward — used on load, so a
-// returning player's unlocked tabs reflect their save rather than starting
-// hidden again.
-function applyCompletedQuestRewards() {
-  for (const questId of completedQuestIds) {
-    const quest = QUESTS.find((q) => q.id === questId);
-    if (quest) applyQuestReward(quest.reward);
-  }
-}
-
-function updateQuestTracker() {
-  const quest = activeQuest(completedQuestIds);
-  questTrackerEl.hidden = !quest;
-  if (!quest) return;
-
-  questTrackerEl.textContent = describeQuestProgress(quest, totalKills);
-}
-
-// Called once per enemy defeated. A `while` (rather than an `if`) covers a
-// quest whose target the kill counter has already passed, so progression
-// never stalls even if a future quest's target is skipped over in one kill.
-function registerKill() {
-  totalKills += 1;
-
-  let quest = activeQuest(completedQuestIds);
-  while (quest && questComplete(quest, totalKills)) {
-    completedQuestIds.push(quest.id);
-    applyQuestReward(quest.reward);
-    quest = activeQuest(completedQuestIds);
-  }
-
-  updateQuestTracker();
-}
-
-// Applies an objective's reward (see OBJECTIVES) — a switch on `reward.type`,
-// same pattern as applyQuestReward, so a future reward kind is a new case
-// here rather than a change to how completion is detected.
-function applyObjectiveReward(reward) {
-  if (reward.type === 'unlockSkill') {
+  } else if (reward.type === 'unlockSkill') {
     markSkillUnlocked(reward.skillId);
   } else if (reward.type === 'unlockToggles') {
     togglesUnlocked = true;
@@ -1610,8 +1570,9 @@ function applyObjectiveReward(reward) {
   saveProgress();
 }
 
-// Re-applies every already-completed objective's reward — used on load, same
-// reasoning as applyCompletedQuestRewards.
+// Re-applies every already-completed objective's reward — used on load, so a
+// returning player's unlocked tabs/skills reflect their save rather than
+// starting locked again.
 function applyCompletedObjectiveRewards() {
   for (const objectiveId of completedObjectiveIds) {
     const objective = OBJECTIVES[objectiveId];
@@ -1619,18 +1580,77 @@ function applyCompletedObjectiveRewards() {
   }
 }
 
-// Checks `event` (e.g. `{ type: 'killMonster', monsterId: 'medium' }`)
-// against every not-yet-completed objective. Unlike registerKill's quest
-// chain, objectives aren't sequential — more than one can match the same
-// event in principle, and any can complete in any order, so this loops over
-// all of them rather than checking only "the" active one.
+// Checks `event` (e.g. `{ type: 'killMonster', monsterId: 'medium',
+// totalKills: 7 }`) against every objective that's available and not yet
+// completed. More than one can match the same event (a Goblin kill can be
+// both "Kill a Goblin" and the 5th kill), so this loops over all of them.
+// Always refreshes the tracker and tab afterwards, since a kill moves a
+// 'killCount' objective's progress even when nothing completes.
 function registerObjectiveEvent(event) {
   for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
     if (completedObjectiveIds.includes(objectiveId)) continue;
+    if (!objectiveAvailable(objective, completedObjectiveIds)) continue;
     if (!objectiveMatches(objective.condition, event)) continue;
 
     completedObjectiveIds.push(objectiveId);
     applyObjectiveReward(objective.reward);
+  }
+
+  updateObjectiveTracker();
+  renderObjectives();
+}
+
+// The first objective, in OBJECTIVES order, that's available and not yet
+// completed — what the tracker above the tabs points a player at next.
+function nextObjectiveId() {
+  return Object.keys(OBJECTIVES).find((objectiveId) =>
+    !completedObjectiveIds.includes(objectiveId) && objectiveAvailable(OBJECTIVES[objectiveId], completedObjectiveIds)
+  ) ?? null;
+}
+
+function updateObjectiveTracker() {
+  const objectiveId = nextObjectiveId();
+  questTrackerEl.hidden = !objectiveId;
+  if (!objectiveId) return;
+
+  questTrackerEl.textContent = describeObjectiveProgress(OBJECTIVES[objectiveId], totalKills);
+}
+
+// One row per objective on the Objectives tab: what to do (with progress)
+// and what it unlocks. Completed objectives are hidden unless "Show
+// completed" is ticked; ones whose prerequisites aren't done yet aren't
+// shown at all.
+function renderObjectives() {
+  objectiveListEl.replaceChildren();
+  const showCompleted = showCompletedObjectivesEl.checked;
+
+  for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
+    const completed = completedObjectiveIds.includes(objectiveId);
+    if (completed && !showCompleted) continue;
+    if (!completed && !objectiveAvailable(objective, completedObjectiveIds)) continue;
+
+    const description = document.createElement('span');
+    description.className = 'objective-description';
+    description.textContent = completed
+      ? `✓ ${objective.description}`
+      : describeObjectiveProgress(objective, totalKills);
+
+    const reward = document.createElement('span');
+    reward.className = 'objective-reward';
+    reward.textContent = describeReward(objective.reward);
+
+    const row = document.createElement('div');
+    row.className = 'objective-row';
+    row.classList.toggle('completed', completed);
+    row.append(description, reward);
+    objectiveListEl.append(row);
+  }
+
+  if (!objectiveListEl.children.length) {
+    const empty = document.createElement('p');
+    empty.className = 'objective-empty';
+    empty.textContent = 'All objectives completed.';
+    objectiveListEl.append(empty);
   }
 }
 
@@ -1657,7 +1677,7 @@ function saveProgress() {
   if (wipingSave) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
-    selectedGroupId, selectedDungeonId, totalKills, completedQuestIds,
+    selectedGroupId, selectedDungeonId, totalKills,
     lifetimeXp, prestigeProgress,
     completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
   }));
@@ -1708,10 +1728,15 @@ function loadProgress() {
   if (saved.selectedGroupId) selectedGroupId = saved.selectedGroupId;
   if (saved.selectedDungeonId) selectedDungeonId = saved.selectedDungeonId;
   if (saved.totalKills) totalKills = saved.totalKills;
-  if (saved.completedQuestIds) completedQuestIds = saved.completedQuestIds;
   if (saved.lifetimeXp) lifetimeXp = saved.lifetimeXp;
   if (saved.prestigeProgress) prestigeProgress = saved.prestigeProgress;
   if (saved.completedObjectiveIds) completedObjectiveIds = saved.completedObjectiveIds;
+  // A save from before quests became objectives (#57) keeps its completed
+  // quests in a list of their own. Their ids (killFive, killTen) are the
+  // same objective ids now, so they just move over.
+  for (const questId of saved.completedQuestIds ?? []) {
+    if (OBJECTIVES[questId] && !completedObjectiveIds.includes(questId)) completedObjectiveIds.push(questId);
+  }
   if (saved.togglesUnlocked) togglesUnlocked = saved.togglesUnlocked;
   if (saved.unlockedToggleIds) unlockedToggleIds = saved.unlockedToggleIds;
   if (saved.activeToggleIds) activeToggleIds = saved.activeToggleIds;
@@ -1731,9 +1756,9 @@ if (playerHp === null) playerHp = effectiveMaxHp();
 startGame();
 updateXpDisplay();
 updateRegenIndicator();
-applyCompletedQuestRewards();
 applyCompletedObjectiveRewards();
-updateQuestTracker();
+updateObjectiveTracker();
+renderObjectives();
 // The placeholder only ever ships from deploy.yml having stamped a real SHA
 // in; any other copy (local dev, `node --test`, a clone) shows this instead
 // of the literal placeholder token.

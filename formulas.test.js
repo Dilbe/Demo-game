@@ -1,13 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS, OBJECTIVES,
+  VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES,
   statValue, statCost,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   findToggle, toggleKey, effectivePointCost,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
-  activeQuest, questComplete, describeQuestProgress,
-  objectiveMatches,
+  objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
   groupKillXp, groupTotalXp,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
   PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,
@@ -459,64 +458,67 @@ test('describeDungeon lists every fight in order and totals their XP, completion
   );
 });
 
-// --- Quests --------------------------------------------------------------
-
-test('every quest defines the full data-object shape', () => {
-  for (const quest of QUESTS) {
-    for (const field of ['id', 'description', 'target', 'reward']) {
-      assert.ok(quest[field] !== undefined, `${quest.id ?? '?'} is missing ${field}`);
-    }
-    assert.ok(quest.target > 0, `${quest.id} has a non-positive target`);
-    assert.ok(quest.reward.type, `${quest.id}'s reward has no type`);
-  }
-});
-
-test('quest ids are unique', () => {
-  const ids = QUESTS.map((quest) => quest.id);
-  assert.strictEqual(new Set(ids).size, ids.length, 'QUESTS has duplicate ids');
-});
-
-test('killFive unlocks the Character tab and killTen unlocks the Skills tab', () => {
-  const killFive = QUESTS.find((quest) => quest.id === 'killFive');
-  const killTen = QUESTS.find((quest) => quest.id === 'killTen');
-  assert.deepStrictEqual(killFive.reward, { type: 'unlockTab', tabId: 'character-tab' });
-  assert.deepStrictEqual(killTen.reward, { type: 'unlockTab', tabId: 'skills-tab' });
-});
-
-test('activeQuest returns quests in order, skipping completed ones', () => {
-  assert.strictEqual(activeQuest([]).id, QUESTS[0].id);
-  assert.strictEqual(activeQuest([QUESTS[0].id]).id, QUESTS[1].id);
-});
-
-test('activeQuest returns null once every quest is completed', () => {
-  assert.strictEqual(activeQuest(QUESTS.map((quest) => quest.id)), null);
-});
-
-test('questComplete is true once the kill count reaches the target, not before', () => {
-  const quest = { target: 5 };
-  assert.strictEqual(questComplete(quest, 4), false);
-  assert.strictEqual(questComplete(quest, 5), true);
-  assert.strictEqual(questComplete(quest, 6), true);
-});
-
-test('describeQuestProgress reports progress capped at the target', () => {
-  const quest = { description: 'Kill 5 enemies', target: 5 };
-  assert.strictEqual(describeQuestProgress(quest, 3), 'Kill 5 enemies (3/5)');
-  assert.strictEqual(describeQuestProgress(quest, 9), 'Kill 5 enemies (5/5)');
-});
-
 // --- Objectives ------------------------------------------------------------
-// Unlike QUESTS, these can complete in any order — nothing gates one behind
-// another, so there's no single "active" one to track.
 
 test('every objective defines the full data-object shape', () => {
   for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
-    for (const field of ['description', 'condition', 'reward']) {
+    for (const field of ['description', 'condition', 'reward', 'prerequisites']) {
       assert.ok(objective[field] !== undefined, `${objectiveId} is missing ${field}`);
     }
     assert.ok(objective.condition.type, `${objectiveId}'s condition has no type`);
     assert.ok(objective.reward.type, `${objectiveId}'s reward has no type`);
+    assert.ok(Array.isArray(objective.prerequisites), `${objectiveId}'s prerequisites is not an array`);
   }
+});
+
+test('every prerequisite names an existing objective', () => {
+  for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
+    for (const prerequisiteId of objective.prerequisites) {
+      assert.ok(OBJECTIVES[prerequisiteId], `${objectiveId} has unknown prerequisite ${prerequisiteId}`);
+    }
+  }
+});
+
+test('every objective has a reward description', () => {
+  for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
+    assert.ok(describeReward(objective.reward), `${objectiveId}'s reward has no description`);
+  }
+});
+
+test('killFive unlocks the Character tab and killTen unlocks the Skills tab', () => {
+  assert.deepStrictEqual(OBJECTIVES.killFive.reward, { type: 'unlockTab', tabId: 'character-tab' });
+  assert.deepStrictEqual(OBJECTIVES.killTen.reward, { type: 'unlockTab', tabId: 'skills-tab' });
+});
+
+test('objectiveMatches completes a killCount condition once the kill total reaches its target', () => {
+  const condition = OBJECTIVES.killFive.condition;
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 4 }), false);
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 5 }), true);
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 6 }), true);
+  assert.strictEqual(objectiveMatches(condition, { type: 'winDungeon' }), false);
+});
+
+test('objectiveAvailable is true only once every prerequisite is completed', () => {
+  const objective = { prerequisites: ['a', 'b'] };
+  assert.strictEqual(objectiveAvailable(objective, []), false);
+  assert.strictEqual(objectiveAvailable(objective, ['a']), false);
+  assert.strictEqual(objectiveAvailable(objective, ['a', 'b']), true);
+  assert.strictEqual(objectiveAvailable({ prerequisites: [] }, []), true);
+});
+
+test('describeObjectiveProgress shows capped progress for a killCount objective', () => {
+  assert.strictEqual(describeObjectiveProgress(OBJECTIVES.killFive, 3), 'Kill 5 enemies (3/5)');
+  assert.strictEqual(describeObjectiveProgress(OBJECTIVES.killFive, 9), 'Kill 5 enemies (5/5)');
+});
+
+test('describeObjectiveProgress is just the description for a one-off objective', () => {
+  assert.strictEqual(describeObjectiveProgress(OBJECTIVES.killMedium, 3), 'Kill a Goblin');
+});
+
+test('describeReward names what each reward unlocks', () => {
+  assert.strictEqual(describeReward(OBJECTIVES.killFive.reward), 'Unlocks the Character tab');
+  assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Strong Attack');
+  assert.strictEqual(describeReward(OBJECTIVES.winDungeon.reward), 'Unlocks skill toggles');
 });
 
 test('killMedium and killBig unlock Strong Attack and Heal', () => {

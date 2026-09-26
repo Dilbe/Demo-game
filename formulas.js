@@ -414,26 +414,47 @@ const SKILLS = {
   },
 };
 
-// A skill can unlock either by spending XP (`unlockCost`) or by completing a
-// gameplay objective (`unlockObjectiveId`, matching a key here) — see
-// SKILLS.strongAttack/heal. Kept separate from QUESTS (which award tab
-// unlocks and progress strictly in sequence): these objectives can complete
-// in any order relative to each other and to the quest chain, since nothing
-// gates one behind another. `condition` is a small data-object describing
-// what event completes it (see objectiveMatches); `reward` is generic like
-// QUESTS' own reward shape, so a future objective isn't limited to unlocking
-// a skill.
+// Everything the player unlocks by *doing* something — a tab, a skill, the
+// toggle system — is an objective here, listed on the Objectives tab. A
+// skill can point back at one with `unlockObjectiveId` (see
+// SKILLS.strongAttack/heal). `condition` is a small data-object describing
+// what completes it (see objectiveMatches); `reward` is generic (`type` plus
+// whatever that type needs), so a new kind of reward is a new case in
+// game.js's applyObjectiveReward, not a change to how completion works.
+//
+// `prerequisites` lists objective ids that must be completed before this one
+// can be (see objectiveAvailable) — how objectives chain. Every objective
+// below is available from the start for now.
+//
+// Key order is display order: the Objectives tab lists them in this order,
+// and the tracker above the tabs shows the first one not yet completed.
 const OBJECTIVES = {
+  killFive: {
+    description: 'Kill 5 enemies',
+    condition: { type: 'killCount', target: 5 },
+    reward: { type: 'unlockTab', tabId: 'character-tab' },
+    prerequisites: [],
+  },
+
+  killTen: {
+    description: 'Kill 10 enemies',
+    condition: { type: 'killCount', target: 10 },
+    reward: { type: 'unlockTab', tabId: 'skills-tab' },
+    prerequisites: [],
+  },
+
   killMedium: {
     description: 'Kill a Goblin',
     condition: { type: 'killMonster', monsterId: 'medium' },
     reward: { type: 'unlockSkill', skillId: 'strongAttack' },
+    prerequisites: [],
   },
 
   killBig: {
     description: 'Kill an Orc',
     condition: { type: 'killMonster', monsterId: 'big' },
     reward: { type: 'unlockSkill', skillId: 'heal' },
+    prerequisites: [],
   },
 
   // Gates the toggle system itself (see SKILLS.*.toggles) rather than a
@@ -442,17 +463,48 @@ const OBJECTIVES = {
     description: 'Win a dungeon',
     condition: { type: 'winDungeon' },
     reward: { type: 'unlockToggles' },
+    prerequisites: [],
   },
 };
 
+// Labels for the tabs an 'unlockTab' reward can name — used only to describe
+// the reward (see describeReward); the tab buttons carry their own text.
+const TAB_LABELS = {
+  'character-tab': 'Character',
+  'skills-tab': 'Skills',
+};
+
 // True if `event` (something that just happened in the game, e.g.
-// `{ type: 'killMonster', monsterId: 'medium' }`) satisfies an objective's
-// `condition`. A condition with nothing beyond `type` (like winDungeon's)
-// matches any event of that type.
+// `{ type: 'killMonster', monsterId: 'medium', totalKills: 7 }`) satisfies
+// an objective's `condition`. A 'killCount' condition checks the running
+// kill total every kill event carries; a condition with nothing beyond
+// `type` (like winDungeon's) matches any event of that type.
 function objectiveMatches(condition, event) {
+  if (condition.type === 'killCount') return event.type === 'killMonster' && event.totalKills >= condition.target;
   if (condition.type !== event.type) return false;
   if (condition.type === 'killMonster') return condition.monsterId === event.monsterId;
   return true;
+}
+
+// Whether an objective can be completed yet: every one of its prerequisites
+// is already done.
+function objectiveAvailable(objective, completedObjectiveIds) {
+  return objective.prerequisites.every((id) => completedObjectiveIds.includes(id));
+}
+
+// The objective's text, plus progress for one that counts toward a target
+// (capped at the target, so it never reads e.g. "12/10").
+function describeObjectiveProgress(objective, totalKills) {
+  const { condition } = objective;
+  if (condition.type !== 'killCount') return objective.description;
+  return `${objective.description} (${Math.min(totalKills, condition.target)}/${condition.target})`;
+}
+
+function describeReward(reward) {
+  if (reward.type === 'unlockTab') return `Unlocks the ${TAB_LABELS[reward.tabId]} tab`;
+  if (reward.type === 'unlockSkill') return `Unlocks ${SKILLS[reward.skillId].label}`;
+  if (reward.type === 'unlockToggles') return 'Unlocks skill toggles';
+  return '';
 }
 
 // The combined multiplier every equipped passive skill with a matching
@@ -629,41 +681,6 @@ function describeMonsterGroup(groupId) {
   return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${totalXp} XP total`;
 }
 
-// A new player sees only the Fight tab; completing a quest reveals the tab
-// (or other reward) it names and moves on to the next quest in order. Same
-// data-object pattern as stats/skills/monsters — adding a quest is a data
-// entry, not new gating logic. `reward` is generic (`type` plus whatever
-// that type needs) so a future quest can unlock something other than a tab
-// without changing how quests are processed, only how rewards are applied.
-const QUESTS = [
-  {
-    id: 'killFive',
-    description: 'Kill 5 enemies',
-    target: 5,
-    reward: { type: 'unlockTab', tabId: 'character-tab' },
-  },
-  {
-    id: 'killTen',
-    description: 'Kill 10 enemies',
-    target: 10,
-    reward: { type: 'unlockTab', tabId: 'skills-tab' },
-  },
-];
-
-// The first quest not yet in `completedQuestIds` — quests complete strictly
-// in order, so there is always at most one active quest.
-function activeQuest(completedQuestIds) {
-  return QUESTS.find((quest) => !completedQuestIds.includes(quest.id)) ?? null;
-}
-
-function questComplete(quest, killCount) {
-  return killCount >= quest.target;
-}
-
-function describeQuestProgress(quest, killCount) {
-  return `${quest.description} (${Math.min(killCount, quest.target)}/${quest.target})`;
-}
-
 // Chains describeMonsterGroup's summaries with the fight order, plus a
 // running total XP across the whole dungeon — mirrors describeMonsterGroup's
 // own total-XP line (group-kill bonus included), summed over every fight
@@ -713,13 +730,12 @@ function statCost(statId, level) {
 // Loaded as a plain <script> in the browser; required by the Node test runner.
 if (typeof module !== 'undefined') {
   module.exports = {
-    VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, QUESTS, DUNGEONS, OBJECTIVES, PERKS,
+    VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES, PERKS,
     statValue, statCost,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
-    activeQuest, questComplete, describeQuestProgress,
-    objectiveMatches,
+    objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupTotalXp,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
     perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,

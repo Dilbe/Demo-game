@@ -362,18 +362,66 @@ body {
   display: none;
 }
 
-/* One row always: About sits to the right of the other tabs rather than
-   wrapping below them on narrow screens, so padding and gap shrink with the
-   viewport instead. */
+/* One row per objective: what to do on top, what it unlocks below. */
+.objective-row {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.objective-row:last-child {
+  border-bottom: none;
+}
+
+.objective-description {
+  display: block;
+  font-weight: bold;
+}
+
+.objective-reward {
+  display: block;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.objective-row.completed {
+  opacity: 0.6;
+}
+
+.objective-empty {
+  margin: 0;
+  color: #555;
+}
+
+#show-completed-label {
+  display: inline-block;
+  margin-bottom: 1rem;
+  cursor: pointer;
+}
+
+/* One row always: on a screen too narrow for every tab, the row scrolls
+   sideways instead of wrapping (#57). The auto margins on the first/last
+   button center the row when it fits — `justify-content: center` would
+   instead push overflowing tabs off the left edge, out of scroll reach. */
 #tabs {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: center;
   gap: clamp(0.3rem, 1.5vw, 0.6rem);
   margin-bottom: 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 0.25rem;
+}
+
+.tab-button:first-child {
+  margin-left: auto;
+}
+
+.tab-button:last-child {
+  margin-right: auto;
 }
 
 .tab-button {
+  flex-shrink: 0;
   font-size: 1rem;
   padding: 0.75rem clamp(0.5rem, 3vw, 1.5rem);
   min-height: 2.75rem;
