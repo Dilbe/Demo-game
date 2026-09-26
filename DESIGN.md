@@ -405,6 +405,7 @@ Everything unlocked by *doing* something is now one list: `OBJECTIVES` in `formu
 - **Tracker** above the tabs shows the first available, unfinished objective in `OBJECTIVES` order.
 - **Old saves:** a save's `completedQuestIds` merge into `completedObjectiveIds` on load, since the ids are the same.
 - **Tabs on a phone** now scroll sideways when they don't fit on one row, instead of squeezing.
+- **Perks tab ([#63](https://github.com/Dilbe/Demo-game/issues/63)):** the perks moved from the bottom of the Character tab to their own tab. It unlocks together with Character (an `unlockTab` reward now takes a `tabIds` list), so perks are still visible from the same moment as before.
 
 ## Future ideas (parking lot — not yet planned)
 

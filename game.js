@@ -1559,7 +1559,9 @@ function upgradeSkillTrack(skillId, upgradeId) {
 // completion is detected.
 function applyObjectiveReward(reward) {
   if (reward.type === 'unlockTab') {
-    document.querySelector(`.tab-button[data-tab="${reward.tabId}"]`).hidden = false;
+    for (const tabId of reward.tabIds) {
+      document.querySelector(`.tab-button[data-tab="${tabId}"]`).hidden = false;
+    }
   } else if (reward.type === 'unlockSkill') {
     markSkillUnlocked(reward.skillId);
   } else if (reward.type === 'unlockToggles') {

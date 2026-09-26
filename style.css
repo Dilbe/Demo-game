@@ -710,11 +710,11 @@ body {
   margin-top: 1.5rem;
 }
 
-/* Same row shape as .stat-row/.skill-row, since a perk is bought (once)
-   rather than leveled, same visual family as the Character tab's other
-   upgrade rows. */
+/* Same row shape as .stat-row/.skill-row: a perk is bought (once) rather
+   than leveled, but reads as the same family of upgrade rows. Lives on its
+   own Perks tab (#63). */
 #perks-section {
-  margin: 1.5rem auto 0;
+  margin: 0 auto;
 }
 
 .perk-row {
