@@ -62,11 +62,12 @@ body {
   margin: 0.2rem 0 0;
 }
 
-/* Smaller than a skill button: it's an indicator only, never clicked. */
+/* Smaller than a skill button: it's an indicator only, never clicked. Wide
+   enough for its longest label, "Defeated". */
 .combatant .cooldown-button {
-  width: 3.5rem;
+  width: 4rem;
   height: 3.5rem;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   flex-shrink: 0;
 }
 
