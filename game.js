@@ -971,8 +971,7 @@ function prestige() {
   maxXp = newMaxXp;
   perkPoints += perkPointsAwarded;
   savePermanentProgress();
-  localStorage.removeItem(SAVE_KEY);
-  location.reload();
+  wipeSaveAndReload();
 }
 
 // One row per PERKS entry — bought once with Perk Points, then just shown as
@@ -1615,7 +1614,20 @@ function savePermanentProgress() {
   localStorage.setItem(MAX_XP_KEY, JSON.stringify({ maxXp, perkPoints, purchasedPerkIds }));
 }
 
+// Set right before a prestige or reset wipes SAVE_KEY and reloads. The
+// reload isn't instant: a still-running timer (a fight, heal-over-time,
+// regen) can fire in between and would write the old state straight back,
+// undoing the wipe (#55). Once set, nothing saves until the page is gone.
+let wipingSave = false;
+
+function wipeSaveAndReload() {
+  wipingSave = true;
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
+}
+
 function saveProgress() {
+  if (wipingSave) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
     selectedGroupId, selectedDungeonId, totalKills, completedQuestIds,
@@ -1684,8 +1696,7 @@ function resetCharacter() {
   xp = 0;
   // Reload from no save rather than zeroing state by hand — a fresh player
   // takes the same path, so this cannot drift as more state is added.
-  localStorage.removeItem(SAVE_KEY);
-  location.reload();
+  wipeSaveAndReload();
 }
 
 loadProgress();
