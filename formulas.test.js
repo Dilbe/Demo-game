@@ -485,9 +485,9 @@ test('every objective has a reward description', () => {
   }
 });
 
-test('killFive unlocks the Character and Perks tabs and killTen unlocks the Skills tab', () => {
-  assert.deepStrictEqual(OBJECTIVES.killFive.reward, { type: 'unlockTab', tabIds: ['character-tab', 'perks-tab'] });
-  assert.deepStrictEqual(OBJECTIVES.killTen.reward, { type: 'unlockTab', tabIds: ['skills-tab'] });
+test('killFive unlocks the Character tab and killTen unlocks the Skills tab', () => {
+  assert.deepStrictEqual(OBJECTIVES.killFive.reward, { type: 'unlockTab', tabId: 'character-tab' });
+  assert.deepStrictEqual(OBJECTIVES.killTen.reward, { type: 'unlockTab', tabId: 'skills-tab' });
 });
 
 test('objectiveMatches completes a killCount condition once the kill total reaches its target', () => {
@@ -516,8 +516,7 @@ test('describeObjectiveProgress is just the description for a one-off objective'
 });
 
 test('describeReward names what each reward unlocks', () => {
-  assert.strictEqual(describeReward(OBJECTIVES.killFive.reward), 'Unlocks the Character and Perks tabs');
-  assert.strictEqual(describeReward(OBJECTIVES.killTen.reward), 'Unlocks the Skills tab');
+  assert.strictEqual(describeReward(OBJECTIVES.killFive.reward), 'Unlocks the Character tab');
   assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Strong Attack');
   assert.strictEqual(describeReward(OBJECTIVES.winDungeon.reward), 'Unlocks skill toggles');
 });

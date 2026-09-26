@@ -432,16 +432,14 @@ const OBJECTIVES = {
   killFive: {
     description: 'Kill 5 enemies',
     condition: { type: 'killCount', target: 5 },
-    // Perks used to sit on the Character tab (#63), so their own tab
-    // unlocks at the same moment.
-    reward: { type: 'unlockTab', tabIds: ['character-tab', 'perks-tab'] },
+    reward: { type: 'unlockTab', tabId: 'character-tab' },
     prerequisites: [],
   },
 
   killTen: {
     description: 'Kill 10 enemies',
     condition: { type: 'killCount', target: 10 },
-    reward: { type: 'unlockTab', tabIds: ['skills-tab'] },
+    reward: { type: 'unlockTab', tabId: 'skills-tab' },
     prerequisites: [],
   },
 
@@ -474,7 +472,6 @@ const OBJECTIVES = {
 const TAB_LABELS = {
   'character-tab': 'Character',
   'skills-tab': 'Skills',
-  'perks-tab': 'Perks',
 };
 
 // True if `event` (something that just happened in the game, e.g.
@@ -504,12 +501,7 @@ function describeObjectiveProgress(objective, totalKills) {
 }
 
 function describeReward(reward) {
-  if (reward.type === 'unlockTab') {
-    const labels = reward.tabIds.map((tabId) => TAB_LABELS[tabId]);
-    return labels.length === 1
-      ? `Unlocks the ${labels[0]} tab`
-      : `Unlocks the ${labels.slice(0, -1).join(', ')} and ${labels.at(-1)} tabs`;
-  }
+  if (reward.type === 'unlockTab') return `Unlocks the ${TAB_LABELS[reward.tabId]} tab`;
   if (reward.type === 'unlockSkill') return `Unlocks ${SKILLS[reward.skillId].label}`;
   if (reward.type === 'unlockToggles') return 'Unlocks skill toggles';
   return '';
