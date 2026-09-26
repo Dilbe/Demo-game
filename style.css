@@ -20,6 +20,17 @@ body {
   padding: 0 1rem;
 }
 
+/* A light bordered box around each main block of a tab (#56), so it's clear
+   where one part of the screen ends and the next begins. */
+.frame {
+  max-width: 40rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
 #monster-list {
   display: flex;
   justify-content: center;
@@ -59,17 +70,44 @@ body {
   cursor: default;
 }
 
-/* Bounded and independently scrollable so a long list of fight options never
-   pushes the Start button (and everything after it) below the fold — only
-   this list scrolls, never the whole page. */
-/* max-height is set inline by fitMonsterSelectHeight (game.js), computed
-   from the actual layout rather than guessed here, since how much the
-   monster preview below it needs varies with how many monsters are in the
-   selected group and how narrow the viewport is. */
+/* The current pick, summarized in one block with the button that opens the
+   full list (#fight-picker) — the list itself no longer sits on the fight
+   view, so it can't push Start below the fold. */
+#selected-fight {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem 1rem;
+  margin-bottom: 1rem;
+}
+
+#selected-fight-name {
+  font-weight: bold;
+}
+
+#selected-fight-detail {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+#selected-fight-detail:empty {
+  display: none;
+}
+
+#choose-fight-button[hidden],
+#fight-view[hidden],
+#fight-picker[hidden] {
+  display: none;
+}
+
+#fight-picker h2 {
+  margin: 0 0 0.5rem;
+}
+
 #monster-select {
-  margin: 0 auto 1.5rem;
-  overflow-y: auto;
-  padding: 0.25rem;
+  max-width: 40rem;
+  margin: 0 auto 1rem;
 }
 
 .select-section-label {
@@ -253,6 +291,8 @@ body {
 
 #restart-button,
 #start-button,
+#choose-fight-button,
+#close-picker-button,
 #retreat-button,
 #reset-character-button {
   font-size: 1rem;
