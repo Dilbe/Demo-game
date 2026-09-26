@@ -133,8 +133,8 @@ const MONSTERS = {
 const MONSTER_GROUPS = {
   small: { label: 'Small Slime', monsterIds: ['small'] },
   medium: { label: 'Goblin', monsterIds: ['medium'] },
-  big: { label: 'Orc', monsterIds: ['big'] },
   twoSmall: { label: 'Two Small Slimes', monsterIds: ['small', 'small'] },
+  big: { label: 'Orc', monsterIds: ['big'] },
 };
 
 // A dungeon chains several fights back-to-back, fought without returning to
@@ -159,6 +159,34 @@ const DUNGEONS = {
     completionBonusXp: 10,
   },
 };
+
+// The order fights unlock in (#59) — MONSTER_GROUPS and DUNGEONS ids mixed
+// in one list, since no id is used by both. A new game can pick only the
+// first; winning a fight unlocks the one after it. Every group and dungeon
+// must appear here, or it can never be picked.
+const FIGHT_UNLOCK_ORDER = ['small', 'medium', 'twoSmall', 'big', 'goblinGauntlet', 'monsterRush'];
+
+// Whether `fightId` can be picked, given how many FIGHT_UNLOCK_ORDER entries
+// are unlocked so far (always at least the first).
+function fightUnlocked(unlockedFightCount, fightId) {
+  const index = FIGHT_UNLOCK_ORDER.indexOf(fightId);
+  return index !== -1 && index < unlockedFightCount;
+}
+
+// How many fights are unlocked after winning `fightId`: always the one right
+// after it, never fewer than before — replaying an earlier fight changes
+// nothing, and the count stops at the end of the list.
+function fightsUnlockedAfterWin(unlockedFightCount, fightId) {
+  const index = FIGHT_UNLOCK_ORDER.indexOf(fightId);
+  return Math.min(FIGHT_UNLOCK_ORDER.length, Math.max(unlockedFightCount, index + 2));
+}
+
+// The hint a locked fight shows instead of being selectable.
+function describeFightUnlock(fightId) {
+  const previousId = FIGHT_UNLOCK_ORDER[FIGHT_UNLOCK_ORDER.indexOf(fightId) - 1];
+  const previous = MONSTER_GROUPS[previousId] ?? DUNGEONS[previousId];
+  return `Locked — win ${previous.label} to unlock`;
+}
 
 // A new game's starting Max XP — the most XP a single cycle can earn.
 // Once lifetime XP reaches it, further XP no longer adds to the spendable
@@ -771,6 +799,7 @@ if (typeof module !== 'undefined') {
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
+    FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupTotalXp,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,

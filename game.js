@@ -67,6 +67,9 @@ let selectedDungeonId = null;
 // dungeon fight, including for a plain single-group fight.
 let activeDungeonId = null;
 let dungeonFightIndex = 0;
+// How many FIGHT_UNLOCK_ORDER entries the player can pick (#59) — starts at
+// just the first, and part of the main save, so a prestige resets it too.
+let unlockedFightCount = 1;
 let activeMonsters = [];
 // How many monsters have died in the current group/fight so far — drives the
 // compounding ×1.25 group-kill XP bonus (see groupKillXp). Reset whenever a
@@ -237,7 +240,7 @@ function renderMonsterSelect() {
     // so Two Small Slimes' card just shows one Small Slime sprite.
     const sprite = MONSTERS[group.monsterIds[0]].sprite;
     monsterSelectEl.append(
-      buildMonsterSelectRow(group.label, describeMonsterGroup(groupId), selected, () => selectMonsterGroup(groupId), sprite)
+      buildMonsterSelectRow(groupId, group.label, describeMonsterGroup(groupId), selected, () => selectMonsterGroup(groupId), sprite)
     );
   }
 
@@ -249,7 +252,7 @@ function renderMonsterSelect() {
   for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
     const selected = dungeonId === selectedDungeonId;
     monsterSelectEl.append(
-      buildMonsterSelectRow(dungeon.label, describeDungeon(dungeonId), selected, () => selectDungeon(dungeonId))
+      buildMonsterSelectRow(dungeonId, dungeon.label, describeDungeon(dungeonId), selected, () => selectDungeon(dungeonId))
     );
   }
 }
@@ -260,7 +263,11 @@ function renderMonsterSelect() {
 // re-render and re-save it would otherwise cause for no change.
 // selectMonsterGroup/selectDungeon already refuse mid-fight. `spriteMarkup` is omitted for a dungeon row —
 // a chain of different fights has no single monster to represent it.
-function buildMonsterSelectRow(label, detailText, selected, onSelect, spriteMarkup) {
+// A fight not yet unlocked (#59) is still listed, greyed out with a hint
+// saying which fight unlocks it, but clicking it does nothing.
+function buildMonsterSelectRow(fightId, label, detailText, selected, onSelect, spriteMarkup) {
+  const locked = !fightUnlocked(unlockedFightCount, fightId);
+
   const name = document.createElement('span');
   name.className = 'monster-name';
   name.textContent = label;
@@ -274,6 +281,17 @@ function buildMonsterSelectRow(label, detailText, selected, onSelect, spriteMark
   row.classList.toggle('selected', selected);
   if (spriteMarkup) row.append(buildSprite(spriteMarkup, 'monster-sprite'));
   row.append(name, detail);
+
+  if (locked) {
+    const lockHint = document.createElement('span');
+    lockHint.className = 'monster-lock-hint';
+    lockHint.textContent = describeFightUnlock(fightId);
+    row.classList.add('locked');
+    row.setAttribute('aria-disabled', 'true');
+    row.append(lockHint);
+    return row;
+  }
+
   row.addEventListener('click', () => {
     if (!selected) onSelect();
     closeFightPicker();
@@ -283,7 +301,7 @@ function buildMonsterSelectRow(label, detailText, selected, onSelect, spriteMark
 }
 
 function selectMonsterGroup(groupId) {
-  if (fightActive) return;
+  if (fightActive || !fightUnlocked(unlockedFightCount, groupId)) return;
 
   selectedGroupId = groupId;
   selectedDungeonId = null;
@@ -294,7 +312,7 @@ function selectMonsterGroup(groupId) {
 }
 
 function selectDungeon(dungeonId) {
-  if (fightActive) return;
+  if (fightActive || !fightUnlocked(unlockedFightCount, dungeonId)) return;
 
   selectedDungeonId = dungeonId;
   selectedGroupId = null;
@@ -658,13 +676,22 @@ function resolveFightProgress() {
     const bonus = DUNGEONS[activeDungeonId].completionBonusXp;
     awardXp(bonus);
     registerObjectiveEvent({ type: 'winDungeon' });
+    recordFightWin(activeDungeonId);
     updateXpDisplay();
     saveProgress();
     endGame(`${DUNGEONS[activeDungeonId].label} cleared! (+${bonus} bonus XP)`);
     return;
   }
 
+  recordFightWin(selectedGroupId);
+  saveProgress();
   endGame('You win!');
+}
+
+// Winning a fight unlocks the next one in FIGHT_UNLOCK_ORDER (#59). The
+// picker is closed during a fight, so it's rebuilt the next time it opens.
+function recordFightWin(fightId) {
+  unlockedFightCount = fightsUnlockedAfterWin(unlockedFightCount, fightId);
 }
 
 // Max HP stat's own XP-funded value, plus any permanent bonus from purchased
@@ -1004,7 +1031,7 @@ function prestige() {
   // pays 1 Perk Point, the 2nd pays 2, and so on with no separate counter.
   const perkPointsAwarded = prestigeCount(newMaxXp);
   const perkPointsLabel = `${perkPointsAwarded} Perk Point${perkPointsAwarded === 1 ? '' : 's'}`;
-  if (!confirm(`Prestige now? This resets your XP, stats, skills, quests, and kill count back to a fresh start, but raises Max XP from ${maxXp} to ${newMaxXp} and awards ${perkPointsLabel}.`)) return;
+  if (!confirm(`Prestige now? This resets your XP, stats, skills, quests, unlocked fights, and kill count back to a fresh start, but raises Max XP from ${maxXp} to ${newMaxXp} and awards ${perkPointsLabel}.`)) return;
 
   maxXp = newMaxXp;
   perkPoints += perkPointsAwarded;
@@ -1695,7 +1722,7 @@ function saveProgress() {
   if (wipingSave) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
-    selectedGroupId, selectedDungeonId, totalKills,
+    selectedGroupId, selectedDungeonId, unlockedFightCount, totalKills,
     lifetimeXp, prestigeProgress,
     completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
   }));
@@ -1743,8 +1770,11 @@ function loadProgress() {
       if (saved.skillLevels[skillId]) skillLevels[skillId] = saved.skillLevels[skillId];
     }
   }
-  if (saved.selectedGroupId) selectedGroupId = saved.selectedGroupId;
-  if (saved.selectedDungeonId) selectedDungeonId = saved.selectedDungeonId;
+  if (saved.unlockedFightCount) unlockedFightCount = saved.unlockedFightCount;
+  // A save from before fights unlocked one by one (#59) may have a fight
+  // selected that's now locked — dropped, so the player picks again.
+  if (fightUnlocked(unlockedFightCount, saved.selectedGroupId)) selectedGroupId = saved.selectedGroupId;
+  if (fightUnlocked(unlockedFightCount, saved.selectedDungeonId)) selectedDungeonId = saved.selectedDungeonId;
   if (saved.totalKills) totalKills = saved.totalKills;
   if (saved.lifetimeXp) lifetimeXp = saved.lifetimeXp;
   if (saved.prestigeProgress) prestigeProgress = saved.prestigeProgress;
