@@ -357,9 +357,16 @@ function renderMonsterList(monsters, { interactive = false } = {}) {
     button.hidden = !interactive;
     button.append(fill, label);
 
+    // Sprite, name/HP and attack indicator side by side rather than stacked,
+    // so each card is one short row — keeps the buttons below the fight
+    // (Retreat, Restart) on screen on a phone.
+    const info = document.createElement('div');
+    info.className = 'combatant-info';
+    info.append(name, hpLine);
+
     const card = document.createElement('div');
     card.className = 'combatant';
-    card.append(sprite, name, hpLine, button);
+    card.append(sprite, info, button);
 
     if (targetable) {
       card.classList.add('targetable');
