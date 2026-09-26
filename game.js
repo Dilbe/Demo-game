@@ -32,6 +32,7 @@ const objectiveListEl = document.getElementById('objective-list');
 const showCompletedObjectivesEl = document.getElementById('show-completed-objectives');
 const versionValueEl = document.getElementById('version-value');
 const maxXpValueEl = document.getElementById('max-xp-value');
+const lifetimeXpValueEl = document.getElementById('lifetime-xp-value');
 const prestigeSectionEl = document.getElementById('prestige-section');
 const prestigeBarFillEl = document.getElementById('prestige-bar-fill');
 const prestigeProgressValueEl = document.getElementById('prestige-progress-value');
@@ -973,6 +974,7 @@ function updateXpDisplay() {
 // prestigeTarget(maxXp) and reveals the Prestige button once full.
 function renderPrestige() {
   maxXpValueEl.textContent = maxXp;
+  lifetimeXpValueEl.textContent = lifetimeXp;
 
   const ready = lifetimeXp >= maxXp;
   prestigeSectionEl.hidden = !ready;
