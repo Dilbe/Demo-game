@@ -24,6 +24,7 @@
     <button class="tab-button" data-tab="objectives-tab">Objectives</button>
     <button class="tab-button" data-tab="character-tab" hidden>Character</button>
     <button class="tab-button" data-tab="skills-tab" hidden>Skills</button>
+    <button class="tab-button" data-tab="perks-tab" hidden>Perks</button>
     <button class="tab-button" data-tab="about-tab">About</button>
   </nav>
 
@@ -77,11 +78,6 @@
 
     <div id="stat-list" class="frame"></div>
 
-    <div id="perks-section" class="frame">
-      <p>Perk Points: <span id="perk-points-value">0</span></p>
-      <div id="perk-list"></div>
-    </div>
-
     <button id="reset-character-button">Reset Character</button>
   </section>
 
@@ -97,6 +93,13 @@
       </div>
 
       <div id="skill-detail-panel" class="frame"></div>
+    </div>
+  </section>
+
+  <section id="perks-tab" class="tab-panel" hidden>
+    <div id="perks-section" class="frame">
+      <p>Perk Points: <span id="perk-points-value">0</span></p>
+      <div id="perk-list"></div>
     </div>
   </section>
 

@@ -1004,8 +1004,8 @@ function prestige() {
 
 // One row per PERKS entry — bought once with Perk Points, then just shown as
 // owned (no further levels, no on/off switch, unlike a stat or a skill
-// toggle). Every perk is always visible, even before a player's first
-// prestige, so it's clear up front what prestiging eventually buys.
+// toggle). Lives on the Perks tab, which only appears once the player has
+// prestiged (see updatePerksTabVisibility).
 function renderPerks() {
   perkPointsValueEl.textContent = perkPoints;
   perkListEl.replaceChildren();
@@ -1751,7 +1751,17 @@ function resetCharacter() {
   wipeSaveAndReload();
 }
 
+// The Perks tab appears once the player has prestiged at least once, and
+// from then on it's there from the start of every new game (#63). Not an
+// objective: objectives reset on a prestige, while the prestige count
+// (derived from maxXp) survives it. Only a prestige changes maxXp, and that
+// reloads the page, so checking once on load is enough.
+function updatePerksTabVisibility() {
+  document.querySelector('.tab-button[data-tab="perks-tab"]').hidden = prestigeCount(maxXp) < 1;
+}
+
 loadProgress();
+updatePerksTabVisibility();
 if (playerHp === null) playerHp = effectiveMaxHp();
 startGame();
 updateXpDisplay();
