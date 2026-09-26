@@ -405,6 +405,7 @@ Everything unlocked by *doing* something is now one list: `OBJECTIVES` in `formu
 - **Tracker** above the tabs shows the first available, unfinished objective in `OBJECTIVES` order.
 - **Old saves:** a save's `completedQuestIds` merge into `completedObjectiveIds` on load, since the ids are the same.
 - **Tabs on a phone** now scroll sideways when they don't fit on one row, instead of squeezing.
+- **First-fight objectives ([#58](https://github.com/Dilbe/Demo-game/issues/58)):** four chained steps come first: select a Small Slime, start the fight, hit it with Basic Attack, kill it (+1 XP). They're the first real use of `prerequisites`. New condition types: `selectFight`, `startFight`, `hitMonster`. `objectiveMatches` now checks every field a condition names, rather than one hard-coded field per type. A `reward` can be `null`, and an `xp` reward is paid only when the objective completes, never again when rewards are re-applied on load.
 - **Perks tab ([#63](https://github.com/Dilbe/Demo-game/issues/63)):** the perks moved from the bottom of the Character tab to their own tab. The tab only appears once the player has prestiged at least once, and from then on it's visible from the start of every new game. This replaces v12's "every perk is always visible, even before the first prestige".
 
 ## Future ideas (parking lot — not yet planned)

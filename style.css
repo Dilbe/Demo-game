@@ -383,6 +383,11 @@ body {
   font-size: 0.9rem;
 }
 
+/* A step with no reward of its own (see OBJECTIVES) shows no reward line. */
+.objective-reward:empty {
+  display: none;
+}
+
 .objective-row.completed {
   opacity: 0.6;
 }

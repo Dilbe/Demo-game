@@ -466,7 +466,7 @@ test('every objective defines the full data-object shape', () => {
       assert.ok(objective[field] !== undefined, `${objectiveId} is missing ${field}`);
     }
     assert.ok(objective.condition.type, `${objectiveId}'s condition has no type`);
-    assert.ok(objective.reward.type, `${objectiveId}'s reward has no type`);
+    assert.ok(objective.reward === null || objective.reward.type, `${objectiveId}'s reward has no type`);
     assert.ok(Array.isArray(objective.prerequisites), `${objectiveId}'s prerequisites is not an array`);
   }
 });
@@ -479,10 +479,40 @@ test('every prerequisite names an existing objective', () => {
   }
 });
 
-test('every objective has a reward description', () => {
+test('every objective with a reward has a reward description', () => {
   for (const [objectiveId, objective] of Object.entries(OBJECTIVES)) {
-    assert.ok(describeReward(objective.reward), `${objectiveId}'s reward has no description`);
+    if (objective.reward) assert.ok(describeReward(objective.reward), `${objectiveId}'s reward has no description`);
   }
+});
+
+test('the first-fight objectives chain in order, each needing the one before', () => {
+  assert.deepStrictEqual(OBJECTIVES.selectSmall.prerequisites, []);
+  assert.deepStrictEqual(OBJECTIVES.startSmall.prerequisites, ['selectSmall']);
+  assert.deepStrictEqual(OBJECTIVES.hitSmall.prerequisites, ['startSmall']);
+  assert.deepStrictEqual(OBJECTIVES.killSmall.prerequisites, ['hitSmall']);
+  assert.deepStrictEqual(Object.keys(OBJECTIVES).slice(0, 4), ['selectSmall', 'startSmall', 'hitSmall', 'killSmall']);
+});
+
+test('killSmall pays 1 bonus XP', () => {
+  assert.deepStrictEqual(OBJECTIVES.killSmall.reward, { type: 'xp', amount: 1 });
+  assert.strictEqual(describeReward(OBJECTIVES.killSmall.reward), '+1 XP');
+});
+
+test('objectiveMatches checks every field a condition names', () => {
+  const condition = OBJECTIVES.hitSmall.condition;
+  assert.strictEqual(objectiveMatches(condition, { type: 'hitMonster', skillId: 'basicAttack', monsterId: 'small' }), true);
+  assert.strictEqual(objectiveMatches(condition, { type: 'hitMonster', skillId: 'strongAttack', monsterId: 'small' }), false);
+  assert.strictEqual(objectiveMatches(condition, { type: 'hitMonster', skillId: 'basicAttack', monsterId: 'medium' }), false);
+});
+
+test('objectiveMatches checks the group for fight selection and start', () => {
+  assert.strictEqual(objectiveMatches(OBJECTIVES.selectSmall.condition, { type: 'selectFight', groupId: 'small' }), true);
+  assert.strictEqual(objectiveMatches(OBJECTIVES.selectSmall.condition, { type: 'selectFight', groupId: 'twoSmall' }), false);
+  assert.strictEqual(objectiveMatches(OBJECTIVES.startSmall.condition, { type: 'startFight', groupId: 'small' }), true);
+});
+
+test('describeReward is empty for an objective with no reward', () => {
+  assert.strictEqual(describeReward(null), '');
 });
 
 test('killFive unlocks the Character tab and killTen unlocks the Skills tab', () => {

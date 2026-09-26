@@ -289,6 +289,7 @@ function selectMonsterGroup(groupId) {
   renderMonsterSelect();
   updateMonsterPreview();
   saveProgress();
+  registerObjectiveEvent({ type: 'selectFight', groupId });
 }
 
 function selectDungeon(dungeonId) {
@@ -597,6 +598,12 @@ function applySkill(skillId) {
   const targets = isToggleActive(skillId, 'multiAttack')
     ? activeMonsters.map((monster, index) => (monster.hp > 0 ? index : null)).filter((index) => index !== null)
     : [targetIndex];
+
+  // Registered before the damage lands, so a hit that also kills completes
+  // "attack it" before "kill it" checks — the kill step needs the hit step.
+  for (const index of targets) {
+    registerObjectiveEvent({ type: 'hitMonster', skillId, monsterId: activeMonsters[index].monsterId });
+  }
 
   const anyKilled = targets.reduce((killed, index) => damageMonster(index, power) || killed, false);
   if (anyKilled) {
@@ -919,6 +926,7 @@ function beginFight() {
   }
 
   startFightGroup(activeDungeonId ? DUNGEONS[activeDungeonId].fightIds[0] : selectedGroupId);
+  if (!activeDungeonId) registerObjectiveEvent({ type: 'startFight', groupId: selectedGroupId });
 }
 
 // Moves a dungeon on to its next fight in the chain, without returning to
@@ -1556,9 +1564,17 @@ function upgradeSkillTrack(skillId, upgradeId) {
 
 // Applies an objective's reward (see OBJECTIVES) — a switch on `reward.type`,
 // so a future reward kind is a new case here rather than a change to how
-// completion is detected.
-function applyObjectiveReward(reward) {
-  if (reward.type === 'unlockTab') {
+// completion is detected. `replaying` is set when re-applying rewards on
+// load (see applyCompletedObjectiveRewards): unlocks are safe to apply
+// again, but XP was already paid when the objective completed, so it's
+// skipped rather than paid once more on every reload.
+function applyObjectiveReward(reward, { replaying = false } = {}) {
+  if (!reward) return;
+
+  if (reward.type === 'xp') {
+    if (replaying) return;
+    awardXp(reward.amount);
+  } else if (reward.type === 'unlockTab') {
     document.querySelector(`.tab-button[data-tab="${reward.tabId}"]`).hidden = false;
   } else if (reward.type === 'unlockSkill') {
     markSkillUnlocked(reward.skillId);
@@ -1576,7 +1592,7 @@ function applyObjectiveReward(reward) {
 function applyCompletedObjectiveRewards() {
   for (const objectiveId of completedObjectiveIds) {
     const objective = OBJECTIVES[objectiveId];
-    if (objective) applyObjectiveReward(objective.reward);
+    if (objective) applyObjectiveReward(objective.reward, { replaying: true });
   }
 }
 
