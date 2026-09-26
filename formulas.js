@@ -160,8 +160,9 @@ const DUNGEONS = {
   },
 };
 
-// A new game's starting Max XP — a lifetime-XP milestone, separate from the
-// spendable XP balance (which keeps working exactly as it always has).
+// A new game's starting Max XP — the most XP a single cycle can earn.
+// Once lifetime XP reaches it, further XP no longer adds to the spendable
+// balance (see spendableXpGain) and only fills the prestige bar instead.
 // Reaching it unlocks the prestige bar; prestiging raises it by 100 for the
 // next cycle. See PRESTIGE_BONUS_PER_CYCLE and prestigeTarget below.
 const STARTING_MAX_XP = 100;
@@ -173,6 +174,14 @@ const PRESTIGE_BONUS_PER_CYCLE = 100;
 // further XP — 10% of maxXp — to fill before the Prestige button appears.
 function prestigeTarget(maxXp) {
   return Math.round(maxXp * 0.1);
+}
+
+// How much of an XP award still reaches the spendable balance, given the
+// lifetime XP earned before it: only the part that fits under maxXp. An
+// award that crosses the threshold is split — the rest is simply not
+// spendable (it still counts toward the prestige bar, see game.js awardXp).
+function spendableXpGain(lifetimeXp, maxXp, amount) {
+  return Math.max(0, Math.min(amount, maxXp - lifetimeXp));
 }
 
 // How many times the player has already prestiged, derived from maxXp
@@ -712,7 +721,7 @@ if (typeof module !== 'undefined') {
     activeQuest, questComplete, describeQuestProgress,
     objectiveMatches,
     groupKillXp, groupTotalXp,
-    STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount,
+    STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
     perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,
   };
 }
