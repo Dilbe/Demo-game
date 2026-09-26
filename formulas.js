@@ -428,7 +428,39 @@ const SKILLS = {
 //
 // Key order is display order: the Objectives tab lists them in this order,
 // and the tracker above the tabs shows the first one not yet completed.
+//
+// `reward` can be null for a step that only leads on to the next one.
 const OBJECTIVES = {
+  // A new player's first steps, one at a time (#58): each needs the one
+  // before it, so the tracker walks them through a first fight.
+  selectSmall: {
+    description: 'Select a Small Slime to fight',
+    condition: { type: 'selectFight', groupId: 'small' },
+    reward: null,
+    prerequisites: [],
+  },
+
+  startSmall: {
+    description: 'Start a fight with a Small Slime',
+    condition: { type: 'startFight', groupId: 'small' },
+    reward: null,
+    prerequisites: ['selectSmall'],
+  },
+
+  hitSmall: {
+    description: 'Attack the Small Slime with your Basic Attack',
+    condition: { type: 'hitMonster', skillId: 'basicAttack', monsterId: 'small' },
+    reward: null,
+    prerequisites: ['startSmall'],
+  },
+
+  killSmall: {
+    description: 'Kill the Small Slime',
+    condition: { type: 'killMonster', monsterId: 'small' },
+    reward: { type: 'xp', amount: 1 },
+    prerequisites: ['hitSmall'],
+  },
+
   killFive: {
     description: 'Kill 5 enemies',
     condition: { type: 'killCount', target: 5 },
@@ -477,13 +509,14 @@ const TAB_LABELS = {
 // True if `event` (something that just happened in the game, e.g.
 // `{ type: 'killMonster', monsterId: 'medium', totalKills: 7 }`) satisfies
 // an objective's `condition`. A 'killCount' condition checks the running
-// kill total every kill event carries; a condition with nothing beyond
-// `type` (like winDungeon's) matches any event of that type.
+// kill total every kill event carries. Any other condition matches an event
+// of its type whose fields equal every other field the condition names — so
+// `{ type: 'killMonster', monsterId: 'medium' }` needs a Goblin kill, and a
+// type-only condition (like winDungeon's) matches any event of that type.
 function objectiveMatches(condition, event) {
   if (condition.type === 'killCount') return event.type === 'killMonster' && event.totalKills >= condition.target;
   if (condition.type !== event.type) return false;
-  if (condition.type === 'killMonster') return condition.monsterId === event.monsterId;
-  return true;
+  return Object.entries(condition).every(([key, value]) => event[key] === value);
 }
 
 // Whether an objective can be completed yet: every one of its prerequisites
@@ -500,7 +533,10 @@ function describeObjectiveProgress(objective, totalKills) {
   return `${objective.description} (${Math.min(totalKills, condition.target)}/${condition.target})`;
 }
 
+// '' for an objective with no reward (see OBJECTIVES' null rewards).
 function describeReward(reward) {
+  if (!reward) return '';
+  if (reward.type === 'xp') return `+${reward.amount} XP`;
   if (reward.type === 'unlockTab') return `Unlocks the ${TAB_LABELS[reward.tabId]} tab`;
   if (reward.type === 'unlockSkill') return `Unlocks ${SKILLS[reward.skillId].label}`;
   if (reward.type === 'unlockToggles') return 'Unlocks skill toggles';
