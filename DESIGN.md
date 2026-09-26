@@ -408,6 +408,16 @@ Everything unlocked by *doing* something is now one list: `OBJECTIVES` in `formu
 - **First-fight objectives ([#58](https://github.com/Dilbe/Demo-game/issues/58)):** four chained steps come first: select a Small Slime, start the fight, hit it with Basic Attack, kill it (+1 XP). They're the first real use of `prerequisites`. New condition types: `selectFight`, `startFight`, `hitMonster`. `objectiveMatches` now checks every field a condition names, rather than one hard-coded field per type. A `reward` can be `null`, and an `xp` reward is paid only when the objective completes, never again when rewards are re-applied on load.
 - **Perks tab ([#63](https://github.com/Dilbe/Demo-game/issues/63)):** the perks moved from the bottom of the Character tab to their own tab. The tab only appears once the player has prestiged at least once, and from then on it's visible from the start of every new game. This replaces v12's "every perk is always visible, even before the first prestige".
 
+## Fight unlocks ([#59](https://github.com/Dilbe/Demo-game/issues/59))
+
+Fights no longer all start selectable. `FIGHT_UNLOCK_ORDER` in `formulas.js` lists every monster group and dungeon in one order: Small Slime → Goblin → Two Small Slimes → Orc → Goblin Gauntlet → Monster Rush. This replaces v4/v5's "every fight and dungeon can be picked from the start".
+
+- **A new game** can pick only the first. The rest are listed in the picker, greyed out, with a "Locked — win <previous fight> to unlock" hint, and clicking them does nothing.
+- **Winning a fight** unlocks the next one (for a dungeon, clearing all of it). Winning an earlier fight again unlocks nothing new.
+- **Saved** as `unlockedFightCount` in the main save, so a prestige resets it to just the first fight, same as the rest of the save.
+- **Old saves** start back at one unlocked fight; a selected fight that's now locked is dropped on load.
+- `MONSTER_GROUPS` was reordered to match, so the picker reads top-down in unlock order.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
