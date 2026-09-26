@@ -305,7 +305,7 @@ const SKILLS = {
     icon: '<svg viewBox="0 0 24 24"><rect x="10" y="1" width="4" height="15" fill="currentColor"/><rect x="6" y="16" width="12" height="2.5" fill="currentColor"/><rect x="9.5" y="18.5" width="5" height="4.5" fill="currentColor"/></svg>',
     damage: 3,
     cooldown: 5,
-    unlockObjectiveId: 'killMedium',
+    unlockObjectiveId: 'killBig',
     pointCost: 2,
     type: 'active',
     // Lands the instant it's pressed, rather than waiting out its (longer)
@@ -348,7 +348,7 @@ const SKILLS = {
     icon: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="18" rx="1.5" fill="currentColor"/><rect x="3" y="9" width="18" height="6" rx="1.5" fill="currentColor"/></svg>',
     healing: 5,
     cooldown: 8,
-    unlockObjectiveId: 'killBig',
+    unlockObjectiveId: 'killMedium',
     pointCost: 2,
     type: 'active',
     // Lands halfway through its cooldown, ahead of whatever the next monster
@@ -478,14 +478,14 @@ const OBJECTIVES = {
   killMedium: {
     description: 'Kill a Goblin',
     condition: { type: 'killMonster', monsterId: 'medium' },
-    reward: { type: 'unlockSkill', skillId: 'strongAttack' },
+    reward: { type: 'unlockSkill', skillId: 'heal' },
     prerequisites: [],
   },
 
   killBig: {
     description: 'Kill an Orc',
     condition: { type: 'killMonster', monsterId: 'big' },
-    reward: { type: 'unlockSkill', skillId: 'heal' },
+    reward: { type: 'unlockSkill', skillId: 'strongAttack' },
     prerequisites: [],
   },
 
