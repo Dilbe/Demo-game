@@ -40,8 +40,40 @@ body {
   margin: 1.5rem auto;
 }
 
+/* Sprite, then name and HP, then the attack indicator — one short row
+   instead of four stacked lines, so the fight view fits a phone screen. */
 .combatant {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.combatant-info {
+  text-align: left;
+}
+
+.combatant h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.combatant-info p {
+  margin: 0.2rem 0 0;
+}
+
+/* Smaller than a skill button: it's an indicator only, never clicked. */
+.combatant .cooldown-button {
+  width: 3.5rem;
+  height: 3.5rem;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+/* display:flex would otherwise override the hidden attribute (the indicator
+   is hidden on the pre-fight preview). */
+.combatant .cooldown-button[hidden] {
+  display: none;
 }
 
 .combatant.targetable {
@@ -240,12 +272,10 @@ body {
   height: 100%;
 }
 
-/* Bigger and set off from the name/HP below it on a combatant card than it
-   is inline in a selection row. */
+/* Bigger on a combatant card than inline in a selection row. */
 .combatant .monster-sprite {
-  width: 4rem;
-  height: 4rem;
-  margin-bottom: 0.25rem;
+  width: 3.5rem;
+  height: 3.5rem;
 }
 
 .cooldown-fill {
@@ -286,7 +316,7 @@ body {
 #result-message {
   font-size: 1.5rem;
   font-weight: bold;
-  margin-top: 2rem;
+  margin: 1rem 0;
 }
 
 #restart-button,
