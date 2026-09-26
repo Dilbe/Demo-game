@@ -1,4 +1,10 @@
 const monsterSelectEl = document.getElementById('monster-select');
+const fightViewEl = document.getElementById('fight-view');
+const fightPickerEl = document.getElementById('fight-picker');
+const selectedFightNameEl = document.getElementById('selected-fight-name');
+const selectedFightDetailEl = document.getElementById('selected-fight-detail');
+const chooseFightButton = document.getElementById('choose-fight-button');
+const closePickerButton = document.getElementById('close-picker-button');
 const dungeonProgressEl = document.getElementById('dungeon-progress');
 const monsterListEl = document.getElementById('monster-list');
 const playerHpEl = document.getElementById('player-hp');
@@ -171,6 +177,8 @@ function resetCooldownFill(fillEl) {
 
 restartButton.addEventListener('click', startGame);
 startButton.addEventListener('click', beginFight);
+chooseFightButton.addEventListener('click', openFightPicker);
+closePickerButton.addEventListener('click', closeFightPicker);
 retreatButton.addEventListener('click', retreat);
 resetCharacterButton.addEventListener('click', resetCharacter);
 prestigeButton.addEventListener('click', prestige);
@@ -195,6 +203,22 @@ function upgradeStat(statId) {
   updateRegenIndicator();
   updateXpDisplay();
   saveProgress();
+}
+
+// The fight list lives on its own screen rather than above the fight itself,
+// so on a phone it can't push Start below the fold (#56). It swaps with the
+// fight view in place — same tab, nothing else on the page moves.
+function openFightPicker() {
+  if (fightActive) return;
+
+  renderMonsterSelect();
+  fightViewEl.hidden = true;
+  fightPickerEl.hidden = false;
+}
+
+function closeFightPicker() {
+  fightPickerEl.hidden = true;
+  fightViewEl.hidden = false;
 }
 
 // One row per fight option, same pattern as renderStats/renderSkills. Covers
@@ -229,10 +253,10 @@ function renderMonsterSelect() {
 }
 
 // One card per fight option (a monster group or a dungeon) — the whole card
-// is the select control, no separate button. selectMonsterGroup/
-// selectDungeon already refuse mid-fight, so the only thing guarded here is
-// re-clicking the already-selected card, which would otherwise just re-render
-// and re-save for no change. `spriteMarkup` is omitted for a dungeon row —
+// is the select control, no separate button. Picking closes the picker
+// either way; re-clicking the already-selected card just skips the
+// re-render and re-save it would otherwise cause for no change.
+// selectMonsterGroup/selectDungeon already refuse mid-fight. `spriteMarkup` is omitted for a dungeon row —
 // a chain of different fights has no single monster to represent it.
 function buildMonsterSelectRow(label, detailText, selected, onSelect, spriteMarkup) {
   const name = document.createElement('span');
@@ -249,8 +273,8 @@ function buildMonsterSelectRow(label, detailText, selected, onSelect, spriteMark
   if (spriteMarkup) row.append(buildSprite(spriteMarkup, 'monster-sprite'));
   row.append(name, detail);
   row.addEventListener('click', () => {
-    if (selected) return;
-    onSelect();
+    if (!selected) onSelect();
+    closeFightPicker();
   });
 
   return row;
@@ -376,26 +400,22 @@ function updateMonsterPreview() {
     : [];
   renderMonsterList(monsters);
   startButton.disabled = !group;
-  fitMonsterSelectHeight();
+  renderSelectedFight();
 }
 
-// Keeps Start (and everything else below the fight-option list) in view
-// without the whole page needing to scroll to reach it — only the list
-// itself scrolls, via #monster-select's own overflow-y (see style.css).
-// Measured rather than guessed, since how much room the monster preview and
-// Start need varies with how many monsters are in the selected group and how
-// narrow the viewport is (more/taller wrapped rows on a phone).
-function fitMonsterSelectHeight() {
-  if (monsterSelectEl.hidden) return; // hidden mid-fight; nothing to fit
-
-  monsterSelectEl.style.maxHeight = 'none'; // measure the fully unconstrained layout first
-  const naturalHeight = monsterSelectEl.getBoundingClientRect().height;
-  const overflow = startButton.getBoundingClientRect().bottom - window.innerHeight;
-
-  const MIN_LIST_HEIGHT = 128; // never shrink the list below a usable size
-  monsterSelectEl.style.maxHeight = overflow > 0
-    ? `${Math.max(naturalHeight - overflow, MIN_LIST_HEIGHT)}px`
-    : '';
+// The fight view's one-line summary of the current pick, above the monster
+// preview — the full list only shows once "Choose fight" opens the picker.
+function renderSelectedFight() {
+  if (selectedDungeonId) {
+    selectedFightNameEl.textContent = DUNGEONS[selectedDungeonId].label;
+    selectedFightDetailEl.textContent = describeDungeon(selectedDungeonId);
+  } else if (selectedGroupId) {
+    selectedFightNameEl.textContent = MONSTER_GROUPS[selectedGroupId].label;
+    selectedFightDetailEl.textContent = describeMonsterGroup(selectedGroupId);
+  } else {
+    selectedFightNameEl.textContent = 'No fight selected';
+    selectedFightDetailEl.textContent = '';
+  }
 }
 
 function renderStats() {
@@ -821,7 +841,7 @@ function startGame() {
 
   renderMonsterSelect();
   updateMonsterPreview();
-  monsterSelectEl.hidden = false;
+  chooseFightButton.hidden = false;
 
   resultMessageEl.hidden = true;
   restartButton.hidden = true;
@@ -878,7 +898,7 @@ function beginFight() {
 
   fightActive = true;
   startButton.hidden = true;
-  monsterSelectEl.hidden = true;
+  chooseFightButton.hidden = true;
   skillBarEl.hidden = false;
   retreatButton.hidden = false;
   updateDungeonProgress();
@@ -1718,13 +1738,7 @@ tabButtons.forEach((button) => {
     tabButtons.forEach((btn) => {
       btn.classList.toggle('active', btn === button);
     });
-    // #monster-select is unmeasurable (0-height) while the Fight tab is
-    // hidden, so re-fit it on the way back in rather than only when its own
-    // content last changed — covers a window resize that happened meanwhile.
-    if (targetId === 'fight-tab') fitMonsterSelectHeight();
   });
 });
 
 document.querySelector('[data-tab="fight-tab"]').classList.add('active');
-
-window.addEventListener('resize', fitMonsterSelectHeight);

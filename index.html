@@ -17,7 +17,7 @@
 
   <p id="xp-display">XP: <span id="xp-value">0</span></p>
 
-  <div id="quest-tracker" hidden></div>
+  <div id="quest-tracker" class="frame" hidden></div>
 
   <nav id="tabs">
     <button class="tab-button" data-tab="fight-tab">Fight</button>
@@ -27,26 +27,38 @@
   </nav>
 
   <section id="fight-tab" class="tab-panel">
-    <div id="monster-select"></div>
+    <div id="fight-view">
+      <div id="selected-fight" class="frame">
+        <span id="selected-fight-name"></span>
+        <span id="selected-fight-detail"></span>
+        <button id="choose-fight-button">Choose fight</button>
+      </div>
 
-    <p id="dungeon-progress" hidden></p>
+      <p id="dungeon-progress" hidden></p>
 
-    <div id="monster-list"></div>
+      <div id="monster-list" class="frame"></div>
 
-    <button id="start-button" disabled>Start</button>
+      <button id="start-button" disabled>Start</button>
 
-    <div id="skill-bar" hidden></div>
+      <div id="skill-bar" class="frame" hidden></div>
 
-    <button id="retreat-button" hidden>Retreat</button>
+      <button id="retreat-button" hidden>Retreat</button>
 
-    <p id="result-message" hidden></p>
-    <button id="restart-button" hidden>Restart</button>
+      <p id="result-message" hidden></p>
+      <button id="restart-button" hidden>Restart</button>
+    </div>
+
+    <div id="fight-picker" hidden>
+      <h2>Choose a fight</h2>
+      <div id="monster-select"></div>
+      <button id="close-picker-button">Back</button>
+    </div>
   </section>
 
   <section id="character-tab" class="tab-panel" hidden>
     <p>Max XP: <span id="max-xp-value">100</span></p>
 
-    <div id="prestige-section" hidden>
+    <div id="prestige-section" class="frame" hidden>
       <div id="prestige-bar">
         <div id="prestige-bar-fill"></div>
         <span id="prestige-bar-label">Prestige: <span id="prestige-progress-value">0</span> / <span id="prestige-target-value">10</span></span>
@@ -54,9 +66,9 @@
       <button id="prestige-button" hidden>Prestige (Max XP +100)</button>
     </div>
 
-    <div id="stat-list"></div>
+    <div id="stat-list" class="frame"></div>
 
-    <div id="perks-section">
+    <div id="perks-section" class="frame">
       <p>Perk Points: <span id="perk-points-value">0</span></p>
       <div id="perk-list"></div>
     </div>
@@ -68,19 +80,19 @@
     <p>Slots: <span id="slots-used">0</span> / <span id="slots-total">2</span> &middot; Points: <span id="points-used">0</span> / <span id="points-total">3</span></p>
 
     <div id="skills-layout">
-      <div id="skills-main">
+      <div id="skills-main" class="frame">
         <div id="skill-list"></div>
         <p class="skill-slots-hint">Drag a skill here to equip it, or drag it back to the list to unequip &mdash; or tap a skill and pick a slot below its stats.</p>
         <div id="skill-slots"></div>
         <p id="skill-equip-message" hidden></p>
       </div>
 
-      <div id="skill-detail-panel"></div>
+      <div id="skill-detail-panel" class="frame"></div>
     </div>
   </section>
 
   <section id="about-tab" class="tab-panel" hidden>
-    <p class="about-blurb">
+    <p class="about-blurb frame">
       Demo Game is a from-scratch learning project, not a product: a small
       combat game built to practice plain JavaScript and HTML/CSS with no
       build tooling, and to work through a data-driven design pattern where
