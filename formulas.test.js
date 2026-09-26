@@ -579,13 +579,13 @@ test('describeObjectiveProgress is just the description for a one-off objective'
 
 test('describeReward names what each reward unlocks', () => {
   assert.strictEqual(describeReward(OBJECTIVES.killFive.reward), 'Unlocks the Character tab');
-  assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Strong Attack');
+  assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Heal');
   assert.strictEqual(describeReward(OBJECTIVES.winDungeon.reward), 'Unlocks skill toggles');
 });
 
-test('killMedium and killBig unlock Strong Attack and Heal', () => {
-  assert.deepStrictEqual(OBJECTIVES.killMedium.reward, { type: 'unlockSkill', skillId: 'strongAttack' });
-  assert.deepStrictEqual(OBJECTIVES.killBig.reward, { type: 'unlockSkill', skillId: 'heal' });
+test('killMedium and killBig unlock Heal and Strong Attack (#71)', () => {
+  assert.deepStrictEqual(OBJECTIVES.killMedium.reward, { type: 'unlockSkill', skillId: 'heal' });
+  assert.deepStrictEqual(OBJECTIVES.killBig.reward, { type: 'unlockSkill', skillId: 'strongAttack' });
 });
 
 test('winDungeon unlocks the toggle system rather than a specific skill', () => {
