@@ -9,7 +9,7 @@ const {
   activeQuest, questComplete, describeQuestProgress,
   objectiveMatches,
   groupKillXp, groupTotalXp,
-  STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount,
+  STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
   PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,
 } = require('./formulas.js');
 
@@ -590,6 +590,20 @@ test('prestigeCount is 0 at the starting maxXp and counts up by cycle after that
   assert.strictEqual(prestigeCount(STARTING_MAX_XP), 0);
   assert.strictEqual(prestigeCount(STARTING_MAX_XP + PRESTIGE_BONUS_PER_CYCLE), 1);
   assert.strictEqual(prestigeCount(STARTING_MAX_XP + PRESTIGE_BONUS_PER_CYCLE * 2), 2);
+});
+
+test('spendableXpGain pays the full award while under maxXp', () => {
+  assert.strictEqual(spendableXpGain(50, 100, 10), 10);
+});
+
+test('spendableXpGain only pays the part of an award that fits under maxXp', () => {
+  assert.strictEqual(spendableXpGain(95, 100, 10), 5);
+  assert.strictEqual(spendableXpGain(90, 100, 10), 10);
+});
+
+test('spendableXpGain pays nothing once lifetime XP has reached maxXp', () => {
+  assert.strictEqual(spendableXpGain(100, 100, 10), 0);
+  assert.strictEqual(spendableXpGain(130, 100, 10), 0);
 });
 
 // --- Perks -------------------------------------------------------------

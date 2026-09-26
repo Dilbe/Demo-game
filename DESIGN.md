@@ -289,7 +289,7 @@ A pass over rough edges across the Skills tab and the Fight tab — not a new fe
 
 A reset-for-a-permanent-bonus loop, picking up the "Prestige mechanic" idea parked since v1. Introduces `maxXp` as a second, slower-moving number alongside the existing XP balance rather than replacing it.
 
-- **`maxXp` starts at 100** in a new game — a lifetime-XP milestone, not a cap on the spendable XP balance already earned and spent on stats/skills today (that keeps working exactly as now).
+- **`maxXp` starts at 100** in a new game — a lifetime-XP milestone, not a cap on the spendable XP balance already earned and spent on stats/skills today (that keeps working exactly as now). *Changed by [#54](https://github.com/Dilbe/Demo-game/issues/54): `maxXp` is now also the cap on spendable XP earned per cycle — once lifetime XP reaches it, further XP only fills the prestige bar.*
 - **Prestige progress bar:** once lifetime XP earned reaches `maxXp`, a second bar appears and starts filling with XP gained from that point on (the regular XP balance keeps accumulating/spending as normal alongside it). It needs 10% of `maxXp` (10 XP, at the starting value) to fill.
 - **Prestige button:** once the prestige bar is full, a "Prestige" button appears. Pressing it resets the whole game — XP balance, stats, skills, quests, kill counter, dungeon/monster selection, everything `localStorage` currently saves — back to a fresh start, except `maxXp` is now 100 higher than it was.
 - Later, possibly: additional permanent rewards for prestiging (unspecified — parked for a future pass, not part of this scope).

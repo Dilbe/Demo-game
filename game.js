@@ -908,8 +908,10 @@ function advanceDungeonFight() {
 // the prestige bar can never drift out of sync with what was actually
 // earned. Spending XP (upgrades, unlocks) still just subtracts from `xp`
 // directly — lifetimeXp and prestigeProgress only ever move forward.
+// maxXp caps what a cycle can add to the spendable balance: past it, XP
+// only fills the prestige bar.
 function awardXp(amount) {
-  xp += amount;
+  xp += spendableXpGain(lifetimeXp, maxXp, amount);
   lifetimeXp += amount;
 
   if (lifetimeXp >= maxXp) {
