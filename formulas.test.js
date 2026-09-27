@@ -9,7 +9,7 @@ const {
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
   groupKillXp, groupTotalXp,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
-  PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,
+  PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus, perkStartingUpgradePoints,
 } = require('./formulas.js');
 
 // --- Version ---------------------------------------------------------
@@ -672,4 +672,15 @@ test('perkSkillDamageBonus only applies to the skill a perk targets', () => {
   assert.strictEqual(perkSkillDamageBonus([], 'basicAttack'), 0);
   assert.strictEqual(perkSkillDamageBonus(['basicAttackDamage'], 'basicAttack'), 1);
   assert.strictEqual(perkSkillDamageBonus(['basicAttackDamage'], 'strongAttack'), 0);
+});
+
+test('perkStartingUpgradePoints is 0 with no starting-Upgrade-Points perk purchased', () => {
+  assert.strictEqual(perkStartingUpgradePoints([]), 0);
+  assert.strictEqual(perkStartingUpgradePoints(['maxHp10']), 0);
+});
+
+test('perkStartingUpgradePoints stacks the three perks to +30', () => {
+  assert.strictEqual(perkStartingUpgradePoints(['startingUpgradePoints1']), 10);
+  assert.strictEqual(perkStartingUpgradePoints(['startingUpgradePoints1', 'startingUpgradePoints2']), 20);
+  assert.strictEqual(perkStartingUpgradePoints(['startingUpgradePoints1', 'startingUpgradePoints2', 'startingUpgradePoints3']), 30);
 });

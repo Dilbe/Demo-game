@@ -408,6 +408,16 @@ Everything unlocked by *doing* something is now one list: `OBJECTIVES` in `formu
 - **First-fight objectives ([#58](https://github.com/Dilbe/Demo-game/issues/58)):** four chained steps come first: select a Small Slime, start the fight, hit it with Basic Attack, kill it (+1 XP). They're the first real use of `prerequisites`. New condition types: `selectFight`, `startFight`, `hitMonster`. `objectiveMatches` now checks every field a condition names, rather than one hard-coded field per type. A `reward` can be `null`, and an `xp` reward is paid only when the objective completes, never again when rewards are re-applied on load.
 - **Perks tab ([#63](https://github.com/Dilbe/Demo-game/issues/63)):** the perks moved from the bottom of the Character tab to their own tab. The tab only appears once the player has prestiged at least once, and from then on it's visible from the start of every new game. This replaces v12's "every perk is always visible, even before the first prestige".
 
+## Upgrade Points ([#76](https://github.com/Dilbe/Demo-game/issues/76))
+
+XP and the currency it pays for are now two separate things. Everywhere earlier sections say "spend XP" or "the XP balance", read **Upgrade Points** (UP).
+
+- **XP only counts up.** It's the XP gained this prestige, capped at Max XP. XP gained past the cap still fills the prestige bar, as before ([#54](https://github.com/Dilbe/Demo-game/issues/54)).
+- **Upgrade Points are the spendable balance.** Every XP gained adds the same amount of UP (so nothing past Max XP), and stat upgrades, skill unlocks, skill upgrades and toggle unlocks all cost UP. Buttons say "Upgrade (5 UP)" instead of "Upgrade (5 XP)".
+- **Header** above the tabs reads `XP: 17/100 (UP: 7)`: XP gained / Max XP, then the UP balance.
+- **Three new perks** each add 10 UP at the start of every prestige, and pay out once right away when bought (so the current cycle gets it too). They cost 2, 5 and 12 Perk Points, are bought independently, and stack to +30 UP. A reset (not just a prestige) also starts with the bonus, since both start a fresh game.
+- **Saves:** the main save stores the balance as `upgradePoints`; an older save's `xp` field loads into it.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
