@@ -418,6 +418,16 @@ Fights no longer all start selectable. `FIGHT_UNLOCK_ORDER` in `formulas.js` lis
 - **Old saves** start back at one unlocked fight; a selected fight that's now locked is dropped on load.
 - `MONSTER_GROUPS` was reordered to match, so the picker reads top-down in unlock order.
 
+## Upgrade Points ([#76](https://github.com/Dilbe/Demo-game/issues/76))
+
+XP and the currency it pays for are now two separate things. Everywhere earlier sections say "spend XP" or "the XP balance", read **Upgrade Points** (UP).
+
+- **XP only counts up.** It's the XP gained this prestige, capped at Max XP. XP gained past the cap still fills the prestige bar, as before ([#54](https://github.com/Dilbe/Demo-game/issues/54)).
+- **Upgrade Points are the spendable balance.** Every XP gained adds the same amount of UP (so nothing past Max XP), and stat upgrades, skill unlocks, skill upgrades and toggle unlocks all cost UP. Buttons say "Upgrade (5 UP)" instead of "Upgrade (5 XP)".
+- **Header bar** above the tabs (shaped like the health bar) reads `XP: 17/100 (UP: 7)` and fills blue toward Max XP. Once XP reaches Max XP it becomes a copy of the Character tab's gold prestige bar: `Prestige: 4/20 (UP: 17)`.
+- **Three new perks** each add 10 UP at the start of every prestige, and pay out once right away when bought (so the current cycle gets it too). They cost 2, 5 and 12 Perk Points, are bought independently, and stack to +30 UP. A reset (not just a prestige) also starts with the bonus, since both start a fresh game.
+- **Saves:** the main save stores the balance as `upgradePoints`; an older save's `xp` field loads into it.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

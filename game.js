@@ -16,7 +16,9 @@ const resultMessageEl = document.getElementById('result-message');
 const restartButton = document.getElementById('restart-button');
 const retreatButton = document.getElementById('retreat-button');
 const startButton = document.getElementById('start-button');
-const xpValueEl = document.getElementById('xp-value');
+const xpBarEl = document.getElementById('xp-bar');
+const xpBarFillEl = document.getElementById('xp-bar-fill');
+const xpBarLabelEl = document.getElementById('xp-bar-label');
 const slotsUsedEl = document.getElementById('slots-used');
 const slotsTotalEl = document.getElementById('slots-total');
 const pointsUsedEl = document.getElementById('points-used');
@@ -113,8 +115,11 @@ let skillLevels = Object.fromEntries(
 // list/slots — null when nothing is currently selected. Not persisted; every
 // reload starts with the panel closed.
 let inspectedSkillId = null;
-let xp = 0;
-// Total XP ever earned (never reduced by spending, unlike xp) — drives the
+// The spendable balance (#76): XP earned adds the same amount of Upgrade
+// Points (up to maxXp per cycle, see awardXp), and upgrades/unlocks spend
+// them. Kept separate from XP itself, which only ever counts up.
+let upgradePoints = 0;
+// Total XP ever earned (never reduced by spending, unlike upgradePoints) — drives the
 // prestige bar once it reaches maxXp. Reset to 0 by a prestige itself, since
 // each cycle needs to build back up to its own (higher) maxXp.
 let lifetimeXp = 0;
@@ -199,9 +204,9 @@ skillListEl.addEventListener('drop', (event) => {
 
 function upgradeStat(statId) {
   const cost = statCost(statId, stats[statId]);
-  if (xp < cost) return;
+  if (upgradePoints < cost) return;
 
-  xp -= cost;
+  upgradePoints -= cost;
   stats[statId] += 1;
 
   updateHealthBar();
@@ -470,8 +475,8 @@ function renderStats() {
     const cost = statCost(statId, stats[statId]);
     const button = document.createElement('button');
     button.className = 'upgrade-button';
-    button.textContent = `Upgrade (${cost} XP)`;
-    button.disabled = xp < cost;
+    button.textContent = `Upgrade (${cost} UP)`;
+    button.disabled = upgradePoints < cost;
     button.addEventListener('click', () => upgradeStat(statId));
 
     const row = document.createElement('div');
@@ -968,14 +973,14 @@ function advanceDungeonFight() {
 }
 
 // Every XP-earning moment (a kill, a dungeon-clear bonus) should route
-// through here rather than adding to `xp` directly, so lifetime tracking and
-// the prestige bar can never drift out of sync with what was actually
-// earned. Spending XP (upgrades, unlocks) still just subtracts from `xp`
-// directly — lifetimeXp and prestigeProgress only ever move forward.
-// maxXp caps what a cycle can add to the spendable balance: past it, XP
-// only fills the prestige bar.
+// through here rather than adding to `upgradePoints` directly, so lifetime
+// tracking and the prestige bar can never drift out of sync with what was
+// actually earned. Spending Upgrade Points (upgrades, unlocks) still just
+// subtracts from `upgradePoints` directly — lifetimeXp and prestigeProgress
+// only ever move forward. maxXp caps what a cycle can add to Upgrade Points:
+// past it, XP only fills the prestige bar.
 function awardXp(amount) {
-  xp += spendableXpGain(lifetimeXp, maxXp, amount);
+  upgradePoints += spendableXpGain(lifetimeXp, maxXp, amount);
   lifetimeXp += amount;
 
   if (lifetimeXp >= maxXp) {
@@ -988,13 +993,26 @@ function awardXp(amount) {
 }
 
 function updateXpDisplay() {
-  xpValueEl.textContent = xp;
+  renderXpBar();
   renderStats();
   renderSkills();
   renderSkillSlots();
   renderSkillDetail();
   renderPrestige();
   renderPerks();
+}
+
+// Fills toward maxXp, then — once XP past it only feeds the prestige bar
+// (see awardXp) — turns into a copy of the Character tab's prestige bar,
+// so progress stays visible from every tab.
+function renderXpBar() {
+  const prestigeReady = lifetimeXp >= maxXp;
+  const [label, value, target] = prestigeReady
+    ? ['Prestige', prestigeProgress, prestigeTarget(maxXp)]
+    : ['XP', lifetimeXp, maxXp];
+  xpBarEl.classList.toggle('prestige', prestigeReady);
+  xpBarFillEl.style.width = `${Math.min(100, (value / target) * 100)}%`;
+  xpBarLabelEl.textContent = `${label}: ${value}/${target} (UP: ${upgradePoints})`;
 }
 
 // Hidden until lifetime XP reaches maxXp; once visible, fills toward
@@ -1031,7 +1049,7 @@ function prestige() {
   // pays 1 Perk Point, the 2nd pays 2, and so on with no separate counter.
   const perkPointsAwarded = prestigeCount(newMaxXp);
   const perkPointsLabel = `${perkPointsAwarded} Perk Point${perkPointsAwarded === 1 ? '' : 's'}`;
-  if (!confirm(`Prestige now? This resets your XP, stats, skills, quests, unlocked fights, and kill count back to a fresh start, but raises Max XP from ${maxXp} to ${newMaxXp} and awards ${perkPointsLabel}.`)) return;
+  if (!confirm(`Prestige now? This resets your XP, Upgrade Points, stats, skills, quests, unlocked fights, and kill count back to a fresh start, but raises Max XP from ${maxXp} to ${newMaxXp} and awards ${perkPointsLabel}.`)) return;
 
   maxXp = newMaxXp;
   perkPoints += perkPointsAwarded;
@@ -1086,6 +1104,11 @@ function buyPerk(perkId) {
   perkPoints -= cost;
   purchasedPerkIds.push(perkId);
   savePermanentProgress();
+  // A starting-Upgrade-Points perk pays out for the current cycle too, not
+  // just from the next prestige on (#76) — a fresh game picks it up in
+  // loadProgress instead.
+  upgradePoints += perkStartingUpgradePoints([perkId]);
+  saveProgress();
 
   // A perk can change effective Max HP or the regen rate immediately, not
   // just future gains, so both need an explicit refresh alongside the
@@ -1101,9 +1124,9 @@ function unlockSkill(skillId) {
   if (SKILLS[skillId].unlockObjectiveId) return;
 
   const cost = SKILLS[skillId].unlockCost;
-  if (unlockedSkills.includes(skillId) || xp < cost) return;
+  if (unlockedSkills.includes(skillId) || upgradePoints < cost) return;
 
-  xp -= cost;
+  upgradePoints -= cost;
   markSkillUnlocked(skillId);
   updateXpDisplay();
   saveProgress();
@@ -1221,9 +1244,9 @@ function unlockToggle(skillId, toggleId) {
   if (unlockedToggleIds.includes(key)) return;
 
   const cost = findToggle(skillId, toggleId).unlockCost;
-  if (xp < cost) return;
+  if (upgradePoints < cost) return;
 
-  xp -= cost;
+  upgradePoints -= cost;
   unlockedToggleIds.push(key);
   updateXpDisplay();
   saveProgress();
@@ -1411,8 +1434,8 @@ function renderSkillDetail() {
       : (() => {
         const button = document.createElement('button');
         button.className = 'unlock-button';
-        button.textContent = `Unlock (${skill.unlockCost} XP)`;
-        button.disabled = xp < skill.unlockCost;
+        button.textContent = `Unlock (${skill.unlockCost} UP)`;
+        button.disabled = upgradePoints < skill.unlockCost;
         button.addEventListener('click', () => unlockSkill(skillId));
         return button;
       })();
@@ -1493,8 +1516,8 @@ function buildToggleRow(skillId) {
     } else {
       const button = document.createElement('button');
       button.className = 'toggle-unlock-button';
-      button.textContent = `Unlock (${toggle.unlockCost} XP)`;
-      button.disabled = !togglesUnlocked || xp < toggle.unlockCost;
+      button.textContent = `Unlock (${toggle.unlockCost} UP)`;
+      button.disabled = !togglesUnlocked || upgradePoints < toggle.unlockCost;
       button.addEventListener('click', () => unlockToggle(skillId, toggle.id));
       row.append(button);
     }
@@ -1571,8 +1594,8 @@ function buildUpgradeRow(skillId) {
 
     const button = document.createElement('button');
     button.className = 'upgrade-button';
-    button.textContent = `Upgrade (${cost} XP)`;
-    button.disabled = xp < cost;
+    button.textContent = `Upgrade (${cost} UP)`;
+    button.disabled = upgradePoints < cost;
     button.addEventListener('click', () => upgradeSkillTrack(skillId, upgrade.id));
 
     row.append(label, change, button);
@@ -1583,9 +1606,9 @@ function buildUpgradeRow(skillId) {
 
 function upgradeSkillTrack(skillId, upgradeId) {
   const cost = skillUpgradeCost(skillId, upgradeId, skillLevels[skillId][upgradeId]);
-  if (xp < cost) return;
+  if (upgradePoints < cost) return;
 
-  xp -= cost;
+  upgradePoints -= cost;
   skillLevels[skillId][upgradeId] += 1;
   updateXpDisplay();
   saveProgress();
@@ -1721,7 +1744,7 @@ function wipeSaveAndReload() {
 function saveProgress() {
   if (wipingSave) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({
-    xp, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
+    upgradePoints, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
     selectedGroupId, selectedDungeonId, unlockedFightCount, totalKills,
     lifetimeXp, prestigeProgress,
     completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
@@ -1755,10 +1778,16 @@ function loadProgress() {
   }
 
   const raw = localStorage.getItem(SAVE_KEY);
-  if (!raw) return;
+  // A fresh game — first launch, or right after a prestige/reset wiped the
+  // main save — starts with whatever Upgrade Points purchased perks grant.
+  if (!raw) {
+    upgradePoints = perkStartingUpgradePoints(purchasedPerkIds);
+    return;
+  }
 
   const saved = JSON.parse(raw);
-  xp = saved.xp;
+  // A save from before #76 still calls the balance `xp`.
+  upgradePoints = saved.upgradePoints ?? saved.xp;
   Object.assign(stats, saved.stats);
   if (saved.hp !== undefined) playerHp = saved.hp;
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills.filter((id) => !isRemovedSkillId(id));
@@ -1791,9 +1820,9 @@ function loadProgress() {
 }
 
 function resetCharacter() {
-  if (!confirm('Reset all XP and stats back to 0?')) return;
+  if (!confirm('Reset all XP, Upgrade Points, and stats back to a fresh start?')) return;
 
-  xp = 0;
+  upgradePoints = 0;
   // Reload from no save rather than zeroing state by hand — a fresh player
   // takes the same path, so this cannot drift as more state is added.
   wipeSaveAndReload();

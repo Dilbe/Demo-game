@@ -631,6 +631,29 @@ const PERKS = {
     cost: 3,
     effect: { type: 'healingSpeedPercent', amount: 25 },
   },
+
+  // Three separate perks rather than tiers of one (#76): each is bought on
+  // its own and they stack, up to +30 Upgrade Points per cycle.
+  startingUpgradePoints1: {
+    label: 'Starting Upgrade Points +10 (I)',
+    description: 'Start every prestige with 10 extra Upgrade Points, including the current one',
+    cost: 2,
+    effect: { type: 'startingUpgradePoints', amount: 10 },
+  },
+
+  startingUpgradePoints2: {
+    label: 'Starting Upgrade Points +10 (II)',
+    description: 'Start every prestige with 10 more Upgrade Points, including the current one',
+    cost: 5,
+    effect: { type: 'startingUpgradePoints', amount: 10 },
+  },
+
+  startingUpgradePoints3: {
+    label: 'Starting Upgrade Points +10 (III)',
+    description: 'Start every prestige with 10 more Upgrade Points, including the current one',
+    cost: 12,
+    effect: { type: 'startingUpgradePoints', amount: 10 },
+  },
 };
 
 // Flat Max HP bonus summed across every purchased perk — perks of this kind
@@ -640,6 +663,16 @@ function perkMaxHpBonus(purchasedPerkIds) {
   return purchasedPerkIds.reduce((total, perkId) => {
     const perk = PERKS[perkId];
     return perk.effect.type === 'maxHp' ? total + perk.effect.amount : total;
+  }, 0);
+}
+
+// Upgrade Points a fresh game (every prestige) starts with, summed across
+// every purchased perk — flat amounts, so they stack additively like
+// perkMaxHpBonus. game.js also pays a perk's amount out once on purchase.
+function perkStartingUpgradePoints(purchasedPerkIds) {
+  return purchasedPerkIds.reduce((total, perkId) => {
+    const perk = PERKS[perkId];
+    return perk.effect.type === 'startingUpgradePoints' ? total + perk.effect.amount : total;
   }, 0);
 }
 
@@ -810,6 +843,6 @@ if (typeof module !== 'undefined') {
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupTotalXp,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
-    perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus,
+    perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus, perkStartingUpgradePoints,
   };
 }
