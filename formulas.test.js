@@ -476,6 +476,20 @@ test('every dungeon fight reuses a real MONSTER_GROUPS entry', () => {
   }
 });
 
+test('every dungeon-only group is used by some dungeon', () => {
+  const usedGroupIds = Object.values(DUNGEONS).flatMap((dungeon) => dungeon.fightIds);
+  for (const [groupId, group] of Object.entries(MONSTER_GROUPS)) {
+    if (group.dungeonOnly) assert.ok(usedGroupIds.includes(groupId), `${groupId} is dungeon-only but no dungeon uses it`);
+  }
+});
+
+test('Slime Companions pairs a Small Slime with each companion in turn', () => {
+  assert.deepStrictEqual(
+    DUNGEONS.slimeCompanions.fightIds.map((groupId) => MONSTER_GROUPS[groupId].monsterIds),
+    [['small', 'small'], ['small', 'medium'], ['small', 'big']],
+  );
+});
+
 test('a dungeon chains more than one fight', () => {
   for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
     assert.ok(dungeon.fightIds.length > 1, `${dungeonId} has only one fight, so isn't really a chain`);
@@ -531,8 +545,9 @@ test('roundXp strips floating-point noise down to one decimal', () => {
 
 // --- Fight unlocks ---------------------------------------------------------
 
-test('FIGHT_UNLOCK_ORDER lists every monster group and dungeon exactly once', () => {
-  const allFightIds = [...Object.keys(MONSTER_GROUPS), ...Object.keys(DUNGEONS)];
+test('FIGHT_UNLOCK_ORDER lists every pickable monster group and dungeon exactly once', () => {
+  const pickableGroupIds = Object.keys(MONSTER_GROUPS).filter((groupId) => !MONSTER_GROUPS[groupId].dungeonOnly);
+  const allFightIds = [...pickableGroupIds, ...Object.keys(DUNGEONS)];
   assert.deepStrictEqual([...FIGHT_UNLOCK_ORDER].sort(), allFightIds.sort());
 });
 
@@ -558,6 +573,7 @@ test('winning the last fight keeps the count at the end of the list', () => {
 test('describeFightUnlock names the fight to win first, group or dungeon', () => {
   assert.strictEqual(describeFightUnlock('medium'), 'Locked — win Small Slime to unlock');
   assert.strictEqual(describeFightUnlock('monsterRush'), 'Locked — win Goblin Gauntlet to unlock');
+  assert.strictEqual(describeFightUnlock('slimeCompanions'), 'Locked — win Monster Rush to unlock');
 });
 
 // --- Objectives ------------------------------------------------------------
