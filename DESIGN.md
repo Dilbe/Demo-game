@@ -438,6 +438,19 @@ Winning the same fight over and over pays less and less XP. This replaces "a kil
 - **Picker and fight summary** show the XP left after diminishing returns. A fight that pays nothing any more is faded, like a locked one, but stays selectable.
 - **Saved** as `fightWinCounts` in the main save, so a prestige resets it, same as fight unlocks.
 
+## Stats ([#78](https://github.com/Dilbe/Demo-game/issues/78))
+
+The four Character-tab stats are now point-based, RPG-style stats. This replaces the v2/v3 stat names and v12's "Max HP +10/+25" and "Healing Speed +25%" perk effects.
+
+- **A stat is a number of points:** its base value plus levels bought with Upgrade Points, plus bonuses from equipped passive skills and purchased perks. Bonuses never change the stat's level, so they never make the next level cost more. Each stat's `effect` turns its total into what the game uses (`statBonuses`, `statTotal` and `statEffect` in `formulas.js`).
+- **Constitution** (was Max HP): starts at 4, and each point is 5 Max HP. 4 points is the same 20 HP a new game always had.
+- **Fortitude** (was Health Regen): starts at 0. Passive regen heals 1 HP every 60 × 0.9^Fortitude seconds.
+- **Wisdom** (was Skill Slots) and **Intelligence** (was Skill Points) work exactly as before. Skills still cost Skill Points; Intelligence is the stat that gives them.
+- **Regen skill:** +6 Fortitude while equipped, instead of +100% regen rate.
+- **Perks:** Max HP +10/+25 became Constitution +2/+5 (the same HP), and Healing Speed +25% became Fortitude +2 (0.9² ≈ 0.81, about the same speed). Their ids didn't change, so saves that bought them still own them.
+- **Breakdown:** hovering a stat's name shows how its total adds up: base, upgrades, each bonus by source, the total, and what it does. On a phone, where there's no hover, tapping the name opens it and tapping anywhere else closes it.
+- **Old saves:** each old stat's level carries over to the stat that replaced it. Max HP maps exactly; a Health Regen level becomes one Fortitude point, which heals a little slower than the old level did.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

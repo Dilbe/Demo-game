@@ -11,41 +11,53 @@ const VERSION = 'v12';
 // as "unreleased build" rather than a fake SHA.
 const BUILD_SHA = '__BUILD_SHA__';
 
+// A stat is a number of points (#78): a base value that grows with levels
+// bought with Upgrade Points (`value`), plus bonuses from equipped passive
+// skills and purchased perks (see statBonuses). `effect` turns the total
+// points into what the game actually uses — Max HP, seconds per healed HP,
+// and so on — and `format` describes that effect for the Character tab.
 const STATS = {
-  maxHp: {
-    label: 'Max HP',
-    description: 'Health you can hold',
-    base: 20,
-    perLevel: 5,
+  constitution: {
+    label: 'Constitution',
+    description: '+5 Max HP per point',
+    // 4 points is the 20 HP a new game has always started with.
+    base: 4,
+    perLevel: 1,
     baseCost: 5,
     costGrowth: 1.4,
     value(level) {
       return this.base + level * this.perLevel;
     },
-    format(value) {
-      return `${value} HP`;
+    effect(points) {
+      return points * 5;
+    },
+    format(effect) {
+      return `${effect} Max HP`;
     },
   },
 
-  healthRegen: {
-    label: 'Health Regen',
-    description: 'Seconds per healed HP',
-    // Seconds to regenerate 1 HP. Divides rather than subtracts, so higher
-    // levels mean less time per HP without the interval ever reaching zero.
-    base: 60,
-    perLevel: 0.25,
+  fortitude: {
+    label: 'Fortitude',
+    description: 'Faster HP regen',
+    // Seconds to regenerate 1 HP: 60 at 0 points, 10% less per point. A
+    // multiplier rather than a subtraction, so it never reaches zero.
+    base: 0,
+    perLevel: 1,
     baseCost: 5,
     costGrowth: 1.5,
     value(level) {
-      return this.base / (1 + level * this.perLevel);
+      return this.base + level * this.perLevel;
     },
-    format(value) {
-      return `${Math.round(value)}s`;
+    effect(points) {
+      return 60 * Math.pow(0.9, points);
+    },
+    format(effect) {
+      return `${Math.round(effect)}s per HP`;
     },
   },
 
-  skillSlots: {
-    label: 'Skill Slots',
+  wisdom: {
+    label: 'Wisdom',
     description: 'Skills you can equip',
     // How many skills can be equipped at once. Starts at 2 so a new player has
     // one empty slot, which advertises that unlocking a skill is worth doing.
@@ -56,16 +68,19 @@ const STATS = {
     value(level) {
       return this.base + level * this.perLevel;
     },
-    format(value) {
-      return `${value}`;
+    effect(points) {
+      return points;
+    },
+    format(effect) {
+      return `${effect} skill slots`;
     },
   },
 
-  skillPoints: {
-    label: 'Skill Points',
-    description: 'Budget for equipped skills',
-    // A second limit alongside slots: slots cap how many skills you equip,
-    // points cap how strong that combination can be.
+  intelligence: {
+    label: 'Intelligence',
+    description: 'Skill Points for equipped skills',
+    // A second limit alongside Wisdom: slots cap how many skills you equip,
+    // Skill Points cap how strong that combination can be.
     base: 3,
     perLevel: 2,
     baseCost: 20,
@@ -73,8 +88,11 @@ const STATS = {
     value(level) {
       return this.base + level * this.perLevel;
     },
-    format(value) {
-      return `${value}`;
+    effect(points) {
+      return points;
+    },
+    format(effect) {
+      return `${effect} Skill Points`;
     },
   },
 };
@@ -296,7 +314,7 @@ function groupKillXp(baseXp, killIndex) {
 //
 // `type: 'passive'` (see Regen/Strength below) is the one kind that skips
 // all of that: no cooldown, no combat button, no `upgrades`/`toggles` track —
-// instead a flat `boost` applies for as long as the skill stays equipped.
+// instead a `boost` applies for as long as the skill stays equipped.
 // Every other skill is `type: 'active'` and keeps the shape described above.
 //
 // `icon` is a small inline SVG string, same reasoning as MONSTERS' `sprite`
@@ -447,17 +465,16 @@ const SKILLS = {
 
   // Passive skills carry no combat button and no cooldown — while equipped
   // (using a slot and Skill Points like any other skill), `boost` just
-  // applies for as long as that stays true. `boost.stat` names what it
-  // affects ('damage' for anything an attack skill deals, or a STATS id like
-  // 'healthRegen'); `passiveMultiplier` below turns a set of equipped
-  // skills into the combined multiplier for a given stat.
+  // applies for as long as that stays true. A boost is one of two kinds:
+  // `percent` on 'damage' (anything an attack skill deals — see
+  // passiveMultiplier), or `points` added to a STATS id (see statBonuses).
   regen: {
     label: 'Regen',
     icon: '<svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 1-6.93 4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><polygon points="4,4 4,10 9,7" fill="currentColor"/></svg>',
     type: 'passive',
     unlockCost: 20,
     pointCost: 2,
-    boost: { stat: 'healthRegen', percent: 100, label: 'HP regen rate' },
+    boost: { stat: 'fortitude', points: 6 },
     upgrades: [],
     toggles: [],
   },
@@ -604,13 +621,13 @@ function describeReward(reward) {
 }
 
 // The combined multiplier every equipped passive skill with a matching
-// `boost.stat` contributes — 1 (no change) if none apply. Stacks
+// percentage `boost` contributes — 1 (no change) if none apply. Stacks
 // multiplicatively rather than adding percentages, so a second future source
 // of the same boost compounds instead of just summing.
 function passiveMultiplier(equippedSkillIds, statId) {
   return equippedSkillIds.reduce((multiplier, skillId) => {
     const skill = SKILLS[skillId];
-    if (skill.type !== 'passive' || skill.boost.stat !== statId) return multiplier;
+    if (skill.type !== 'passive' || skill.boost.stat !== statId || !skill.boost.percent) return multiplier;
     return multiplier * (1 + skill.boost.percent / 100);
   }, 1);
 }
@@ -634,27 +651,31 @@ const PERKS = {
     effect: { type: 'skillDamage', skillId: 'basicAttack', amount: 1 },
   },
 
+  // The three stat perks keep their pre-#78 ids (Max HP +10/+25, Healing
+  // Speed +25%) so saves that bought them still own them. Each became a
+  // stat bonus giving about the same as before: 10 and 25 HP are 2 and 5
+  // Constitution, and 2 Fortitude (0.9² = 0.81) is close to +25% speed.
   maxHp10: {
-    label: 'Max HP +10',
-    description: 'Adds 10 to your effective Max HP',
+    label: 'Constitution +2',
+    description: 'Adds 2 Constitution (+10 Max HP)',
     cost: 1,
-    effect: { type: 'maxHp', amount: 10 },
+    effect: { type: 'statBonus', stat: 'constitution', points: 2 },
   },
 
   // A separate perk from maxHp10, not a bigger tier of it — buying both
-  // stacks to +35 Max HP total.
+  // stacks to +7 Constitution total.
   maxHp25: {
-    label: 'Max HP +25',
-    description: 'Adds 25 to your effective Max HP',
+    label: 'Constitution +5',
+    description: 'Adds 5 Constitution (+25 Max HP)',
     cost: 5,
-    effect: { type: 'maxHp', amount: 25 },
+    effect: { type: 'statBonus', stat: 'constitution', points: 5 },
   },
 
   healingSpeed25: {
-    label: 'Healing Speed +25%',
-    description: 'Speeds up HP regen by 25%, stacking multiplicatively with every other source of the same boost',
+    label: 'Fortitude +2',
+    description: 'Adds 2 Fortitude (faster HP regen)',
     cost: 3,
-    effect: { type: 'healingSpeedPercent', amount: 25 },
+    effect: { type: 'statBonus', stat: 'fortitude', points: 2 },
   },
 
   // Three separate perks rather than tiers of one (#76): each is bought on
@@ -681,34 +702,13 @@ const PERKS = {
   },
 };
 
-// Flat Max HP bonus summed across every purchased perk — perks of this kind
-// stack additively with each other (each one is a flat amount, unlike the
-// percentage perks below).
-function perkMaxHpBonus(purchasedPerkIds) {
-  return purchasedPerkIds.reduce((total, perkId) => {
-    const perk = PERKS[perkId];
-    return perk.effect.type === 'maxHp' ? total + perk.effect.amount : total;
-  }, 0);
-}
-
 // Upgrade Points a fresh game (every prestige) starts with, summed across
-// every purchased perk — flat amounts, so they stack additively like
-// perkMaxHpBonus. game.js also pays a perk's amount out once on purchase.
+// every purchased perk — flat amounts, so they stack additively. game.js also pays a perk's amount out once on purchase.
 function perkStartingUpgradePoints(purchasedPerkIds) {
   return purchasedPerkIds.reduce((total, perkId) => {
     const perk = PERKS[perkId];
     return perk.effect.type === 'startingUpgradePoints' ? total + perk.effect.amount : total;
   }, 0);
-}
-
-// Same multiplicative-stacking pattern as passiveMultiplier, so a second
-// future Healing Speed perk would compound with this one (and with Regen's
-// own passive boost) rather than the percentages just adding.
-function perkHealingSpeedMultiplier(purchasedPerkIds) {
-  return purchasedPerkIds.reduce((multiplier, perkId) => {
-    const perk = PERKS[perkId];
-    return perk.effect.type === 'healingSpeedPercent' ? multiplier * (1 + perk.effect.amount / 100) : multiplier;
-  }, 1);
 }
 
 // Flat damage bonus from every purchased perk that targets `skillId`
@@ -775,7 +775,9 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus
   const skill = SKILLS[skillId];
 
   if (skill.type === 'passive') {
-    return `+${skill.boost.percent}% ${skill.boost.label} while equipped`;
+    const { boost } = skill;
+    if (boost.points) return `+${boost.points} ${STATS[boost.stat].label} while equipped`;
+    return `+${boost.percent}% ${boost.label} while equipped`;
   }
 
   const power = skillPower(skillId, levels.power) + (skill.healing ? 0 : perkDamageBonus);
@@ -852,8 +854,35 @@ function advanceRegen({ hp, maxHp, progress, secondsPerHp }, elapsedSeconds) {
   return { hp: newHp, progress: newProgress };
 }
 
+// A stat's base points: its starting value plus whatever levels were bought.
 function statValue(statId, level) {
   return STATS[statId].value(level);
+}
+
+// Every bonus on top of a stat's base points, each with where it comes from
+// so the Character tab can show how the total adds up: equipped passive
+// skills with a `points` boost for it, and purchased stat perks. Neither
+// touches the stat's level, so a bonus never makes the next level cost more.
+function statBonuses(statId, equippedSkillIds, purchasedPerkIds) {
+  const bonuses = [];
+  for (const skillId of equippedSkillIds) {
+    const { boost } = SKILLS[skillId];
+    if (boost && boost.stat === statId && boost.points) bonuses.push({ source: SKILLS[skillId].label, points: boost.points });
+  }
+  for (const perkId of purchasedPerkIds) {
+    const { effect } = PERKS[perkId];
+    if (effect.type === 'statBonus' && effect.stat === statId) bonuses.push({ source: PERKS[perkId].label, points: effect.points });
+  }
+  return bonuses;
+}
+
+// Base points plus every bonus — the number the stat's `effect` works from.
+function statTotal(statId, level, bonuses) {
+  return bonuses.reduce((total, bonus) => total + bonus.points, statValue(statId, level));
+}
+
+function statEffect(statId, points) {
+  return STATS[statId].effect(points);
 }
 
 function statCost(statId, level) {
@@ -865,7 +894,7 @@ function statCost(statId, level) {
 if (typeof module !== 'undefined') {
   module.exports = {
     VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES, PERKS,
-    statValue, statCost,
+    statValue, statCost, statBonuses, statTotal, statEffect,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
@@ -873,6 +902,6 @@ if (typeof module !== 'undefined') {
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupTotalXp, diminishedXp, fightPaysXp, roundXp,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
-    perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus, perkStartingUpgradePoints,
+    perkSkillDamageBonus, perkStartingUpgradePoints,
   };
 }
