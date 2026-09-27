@@ -181,6 +181,17 @@ body {
   cursor: default;
 }
 
+.monster-row.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.monster-lock-hint {
+  flex-basis: 100%;
+  font-style: italic;
+  color: #555;
+}
+
 .monster-name {
   width: 8rem;
   text-align: right;

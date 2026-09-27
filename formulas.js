@@ -133,8 +133,8 @@ const MONSTERS = {
 const MONSTER_GROUPS = {
   small: { label: 'Small Slime', monsterIds: ['small'] },
   medium: { label: 'Goblin', monsterIds: ['medium'] },
-  big: { label: 'Orc', monsterIds: ['big'] },
   twoSmall: { label: 'Two Small Slimes', monsterIds: ['small', 'small'] },
+  big: { label: 'Orc', monsterIds: ['big'] },
 };
 
 // A dungeon chains several fights back-to-back, fought without returning to
@@ -159,6 +159,34 @@ const DUNGEONS = {
     completionBonusXp: 10,
   },
 };
+
+// The order fights unlock in (#59) — MONSTER_GROUPS and DUNGEONS ids mixed
+// in one list, since no id is used by both. A new game can pick only the
+// first; winning a fight unlocks the one after it. Every group and dungeon
+// must appear here, or it can never be picked.
+const FIGHT_UNLOCK_ORDER = ['small', 'medium', 'twoSmall', 'big', 'goblinGauntlet', 'monsterRush'];
+
+// Whether `fightId` can be picked, given how many FIGHT_UNLOCK_ORDER entries
+// are unlocked so far (always at least the first).
+function fightUnlocked(unlockedFightCount, fightId) {
+  const index = FIGHT_UNLOCK_ORDER.indexOf(fightId);
+  return index !== -1 && index < unlockedFightCount;
+}
+
+// How many fights are unlocked after winning `fightId`: always the one right
+// after it, never fewer than before — replaying an earlier fight changes
+// nothing, and the count stops at the end of the list.
+function fightsUnlockedAfterWin(unlockedFightCount, fightId) {
+  const index = FIGHT_UNLOCK_ORDER.indexOf(fightId);
+  return Math.min(FIGHT_UNLOCK_ORDER.length, Math.max(unlockedFightCount, index + 2));
+}
+
+// The hint a locked fight shows instead of being selectable.
+function describeFightUnlock(fightId) {
+  const previousId = FIGHT_UNLOCK_ORDER[FIGHT_UNLOCK_ORDER.indexOf(fightId) - 1];
+  const previous = MONSTER_GROUPS[previousId] ?? DUNGEONS[previousId];
+  return `Locked — win ${previous.label} to unlock`;
+}
 
 // A new game's starting Max XP — the most XP a single cycle can earn.
 // Once lifetime XP reaches it, further XP no longer adds to the spendable
@@ -305,7 +333,7 @@ const SKILLS = {
     icon: '<svg viewBox="0 0 24 24"><rect x="10" y="1" width="4" height="15" fill="currentColor"/><rect x="6" y="16" width="12" height="2.5" fill="currentColor"/><rect x="9.5" y="18.5" width="5" height="4.5" fill="currentColor"/></svg>',
     damage: 3,
     cooldown: 5,
-    unlockObjectiveId: 'killMedium',
+    unlockObjectiveId: 'killBig',
     pointCost: 2,
     type: 'active',
     // Lands the instant it's pressed, rather than waiting out its (longer)
@@ -348,7 +376,7 @@ const SKILLS = {
     icon: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="18" rx="1.5" fill="currentColor"/><rect x="3" y="9" width="18" height="6" rx="1.5" fill="currentColor"/></svg>',
     healing: 5,
     cooldown: 8,
-    unlockObjectiveId: 'killBig',
+    unlockObjectiveId: 'killMedium',
     pointCost: 2,
     type: 'active',
     // Lands halfway through its cooldown, ahead of whatever the next monster
@@ -380,6 +408,13 @@ const SKILLS = {
         label: 'Heal over Time',
         description: 'Spreads the same total healing evenly over 10 seconds instead of landing it all at once',
         unlockCost: 30,
+        pointSurcharge: 1,
+      },
+      {
+        id: 'autoTrigger',
+        label: 'Auto-Trigger',
+        description: 'Fires automatically as soon as the cooldown is ready, with no click needed',
+        unlockCost: 25,
         pointSurcharge: 1,
       },
     ],
@@ -478,14 +513,14 @@ const OBJECTIVES = {
   killMedium: {
     description: 'Kill a Goblin',
     condition: { type: 'killMonster', monsterId: 'medium' },
-    reward: { type: 'unlockSkill', skillId: 'strongAttack' },
+    reward: { type: 'unlockSkill', skillId: 'heal' },
     prerequisites: [],
   },
 
   killBig: {
     description: 'Kill an Orc',
     condition: { type: 'killMonster', monsterId: 'big' },
-    reward: { type: 'unlockSkill', skillId: 'heal' },
+    reward: { type: 'unlockSkill', skillId: 'strongAttack' },
     prerequisites: [],
   },
 
@@ -804,6 +839,7 @@ if (typeof module !== 'undefined') {
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
+    FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupTotalXp,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,

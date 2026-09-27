@@ -309,7 +309,7 @@ Three related changes to how skills work: a first passive skill, unlocking skill
 
 - **Passive skills:** a new skill kind that isn't used in combat at all — while equipped (using a slot and Skill Points like any other skill), it just grants a flat stat boost for as long as it stays equipped.
 - **Two new skills:** Regen (+100% HP regen rate while equipped) and Strength (+25% damage on all attacks while equipped).
-- **Objective-gated unlocks replace XP unlocks for Strong Attack and Heal:** two new objectives — kill a Medium Monster unlocks Strong Attack, kill a Big Monster unlocks Heal — and completing the objective unlocks the skill directly, free of charge. Their existing `unlockCost` XP price goes away.
+- **Objective-gated unlocks replace XP unlocks for Strong Attack and Heal:** two new objectives — kill a Medium Monster unlocks Strong Attack, kill a Big Monster unlocks Heal — and completing the objective unlocks the skill directly, free of charge. Their existing `unlockCost` XP price goes away. *Swapped by [#71](https://github.com/Dilbe/Demo-game/issues/71): killing a Goblin now unlocks Heal and killing an Orc unlocks Strong Attack, so Heal comes first.*
 - **Optional per-skill upgrades ("toggles"):** a new array per skill, separate from the existing continuous Power/Speed upgrade tracks. Each toggle is unlocked once with an XP cost, then can be switched on/off freely; switching one on increases that skill's Skill Point cost while equipped (switching it off returns the cost to normal).
   - Basic Attack gets a **Multi Attack** toggle: while on, each hit strikes every active monster for full listed damage instead of just the targeted one.
   - Heal gets a **Heal over Time** toggle: while on, casting Heal instead applies a 10-second heal-over-time effect, healing the same total HP the instant cast would have, spread evenly across the 10 seconds.
@@ -326,7 +326,7 @@ Three related changes to how skills work: a first passive skill, unlocking skill
 6. Multi Attack toggle on Basic Attack — while on, Basic Attack hits every active monster for full damage instead of the single targeted one.
 7. Heal over Time toggle on Heal — while on, casting Heal applies a 10-second HoT healing the same total HP a straight cast would, spread evenly over the duration, instead of healing instantly.
 8. Remove Auto Attack — retire the skill (and migrate any existing save data that has it unlocked/equipped).
-9. Basic attack and strong attack get an upgrade toggle for auto attack. This makes those abilities trigger automatically as soon as they are available.
+9. Basic attack and strong attack get an upgrade toggle for auto attack. This makes those abilities trigger automatically as soon as they are available. *Extended to Heal by [#72](https://github.com/Dilbe/Demo-game/issues/72): Heal gets the same Auto-Trigger toggle (25 XP, +1 Skill Point while on), so every active skill can now fire itself.*
 10. "Win a dungeon" objective — new objective that gates the toggle system itself; toggles are visible-but-locked until it completes.
 
 **Milestones 1-2 status: done.** Shipped together, since a passive type with nothing using it yet would have no visible effect (same reasoning v3's milestone-7 reordering note gives). Every skill now carries an explicit `type` ('active' or 'passive'); a passive skill drops `cooldown`/`triggerAt`/`auto`/`upgrades` in favor of a `boost: { stat, percent, label }` describing what it grants while equipped, and `passiveMultiplier(equippedSkillIds, statId)` turns a set of equipped skills into the combined multiplier for a given stat (multiplicative, so a future second source of the same boost would compound rather than just add). Regen (`boost.stat: 'healthRegen'`, +100%) and Strength (`boost.stat: 'damage'`, +25%) are defined this way — both unlock for 20 XP and cost 2 Skill Points, same budget as any other skill. Passive skills still take a slot and count against the Skill Points budget like any other skill, unlock/equip/inspect the same way (their Skills-tab square and slot box work exactly like an active skill's), and their boost applies for as long as they stay equipped — but `renderSkillBar` and `beginFight` both skip them, so they get no button and no cooldown on the Fight tab. Strength's damage multiplier is applied in `applySkill` (rounded, and only to damage — never to Heal); Regen's is applied via a new `effectiveSecondsPerHp()` that both `regenTick` and `updateRegenIndicator` now go through instead of reading the Health Regen stat directly. Verified live: equipping Strength turns a 4-damage Basic Attack hit into 5, and equipping Regen halves the seconds-per-HP the regen bar fills against.
@@ -407,6 +407,16 @@ Everything unlocked by *doing* something is now one list: `OBJECTIVES` in `formu
 - **Tabs on a phone** now scroll sideways when they don't fit on one row, instead of squeezing.
 - **First-fight objectives ([#58](https://github.com/Dilbe/Demo-game/issues/58)):** four chained steps come first: select a Small Slime, start the fight, hit it with Basic Attack, kill it (+1 XP). They're the first real use of `prerequisites`. New condition types: `selectFight`, `startFight`, `hitMonster`. `objectiveMatches` now checks every field a condition names, rather than one hard-coded field per type. A `reward` can be `null`, and an `xp` reward is paid only when the objective completes, never again when rewards are re-applied on load.
 - **Perks tab ([#63](https://github.com/Dilbe/Demo-game/issues/63)):** the perks moved from the bottom of the Character tab to their own tab. The tab only appears once the player has prestiged at least once, and from then on it's visible from the start of every new game. This replaces v12's "every perk is always visible, even before the first prestige".
+
+## Fight unlocks ([#59](https://github.com/Dilbe/Demo-game/issues/59))
+
+Fights no longer all start selectable. `FIGHT_UNLOCK_ORDER` in `formulas.js` lists every monster group and dungeon in one order: Small Slime → Goblin → Two Small Slimes → Orc → Goblin Gauntlet → Monster Rush. This replaces v4/v5's "every fight and dungeon can be picked from the start".
+
+- **A new game** can pick only the first. The rest are listed in the picker, greyed out, with a "Locked — win <previous fight> to unlock" hint, and clicking them does nothing.
+- **Winning a fight** unlocks the next one (for a dungeon, clearing all of it). Winning an earlier fight again unlocks nothing new.
+- **Saved** as `unlockedFightCount` in the main save, so a prestige resets it to just the first fight, same as the rest of the save.
+- **Old saves** start back at one unlocked fight; a selected fight that's now locked is dropped on load.
+- `MONSTER_GROUPS` was reordered to match, so the picker reads top-down in unlock order.
 
 ## Upgrade Points ([#76](https://github.com/Dilbe/Demo-game/issues/76))
 

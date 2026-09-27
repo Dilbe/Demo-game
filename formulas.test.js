@@ -6,6 +6,7 @@ const {
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   findToggle, toggleKey, effectivePointCost,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
+  FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
   groupKillXp, groupTotalXp,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
@@ -292,6 +293,13 @@ test('toggleKey is unique per skill even for toggles sharing an id', () => {
   assert.notStrictEqual(toggleKey('basicAttack', 'autoTrigger'), toggleKey('strongAttack', 'autoTrigger'));
 });
 
+test('every active skill has an Auto-Trigger toggle', () => {
+  for (const [skillId, skill] of Object.entries(SKILLS)) {
+    if (skill.type !== 'active') continue;
+    assert.ok(findToggle(skillId, 'autoTrigger'), `${skillId} has no Auto-Trigger toggle`);
+  }
+});
+
 test('findToggle looks up a skill\'s own toggle by id', () => {
   assert.strictEqual(findToggle('basicAttack', 'multiAttack').label, 'Multi Attack');
   assert.strictEqual(findToggle('heal', 'healOverTime').label, 'Heal over Time');
@@ -458,6 +466,37 @@ test('describeDungeon lists every fight in order and totals their XP, completion
   );
 });
 
+// --- Fight unlocks ---------------------------------------------------------
+
+test('FIGHT_UNLOCK_ORDER lists every monster group and dungeon exactly once', () => {
+  const allFightIds = [...Object.keys(MONSTER_GROUPS), ...Object.keys(DUNGEONS)];
+  assert.deepStrictEqual([...FIGHT_UNLOCK_ORDER].sort(), allFightIds.sort());
+});
+
+test('a new game can pick only the first fight', () => {
+  assert.strictEqual(fightUnlocked(1, FIGHT_UNLOCK_ORDER[0]), true);
+  for (const fightId of FIGHT_UNLOCK_ORDER.slice(1)) assert.strictEqual(fightUnlocked(1, fightId), false);
+});
+
+test('winning the newest unlocked fight unlocks the next one', () => {
+  assert.strictEqual(fightsUnlockedAfterWin(1, 'small'), 2);
+  assert.strictEqual(fightsUnlockedAfterWin(4, 'big'), 5);
+});
+
+test('winning an earlier fight again unlocks nothing new', () => {
+  assert.strictEqual(fightsUnlockedAfterWin(4, 'small'), 4);
+});
+
+test('winning the last fight keeps the count at the end of the list', () => {
+  const all = FIGHT_UNLOCK_ORDER.length;
+  assert.strictEqual(fightsUnlockedAfterWin(all, FIGHT_UNLOCK_ORDER[all - 1]), all);
+});
+
+test('describeFightUnlock names the fight to win first, group or dungeon', () => {
+  assert.strictEqual(describeFightUnlock('medium'), 'Locked — win Small Slime to unlock');
+  assert.strictEqual(describeFightUnlock('monsterRush'), 'Locked — win Goblin Gauntlet to unlock');
+});
+
 // --- Objectives ------------------------------------------------------------
 
 test('every objective defines the full data-object shape', () => {
@@ -547,13 +586,13 @@ test('describeObjectiveProgress is just the description for a one-off objective'
 
 test('describeReward names what each reward unlocks', () => {
   assert.strictEqual(describeReward(OBJECTIVES.killFive.reward), 'Unlocks the Character tab');
-  assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Strong Attack');
+  assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Heal');
   assert.strictEqual(describeReward(OBJECTIVES.winDungeon.reward), 'Unlocks skill toggles');
 });
 
-test('killMedium and killBig unlock Strong Attack and Heal', () => {
-  assert.deepStrictEqual(OBJECTIVES.killMedium.reward, { type: 'unlockSkill', skillId: 'strongAttack' });
-  assert.deepStrictEqual(OBJECTIVES.killBig.reward, { type: 'unlockSkill', skillId: 'heal' });
+test('killMedium and killBig unlock Heal and Strong Attack (#71)', () => {
+  assert.deepStrictEqual(OBJECTIVES.killMedium.reward, { type: 'unlockSkill', skillId: 'heal' });
+  assert.deepStrictEqual(OBJECTIVES.killBig.reward, { type: 'unlockSkill', skillId: 'strongAttack' });
 });
 
 test('winDungeon unlocks the toggle system rather than a specific skill', () => {
