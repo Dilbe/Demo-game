@@ -492,9 +492,70 @@ body {
   margin: 0.75rem auto;
 }
 
-.stat-name {
+/* The name is a button so a tap can open its breakdown on a phone, but it
+   reads as a label with a dotted underline hinting there's more to see. */
+.stat-name-wrap {
+  position: relative;
   width: 7.5rem;
   text-align: right;
+}
+
+.stat-name {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  min-height: 2.75rem;
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
+.stat-breakdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  width: 14rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid #999;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+/* Hover only where there's a real pointer — on a touchscreen a tap would
+   otherwise leave it stuck open until the next tap elsewhere. */
+@media (hover: hover) {
+  .stat-name-wrap:hover .stat-breakdown {
+    display: block;
+  }
+}
+
+.stat-name-wrap.open .stat-breakdown {
+  display: block;
+}
+
+.stat-breakdown-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stat-breakdown-total {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid #ccc;
+  font-weight: bold;
+}
+
+.stat-breakdown-effect {
+  display: block;
+  color: #555;
 }
 
 .stat-level {

@@ -197,6 +197,14 @@ resetCharacterButton.addEventListener('click', resetCharacter);
 prestigeButton.addEventListener('click', prestige);
 showCompletedObjectivesEl.addEventListener('change', renderObjectives);
 
+// Tapping anywhere other than a stat's name closes its open breakdown.
+document.addEventListener('click', (event) => {
+  if (openStatBreakdownId && !event.target.closest('.stat-name')) {
+    openStatBreakdownId = null;
+    renderStats();
+  }
+});
+
 // Dropping a skill back onto the list unequips it — the list itself is a
 // fixed element (only its rows get rebuilt), so this is wired up once here
 // rather than inside renderSkills.
@@ -462,24 +470,38 @@ function renderStats() {
   statListEl.replaceChildren();
 
   for (const [statId, stat] of Object.entries(STATS)) {
-    const name = document.createElement('span');
+    const level = stats[statId];
+    const bonuses = currentStatBonuses(statId);
+    const total = statTotal(statId, level, bonuses);
+
+    const name = document.createElement('button');
     name.className = 'stat-name';
     name.textContent = stat.label;
+    name.setAttribute('aria-expanded', String(openStatBreakdownId === statId));
+    name.addEventListener('click', () => toggleStatBreakdown(statId));
 
-    const level = document.createElement('span');
-    level.className = 'stat-level';
-    level.textContent = `Lvl ${stats[statId]}`;
+    const breakdown = buildStatBreakdown(statId, level, bonuses, total);
+
+    const nameWrap = document.createElement('span');
+    nameWrap.className = 'stat-name-wrap';
+    nameWrap.classList.toggle('open', openStatBreakdownId === statId);
+    nameWrap.append(name, breakdown);
+
+    const points = document.createElement('span');
+    points.className = 'stat-level';
+    points.textContent = total;
 
     const description = document.createElement('span');
     description.className = 'stat-description';
     description.textContent = stat.description;
 
-    // Shows what the level costs you in outcome terms, not just in levels.
+    // Shows what the next level buys in outcome terms, not just in points.
+    // Bonuses stay the same across a level, so they're counted on both sides.
     const change = document.createElement('span');
     change.className = 'stat-change';
-    change.textContent = `${stat.format(statValue(statId, stats[statId]))} → ${stat.format(statValue(statId, stats[statId] + 1))}`;
+    change.textContent = `${stat.format(statEffect(statId, total))} → ${stat.format(statEffect(statId, total + stat.perLevel))}`;
 
-    const cost = statCost(statId, stats[statId]);
+    const cost = statCost(statId, level);
     const button = document.createElement('button');
     button.className = 'upgrade-button';
     button.textContent = `Upgrade (${cost} UP)`;
@@ -488,9 +510,53 @@ function renderStats() {
 
     const row = document.createElement('div');
     row.className = 'stat-row';
-    row.append(name, level, description, change, button);
+    row.append(nameWrap, points, description, change, button);
     statListEl.append(row);
   }
+}
+
+// How a stat's total adds up (#78): its base value, the levels bought on
+// top, each bonus by where it comes from, and what the total does. Shown on
+// hover with a mouse; on a phone, tapping the stat's name opens it instead
+// (see toggleStatBreakdown), since a touchscreen has no hover.
+function buildStatBreakdown(statId, level, bonuses, total) {
+  const stat = STATS[statId];
+  const lines = [
+    ['Base', `${stat.base}`],
+    ...(level > 0 ? [[`Upgrades (Lvl ${level})`, `+${level * stat.perLevel}`]] : []),
+    ...bonuses.map((bonus) => [bonus.source, `+${bonus.points}`]),
+  ];
+
+  const breakdown = document.createElement('span');
+  breakdown.className = 'stat-breakdown';
+  breakdown.setAttribute('role', 'tooltip');
+
+  for (const [label, value] of lines) {
+    const line = document.createElement('span');
+    line.className = 'stat-breakdown-line';
+    line.append(label, Object.assign(document.createElement('span'), { textContent: value }));
+    breakdown.append(line);
+  }
+
+  const totalLine = document.createElement('span');
+  totalLine.className = 'stat-breakdown-line stat-breakdown-total';
+  totalLine.append(stat.label, Object.assign(document.createElement('span'), { textContent: `${total}` }));
+
+  const effect = document.createElement('span');
+  effect.className = 'stat-breakdown-effect';
+  effect.textContent = `= ${stat.format(statEffect(statId, total))}`;
+
+  breakdown.append(totalLine, effect);
+  return breakdown;
+}
+
+// Which stat's breakdown was opened by a click/tap, if any — remembered so
+// the Character tab re-rendering (on every XP award, say) doesn't close it.
+let openStatBreakdownId = null;
+
+function toggleStatBreakdown(statId) {
+  openStatBreakdownId = openStatBreakdownId === statId ? null : statId;
+  renderStats();
 }
 
 // The compact list of what's actually equipped, in slot order, with the
@@ -719,12 +785,20 @@ function currentFightId() {
   return activeDungeonId ?? selectedGroupId;
 }
 
-// Max HP stat's own XP-funded value, plus any permanent bonus from purchased
-// Max HP perks (see PERKS) — a perk applies as an independent layer on top,
-// never by mutating the stat itself, so buying one never raises what the
-// stat's next XP-funded level costs.
+// Where each bonus on a stat comes from right now — the equipped passive
+// skills and purchased perks that add to it (see statBonuses).
+function currentStatBonuses(statId) {
+  return statBonuses(statId, equippedSkillIds(), purchasedPerkIds);
+}
+
+// What a stat currently does — Max HP, seconds per HP, and so on — from its
+// base points plus every bonus (see STATS' `effect`).
+function currentStatEffect(statId) {
+  return statEffect(statId, statTotal(statId, stats[statId], currentStatBonuses(statId)));
+}
+
 function effectiveMaxHp() {
-  return statValue('maxHp', stats.maxHp) + perkMaxHpBonus(purchasedPerkIds);
+  return currentStatEffect('constitution');
 }
 
 function healPlayer(amount) {
@@ -779,21 +853,16 @@ function updateHealthBar() {
   healthBarFillEl.style.width = `${(playerHp / maxHp) * 100}%`;
 }
 
-// The Health Regen stat's own seconds-per-HP, sped up by Regen (a passive
-// skill) for as long as it stays equipped, and by any purchased Healing
-// Speed perk (see PERKS) on top of that — both divide, since a higher
-// multiplier means less time per HP, same relationship the stat's own
-// perLevel already has.
+// Fortitude's seconds per healed HP, including the Regen skill's and the
+// Fortitude perk's bonus points.
 function effectiveSecondsPerHp() {
-  return statValue('healthRegen', stats.healthRegen)
-    / passiveMultiplier(equippedSkillIds(), 'healthRegen')
-    / perkHealingSpeedMultiplier(purchasedPerkIds);
+  return currentStatEffect('fortitude');
 }
 
 function updateRegenIndicator() {
   const pending = playerHp < effectiveMaxHp();
   const secondsPerHp = effectiveSecondsPerHp();
-  // Clamped because upgrading Health Regen can leave progress above the new
+  // Clamped because upgrading Fortitude can leave progress above the new
   // requirement until the next tick collects it.
   const percent = Math.min(100, (regenProgress / secondsPerHp) * 100);
   regenProgressEl.style.width = pending ? `${percent}%` : '0%';
@@ -803,7 +872,7 @@ function updateRegenIndicator() {
 // it is what makes HP recoverable now that fights no longer heal you.
 //
 // Progress accumulates against the *current* seconds-per-HP rather than being
-// scheduled, so upgrading Health Regen applies immediately instead of
+// scheduled, so upgrading Fortitude applies immediately instead of
 // discarding the wait already served.
 //
 // Driven by real elapsed time (see advanceRegen) rather than counting ticks,
@@ -1176,10 +1245,10 @@ function pointsUsed() {
   return equippedSkillIds().reduce((total, skillId) => total + effectivePointCost(skillId, activeToggleIds), 0);
 }
 
-// The lowest-index slot (within today's Skill Slots count) that's empty, or
+// The lowest-index slot (within today's Wisdom slot count) that's empty, or
 // -1 if every slot is already filled.
 function firstEmptySlotIndex() {
-  const slotCount = statValue('skillSlots', stats.skillSlots);
+  const slotCount = currentStatEffect('wisdom');
   for (let index = 0; index < slotCount; index += 1) {
     if (!equippedSkills[index]) return index;
   }
@@ -1189,8 +1258,8 @@ function firstEmptySlotIndex() {
 // Equipping is limited on two axes: slots cap how many skills you carry,
 // points cap how strong that combination is.
 function canEquip(skillId) {
-  return equippedSkillIds().length < statValue('skillSlots', stats.skillSlots)
-    && pointsUsed() + effectivePointCost(skillId, activeToggleIds) <= statValue('skillPoints', stats.skillPoints);
+  return equippedSkillIds().length < currentStatEffect('wisdom')
+    && pointsUsed() + effectivePointCost(skillId, activeToggleIds) <= currentStatEffect('intelligence');
 }
 
 // Equips `skillId` into `slotIndex`, moving it there if it's already
@@ -1208,12 +1277,12 @@ function equipInSlot(skillId, slotIndex) {
   const otherIds = equippedSkills.filter((id, index) => id && index !== previousIndex && index !== slotIndex);
   const projectedPoints = otherIds.reduce((total, id) => total + effectivePointCost(id, activeToggleIds), 0)
     + effectivePointCost(skillId, activeToggleIds);
-  const budget = statValue('skillPoints', stats.skillPoints);
+  const budget = currentStatEffect('intelligence');
   if (projectedPoints > budget) {
     const shortfall = projectedPoints - budget;
     showSkillEquipMessage(
       `Not enough Skill Points to equip ${SKILLS[skillId].label} — needs ${shortfall} more `
-      + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Skill Points.`
+      + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Intelligence.`
     );
     // Mirrors the message inline if the detail panel is open — see there —
     // since a tap-to-equip attempt (unlike a drag) is triggered from inside
@@ -1291,12 +1360,12 @@ function setToggleActive(skillId, toggleId, active) {
   if (active && equippedSkills.includes(skillId)) {
     const toggle = findToggle(skillId, toggleId);
     const projectedPoints = pointsUsed() + toggle.pointSurcharge;
-    const budget = statValue('skillPoints', stats.skillPoints);
+    const budget = currentStatEffect('intelligence');
     if (projectedPoints > budget) {
       const shortfall = projectedPoints - budget;
       showSkillEquipMessage(
         `Not enough Skill Points to turn on ${toggle.label} — needs ${shortfall} more `
-        + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Skill Points.`
+        + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Intelligence.`
       );
       // The toggle switch lives inside the detail panel, not near the shared
       // message slot below the skill list — mirror it inline (see there) so
@@ -1324,11 +1393,11 @@ function setToggleActive(skillId, toggleId, active) {
 function renderSkills() {
   skillListEl.replaceChildren();
 
-  const slots = statValue('skillSlots', stats.skillSlots);
+  const slots = currentStatEffect('wisdom');
   slotsUsedEl.textContent = equippedSkillIds().length;
   slotsTotalEl.textContent = slots;
   pointsUsedEl.textContent = pointsUsed();
-  pointsTotalEl.textContent = statValue('skillPoints', stats.skillPoints);
+  pointsTotalEl.textContent = currentStatEffect('intelligence');
 
   for (const skillId of Object.keys(SKILLS)) {
     const skill = SKILLS[skillId];
@@ -1370,7 +1439,7 @@ function renderSkills() {
 function renderSkillSlots() {
   skillSlotsEl.replaceChildren();
 
-  const slotCount = statValue('skillSlots', stats.skillSlots);
+  const slotCount = currentStatEffect('wisdom');
 
   for (let index = 0; index < slotCount; index += 1) {
     const skillId = equippedSkills[index];
@@ -1563,7 +1632,7 @@ function buildEquipControls(skillId) {
   const container = document.createElement('div');
   container.className = 'skill-equip-controls';
 
-  const slotCount = statValue('skillSlots', stats.skillSlots);
+  const slotCount = currentStatEffect('wisdom');
   const currentIndex = equippedSkills.indexOf(skillId);
 
   const slotsRow = document.createElement('div');
@@ -1782,6 +1851,16 @@ function isRemovedSkillId(skillId) {
   return skillId && !SKILLS[skillId];
 }
 
+// Pre-#78 stat ids → the stats that replaced them. One Max HP level was
+// 5 HP, the same as one Constitution point, so Max HP carries over exactly;
+// a Health Regen level becomes a Fortitude point, which heals a bit slower.
+const RENAMED_STAT_IDS = {
+  maxHp: 'constitution',
+  healthRegen: 'fortitude',
+  skillSlots: 'wisdom',
+  skillPoints: 'intelligence',
+};
+
 function loadProgress() {
   // maxXp, perkPoints, and purchasedPerkIds all live outside SAVE_KEY (see
   // MAX_XP_KEY) specifically so they survive a prestige wiping everything
@@ -1812,7 +1891,15 @@ function loadProgress() {
   const saved = JSON.parse(raw);
   // A save from before #76 still calls the balance `xp`.
   upgradePoints = saved.upgradePoints ?? saved.xp;
-  Object.assign(stats, saved.stats);
+  // Merged key-by-key against today's STATS, so a stat id from an older save
+  // that no longer exists doesn't tag along. A save from before #78 uses the
+  // old ids; each level carries over to the stat that replaced it.
+  if (saved.stats) {
+    for (const [statId, level] of Object.entries(saved.stats)) {
+      const currentId = RENAMED_STAT_IDS[statId] ?? statId;
+      if (STATS[currentId]) stats[currentId] = level;
+    }
+  }
   if (saved.hp !== undefined) playerHp = saved.hp;
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills.filter((id) => !isRemovedSkillId(id));
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills.map((id) => (isRemovedSkillId(id) ? null : id));
