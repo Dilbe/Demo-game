@@ -293,6 +293,13 @@ test('toggleKey is unique per skill even for toggles sharing an id', () => {
   assert.notStrictEqual(toggleKey('basicAttack', 'autoTrigger'), toggleKey('strongAttack', 'autoTrigger'));
 });
 
+test('every active skill has an Auto-Trigger toggle', () => {
+  for (const [skillId, skill] of Object.entries(SKILLS)) {
+    if (skill.type !== 'active') continue;
+    assert.ok(findToggle(skillId, 'autoTrigger'), `${skillId} has no Auto-Trigger toggle`);
+  }
+});
+
 test('findToggle looks up a skill\'s own toggle by id', () => {
   assert.strictEqual(findToggle('basicAttack', 'multiAttack').label, 'Multi Attack');
   assert.strictEqual(findToggle('heal', 'healOverTime').label, 'Heal over Time');

@@ -491,7 +491,7 @@ function equippedSkillIds() {
 
 // True if `skillId` should fire itself as soon as its cooldown allows,
 // rather than waiting for a click — the Auto-Trigger toggle (see
-// SKILLS.basicAttack/strongAttack.toggles), checked live rather than frozen
+// SKILLS.basicAttack/strongAttack/heal.toggles), checked live rather than frozen
 // at fight start, same as every other toggle/upgrade-level lookup here.
 function isAutoTriggering(skillId) {
   return isToggleActive(skillId, 'autoTrigger');
