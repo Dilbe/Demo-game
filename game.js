@@ -16,7 +16,9 @@ const resultMessageEl = document.getElementById('result-message');
 const restartButton = document.getElementById('restart-button');
 const retreatButton = document.getElementById('retreat-button');
 const startButton = document.getElementById('start-button');
-const xpDisplayEl = document.getElementById('xp-display');
+const xpBarEl = document.getElementById('xp-bar');
+const xpBarFillEl = document.getElementById('xp-bar-fill');
+const xpBarLabelEl = document.getElementById('xp-bar-label');
 const slotsUsedEl = document.getElementById('slots-used');
 const slotsTotalEl = document.getElementById('slots-total');
 const pointsUsedEl = document.getElementById('points-used');
@@ -964,15 +966,26 @@ function awardXp(amount) {
 }
 
 function updateXpDisplay() {
-  // XP is capped at maxXp here even though lifetimeXp keeps counting past it
-  // (the overflow fills the prestige bar instead) — see awardXp.
-  xpDisplayEl.textContent = `XP: ${Math.min(lifetimeXp, maxXp)}/${maxXp} (UP: ${upgradePoints})`;
+  renderXpBar();
   renderStats();
   renderSkills();
   renderSkillSlots();
   renderSkillDetail();
   renderPrestige();
   renderPerks();
+}
+
+// Fills toward maxXp, then — once XP past it only feeds the prestige bar
+// (see awardXp) — turns into a copy of the Character tab's prestige bar,
+// so progress stays visible from every tab.
+function renderXpBar() {
+  const prestigeReady = lifetimeXp >= maxXp;
+  const [label, value, target] = prestigeReady
+    ? ['Prestige', prestigeProgress, prestigeTarget(maxXp)]
+    : ['XP', lifetimeXp, maxXp];
+  xpBarEl.classList.toggle('prestige', prestigeReady);
+  xpBarFillEl.style.width = `${Math.min(100, (value / target) * 100)}%`;
+  xpBarLabelEl.textContent = `${label}: ${value}/${target} (UP: ${upgradePoints})`;
 }
 
 // Hidden until lifetime XP reaches maxXp; once visible, fills toward

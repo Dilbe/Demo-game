@@ -343,10 +343,38 @@ body {
 
 /* Always visible below the health bar, on every tab, so the current XP
    balance never needs a tab switch to check. */
-#xp-display {
+/* Same shape as #health-bar, blue while XP climbs toward Max XP, then the
+   prestige bar's gold once XP is capped and only the prestige bar fills. */
+#xp-bar {
+  position: relative;
+  width: 100%;
+  max-width: 16rem;
+  height: 1.75rem;
   margin: 0 auto 1rem;
+  border: 1px solid #999;
+  background: #eee;
+  overflow: hidden;
   font-size: 0.9rem;
   color: #333;
+}
+
+#xp-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: #8ab4e0;
+  transition: width 0.2s linear;
+}
+
+#xp-bar.prestige #xp-bar-fill {
+  background: #d4af37;
+}
+
+#xp-bar-label {
+  position: relative;
+  line-height: 1.75rem;
 }
 
 #quest-tracker {
