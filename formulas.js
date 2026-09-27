@@ -150,11 +150,16 @@ const MONSTERS = {
 // adding one is still a data entry, matching the monster/stat/skill pattern.
 // The three single-monster groups mirror MONSTERS one-to-one; twoSmall is
 // the first multi-monster option.
+// `dungeonOnly` groups exist only as fights inside a dungeon (#79): they're
+// left out of the picker and FIGHT_UNLOCK_ORDER, so they can't be picked
+// on their own.
 const MONSTER_GROUPS = {
   small: { label: 'Small Slime', monsterIds: ['small'] },
   medium: { label: 'Goblin', monsterIds: ['medium'] },
   twoSmall: { label: 'Two Small Slimes', monsterIds: ['small', 'small'] },
   big: { label: 'Orc', monsterIds: ['big'] },
+  smallAndMedium: { label: 'Small Slime + Goblin', monsterIds: ['small', 'medium'], dungeonOnly: true },
+  smallAndBig: { label: 'Small Slime + Orc', monsterIds: ['small', 'big'], dungeonOnly: true },
 };
 
 // A dungeon chains several fights back-to-back, fought without returning to
@@ -178,13 +183,21 @@ const DUNGEONS = {
     fightIds: ['small', 'medium', 'big'],
     completionBonusXp: 10,
   },
+
+  // #79: every fight pairs a Small Slime with a companion.
+  slimeCompanions: {
+    label: 'Slime Companions',
+    fightIds: ['twoSmall', 'smallAndMedium', 'smallAndBig'],
+    completionBonusXp: 12,
+  },
 };
 
 // The order fights unlock in (#59) — MONSTER_GROUPS and DUNGEONS ids mixed
 // in one list, since no id is used by both. A new game can pick only the
 // first; winning a fight unlocks the one after it. Every group and dungeon
-// must appear here, or it can never be picked.
-const FIGHT_UNLOCK_ORDER = ['small', 'medium', 'twoSmall', 'big', 'goblinGauntlet', 'monsterRush'];
+// must appear here, or it can never be picked — except `dungeonOnly` groups,
+// which are never picked on their own.
+const FIGHT_UNLOCK_ORDER = ['small', 'medium', 'twoSmall', 'big', 'goblinGauntlet', 'monsterRush', 'slimeCompanions'];
 
 // Whether `fightId` can be picked, given how many FIGHT_UNLOCK_ORDER entries
 // are unlocked so far (always at least the first).

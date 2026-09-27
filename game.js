@@ -251,6 +251,7 @@ function renderMonsterSelect() {
   monsterSelectEl.replaceChildren();
 
   for (const [groupId, group] of Object.entries(MONSTER_GROUPS)) {
+    if (group.dungeonOnly) continue;
     const selected = groupId === selectedGroupId;
     // The group's first monster represents the whole group — every group
     // defined so far is homogeneous (see describeMonsterGroup's own note),

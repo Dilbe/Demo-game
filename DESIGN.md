@@ -410,13 +410,19 @@ Everything unlocked by *doing* something is now one list: `OBJECTIVES` in `formu
 
 ## Fight unlocks ([#59](https://github.com/Dilbe/Demo-game/issues/59))
 
-Fights no longer all start selectable. `FIGHT_UNLOCK_ORDER` in `formulas.js` lists every monster group and dungeon in one order: Small Slime → Goblin → Two Small Slimes → Orc → Goblin Gauntlet → Monster Rush. This replaces v4/v5's "every fight and dungeon can be picked from the start".
+Fights no longer all start selectable. `FIGHT_UNLOCK_ORDER` in `formulas.js` lists every monster group and dungeon in one order: Small Slime → Goblin → Two Small Slimes → Orc → Goblin Gauntlet → Monster Rush → Slime Companions ([#79](https://github.com/Dilbe/Demo-game/issues/79)). This replaces v4/v5's "every fight and dungeon can be picked from the start".
 
 - **A new game** can pick only the first. The rest are listed in the picker, greyed out, with a "Locked — win <previous fight> to unlock" hint, and clicking them does nothing.
 - **Winning a fight** unlocks the next one (for a dungeon, clearing all of it). Winning an earlier fight again unlocks nothing new.
 - **Saved** as `unlockedFightCount` in the main save, so a prestige resets it to just the first fight, same as the rest of the save.
 - **Old saves** start back at one unlocked fight; a selected fight that's now locked is dropped on load.
 - `MONSTER_GROUPS` was reordered to match, so the picker reads top-down in unlock order.
+
+## Slime Companions ([#79](https://github.com/Dilbe/Demo-game/issues/79))
+
+A third dungeon, unlocked by clearing Monster Rush: Two Small Slimes → Small Slime + Goblin → Small Slime + Orc, with a 12 XP completion bonus.
+
+- **First mixed groups.** Its last two fights pair different monsters. They're `MONSTER_GROUPS` entries marked `dungeonOnly`, which keeps them out of the picker and `FIGHT_UNLOCK_ORDER`, so they can only be fought inside the dungeon.
 
 ## Upgrade Points ([#76](https://github.com/Dilbe/Demo-game/issues/76))
 
