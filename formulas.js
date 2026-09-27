@@ -410,6 +410,13 @@ const SKILLS = {
         unlockCost: 30,
         pointSurcharge: 1,
       },
+      {
+        id: 'autoTrigger',
+        label: 'Auto-Trigger',
+        description: 'Fires automatically as soon as the cooldown is ready, with no click needed',
+        unlockCost: 25,
+        pointSurcharge: 1,
+      },
     ],
   },
 
