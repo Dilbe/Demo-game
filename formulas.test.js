@@ -8,7 +8,7 @@ const {
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
-  groupKillXp, groupTotalXp,
+  groupKillXp, groupTotalXp, diminishedXp, fightPaysXp, roundXp,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
   PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus, perkStartingUpgradePoints,
 } = require('./formulas.js');
@@ -372,7 +372,7 @@ test('Small monster matches the game\'s original fixed monster', () => {
   assert.strictEqual(MONSTERS.small.maxHp, 5);
   assert.strictEqual(MONSTERS.small.damage, 1);
   assert.strictEqual(MONSTERS.small.cooldown, 3);
-  assert.strictEqual(MONSTERS.small.xp, 1);
+  assert.strictEqual(MONSTERS.small.xp, 2); // originally 1, doubled in #77
 });
 
 test('Medium and Big monsters are tougher and worth more XP than Small', () => {
@@ -385,7 +385,11 @@ test('Medium and Big monsters are tougher and worth more XP than Small', () => {
 });
 
 test('describeMonster summarizes HP, damage, cooldown, and XP', () => {
-  assert.strictEqual(describeMonster('small'), '5 HP \u00b7 1 damage every 3s \u00b7 1 XP');
+  assert.strictEqual(describeMonster('small'), '5 HP \u00b7 1 damage every 3s \u00b7 2 XP');
+});
+
+test('describeMonster shows the XP left after diminishing returns', () => {
+  assert.strictEqual(describeMonster('small', 1), '5 HP \u00b7 1 damage every 3s \u00b7 1.8 XP');
 });
 
 test('the three single-monster groups mirror MONSTERS one-to-one', () => {
@@ -403,7 +407,11 @@ test('describeMonsterGroup matches describeMonster for a single-monster group', 
 });
 
 test('describeMonsterGroup totals XP across a multi-monster group', () => {
-  assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 3 XP total');
+  assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 5 XP total'); // 2, then ceil(2 * 1.25)
+});
+
+test('describeMonsterGroup scales the group total by its own win count', () => {
+  assert.strictEqual(describeMonsterGroup('twoSmall', 3), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 3.5 XP total');
 });
 
 test('groupKillXp does not change the first kill in a group', () => {
@@ -427,7 +435,7 @@ test('groupKillXp computes each kill fresh from baseXp, not chained off the last
 });
 
 test('groupTotalXp sums every kill in order, bonus included', () => {
-  assert.strictEqual(groupTotalXp(['medium', 'medium']), 4 + 5); // 4, then 4 * 1.25
+  assert.strictEqual(groupTotalXp(['medium', 'medium']), 8 + 10); // 8, then 8 * 1.25
 });
 
 test('groupTotalXp matches a monster\'s own XP for a single-monster group', () => {
@@ -462,8 +470,47 @@ test('describeDungeon lists every fight in order and totals their XP, completion
   assert.strictEqual(DUNGEONS.goblinGauntlet.completionBonusXp, 5);
   assert.strictEqual(
     describeDungeon('goblinGauntlet'),
-    'Small Slime → Small Slime → Goblin · 11 XP total', // 1 + 1 + 4 monster XP + 5 bonus
+    'Small Slime → Small Slime → Goblin · 17 XP total', // 2 + 2 + 8 monster XP + 5 bonus
   );
+});
+
+test('describeDungeon scales monster XP and bonus alike by the dungeon\'s win count', () => {
+  assert.strictEqual(
+    describeDungeon('goblinGauntlet', 5),
+    'Small Slime → Small Slime → Goblin · 8.5 XP total', // 17 at 50%
+  );
+});
+
+// --- Diminishing XP (#77) --------------------------------------------------
+
+test('diminishedXp pays in full on the first win, then 10% less per win', () => {
+  assert.strictEqual(diminishedXp(2, 0), 2);
+  assert.strictEqual(diminishedXp(2, 1), 1.8);
+  assert.strictEqual(diminishedXp(2, 9), 0.2);
+});
+
+test('diminishedXp pays nothing from the 11th win on', () => {
+  assert.strictEqual(diminishedXp(24, 10), 0);
+  assert.strictEqual(diminishedXp(24, 15), 0);
+});
+
+test('diminishedXp keeps at most one decimal', () => {
+  for (let wins = 0; wins <= 10; wins++) {
+    const xp = diminishedXp(7, wins);
+    assert.strictEqual(xp, Math.round(xp * 10) / 10);
+  }
+});
+
+test('fightPaysXp turns false exactly when diminishedXp reaches zero', () => {
+  assert.strictEqual(fightPaysXp(9), true);
+  assert.ok(diminishedXp(1, 9) > 0);
+  assert.strictEqual(fightPaysXp(10), false);
+  assert.strictEqual(diminishedXp(1, 10), 0);
+});
+
+test('roundXp strips floating-point noise down to one decimal', () => {
+  assert.strictEqual(roundXp(0.1 + 0.2), 0.3);
+  assert.strictEqual(roundXp(5.1 - 3), 2.1);
 });
 
 // --- Fight unlocks ---------------------------------------------------------

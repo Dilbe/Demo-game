@@ -81,7 +81,9 @@ const STATS = {
 
 // A monster is data for the same reason stats and skills are: adding one should
 // be a data entry rather than new fight logic. Small is the monster the game has
-// always had — 5 HP, 1 damage every 3 seconds, 1 XP — now described as data.
+// always had — 5 HP, 1 damage every 3 seconds — now described as data.
+// Every monster's XP was doubled in #77, alongside fights paying less XP
+// each time they're won (see diminishedXp).
 // `xp` is part of the template because otherwise a tougher monster would be
 // strictly worse to pick: more HP to chew through for the same reward.
 //
@@ -96,7 +98,7 @@ const MONSTERS = {
     maxHp: 5,
     damage: 1,
     cooldown: 3,
-    xp: 1,
+    xp: 2,
     // A squat blob with a lighter highlight and two dot eyes — no limbs, the
     // simplest silhouette of the three.
     sprite: '<svg viewBox="0 0 40 40"><ellipse cx="20" cy="27" rx="16" ry="11" fill="#4caf50"/><ellipse cx="20" cy="21" rx="12" ry="9" fill="#81c784"/><circle cx="15" cy="21" r="2" fill="#1b3a1b"/><circle cx="25" cy="21" r="2" fill="#1b3a1b"/></svg>',
@@ -107,7 +109,7 @@ const MONSTERS = {
     maxHp: 15,
     damage: 2,
     cooldown: 3,
-    xp: 4,
+    xp: 8,
     // A round head with pointed ears over a small body — reads as a
     // humanoid, distinct from the slime's limbless blob.
     sprite: '<svg viewBox="0 0 40 40"><polygon points="10,13 3,5 13,11" fill="#7a9d54"/><polygon points="30,13 37,5 27,11" fill="#7a9d54"/><rect x="12" y="25" width="16" height="12" rx="4" fill="#5c7a3d"/><circle cx="20" cy="16" r="9" fill="#7a9d54"/><circle cx="16" cy="15" r="1.6" fill="#1b1b1b"/><circle cx="24" cy="15" r="1.6" fill="#1b1b1b"/></svg>',
@@ -118,7 +120,7 @@ const MONSTERS = {
     maxHp: 40,
     damage: 4,
     cooldown: 4,
-    xp: 12,
+    xp: 24,
     // Bigger head and broader body than the Goblin, plus two tusks, so it
     // reads as the toughest of the three at a glance.
     sprite: '<svg viewBox="0 0 40 40"><rect x="7" y="21" width="26" height="16" rx="5" fill="#6b7d4a"/><circle cx="20" cy="14" r="11" fill="#7d8f57"/><circle cx="15" cy="13" r="1.8" fill="#1b1b1b"/><circle cx="25" cy="13" r="1.8" fill="#1b1b1b"/><polygon points="15,19 17,24 19,19" fill="#f1f1f1"/><polygon points="25,19 23,24 21,19" fill="#f1f1f1"/></svg>',
@@ -222,6 +224,29 @@ function prestigeCount(maxXp) {
 
 // Rounds an upgrade/stat's cost the same way for all of them: compounding
 // baseCost by costGrowth per level, like statCost below.
+// Each win of the same fight pays 10% (of its full XP) less than the last
+// (#77): the 1st win pays 100%, the 2nd 90%, ... the 10th 10%, and from the
+// 11th on nothing. `winCount` is how many times this fight was already won.
+// Tracked per fight option (a monster group or a whole dungeon), not per
+// monster, so farming Small Slime doesn't touch Two Small Slimes' XP.
+// XP keeps at most one decimal: `amount` is always a whole number, so
+// amount × (10 - winCount) / 10 never needs rounding beyond that.
+function diminishedXp(amount, winCount) {
+  return (amount * Math.max(0, 10 - winCount)) / 10;
+}
+
+// Whether a fight still pays any XP at all — the picker fades the ones that
+// don't (still selectable, just not worth it for XP).
+function fightPaysXp(winCount) {
+  return winCount < 10;
+}
+
+// Rounds away floating-point noise from adding one-decimal XP amounts
+// together (0.1 + 0.2 and so on), so balances stay at one decimal.
+function roundXp(amount) {
+  return Math.round(amount * 10) / 10;
+}
+
 function costForLevel(baseCost, costGrowth, level) {
   return Math.round(baseCost * Math.pow(costGrowth, level));
 }
@@ -759,9 +784,11 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus
   return `${effect}, ${cooldown}s cooldown`;
 }
 
-function describeMonster(monsterId) {
+// `winCount` (how often this fight was already won) shows the XP after
+// diminishing returns (see diminishedXp) — 0 for the full amount.
+function describeMonster(monsterId, winCount = 0) {
   const monster = MONSTERS[monsterId];
-  return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${monster.xp} XP`;
+  return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${diminishedXp(monster.xp, winCount)} XP`;
 }
 
 // Total XP for clearing a group's monsters, including the ×1.25 compounding
@@ -774,14 +801,14 @@ function groupTotalXp(monsterIds) {
 
 // Assumes a homogeneous group (every monster the same type) — true of every
 // group defined so far. A mixed group would need a richer description.
-function describeMonsterGroup(groupId) {
+function describeMonsterGroup(groupId, winCount = 0) {
   const { monsterIds } = MONSTER_GROUPS[groupId];
   const [firstId] = monsterIds;
 
-  if (monsterIds.length === 1) return describeMonster(firstId);
+  if (monsterIds.length === 1) return describeMonster(firstId, winCount);
 
   const monster = MONSTERS[firstId];
-  const totalXp = groupTotalXp(monsterIds);
+  const totalXp = diminishedXp(groupTotalXp(monsterIds), winCount);
   return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${totalXp} XP total`;
 }
 
@@ -792,11 +819,14 @@ function describeMonsterGroup(groupId) {
 // (paid only on a full clear, which is exactly what this total assumes).
 // Each fight is its own group for the kill bonus's purposes, so that part
 // doesn't compound across fights, only within each one.
-function describeDungeon(dungeonId) {
+// A dungeon counts as one fight for diminishing returns (see diminishedXp):
+// `winCount` is how often the whole dungeon was cleared, and it scales both
+// the monsters' XP and the completion bonus.
+function describeDungeon(dungeonId, winCount = 0) {
   const dungeon = DUNGEONS[dungeonId];
   const labels = dungeon.fightIds.map((groupId) => MONSTER_GROUPS[groupId].label);
   const monsterXp = dungeon.fightIds.reduce((sum, groupId) => sum + groupTotalXp(MONSTER_GROUPS[groupId].monsterIds), 0);
-  const totalXp = monsterXp + dungeon.completionBonusXp;
+  const totalXp = diminishedXp(monsterXp + dungeon.completionBonusXp, winCount);
   return `${labels.join(' → ')} · ${totalXp} XP total`;
 }
 
@@ -841,7 +871,7 @@ if (typeof module !== 'undefined') {
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
-    groupKillXp, groupTotalXp,
+    groupKillXp, groupTotalXp, diminishedXp, fightPaysXp, roundXp,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
     perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus, perkStartingUpgradePoints,
   };

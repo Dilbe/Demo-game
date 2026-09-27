@@ -428,6 +428,16 @@ XP and the currency it pays for are now two separate things. Everywhere earlier 
 - **Three new perks** each add 10 UP at the start of every prestige, and pay out once right away when bought (so the current cycle gets it too). They cost 2, 5 and 12 Perk Points, are bought independently, and stack to +30 UP. A reset (not just a prestige) also starts with the bonus, since both start a fresh game.
 - **Saves:** the main save stores the balance as `upgradePoints`; an older save's `xp` field loads into it.
 
+## Diminishing XP ([#77](https://github.com/Dilbe/Demo-game/issues/77))
+
+Winning the same fight over and over pays less and less XP. This replaces "a kill grants that monster's XP" from v4.
+
+- **Monster XP doubled:** Small Slime 2, Goblin 8, Orc 24. Dungeon completion bonuses are unchanged (5 and 10).
+- **Each win pays 10% less** of the fight's full XP than the one before: the 1st win pays 100%, the 2nd 90%, ... the 10th 10%, and from the 11th on nothing (`diminishedXp` in `formulas.js`). XP can now have one decimal, e.g. a Small Slime pays 1.8 XP on its 2nd win.
+- **Per fight, not per monster:** each monster group and each dungeon keeps its own win count. Farming Small Slime doesn't lower Two Small Slimes' XP. A dungeon counts as one fight: clearing it bumps only the dungeon's count, and that count scales both its monsters' XP and its completion bonus.
+- **Picker and fight summary** show the XP left after diminishing returns. A fight that pays nothing any more is faded, like a locked one, but stays selectable.
+- **Saved** as `fightWinCounts` in the main save, so a prestige resets it, same as fight unlocks.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

@@ -72,6 +72,10 @@ let dungeonFightIndex = 0;
 // How many FIGHT_UNLOCK_ORDER entries the player can pick (#59) — starts at
 // just the first, and part of the main save, so a prestige resets it too.
 let unlockedFightCount = 1;
+// How often each fight option (a MONSTER_GROUPS or DUNGEONS id) has been
+// won — drives its diminishing XP (#77, see diminishedXp). A dungeon counts
+// as one fight: clearing it bumps the dungeon's own count, not its groups'.
+let fightWinCounts = {};
 let activeMonsters = [];
 // How many monsters have died in the current group/fight so far — drives the
 // compounding ×1.25 group-kill XP bonus (see groupKillXp). Reset whenever a
@@ -245,7 +249,7 @@ function renderMonsterSelect() {
     // so Two Small Slimes' card just shows one Small Slime sprite.
     const sprite = MONSTERS[group.monsterIds[0]].sprite;
     monsterSelectEl.append(
-      buildMonsterSelectRow(groupId, group.label, describeMonsterGroup(groupId), selected, () => selectMonsterGroup(groupId), sprite)
+      buildMonsterSelectRow(groupId, group.label, describeMonsterGroup(groupId, fightWins(groupId)), selected, () => selectMonsterGroup(groupId), sprite)
     );
   }
 
@@ -257,7 +261,7 @@ function renderMonsterSelect() {
   for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
     const selected = dungeonId === selectedDungeonId;
     monsterSelectEl.append(
-      buildMonsterSelectRow(dungeonId, dungeon.label, describeDungeon(dungeonId), selected, () => selectDungeon(dungeonId))
+      buildMonsterSelectRow(dungeonId, dungeon.label, describeDungeon(dungeonId, fightWins(dungeonId)), selected, () => selectDungeon(dungeonId))
     );
   }
 }
@@ -270,6 +274,8 @@ function renderMonsterSelect() {
 // a chain of different fights has no single monster to represent it.
 // A fight not yet unlocked (#59) is still listed, greyed out with a hint
 // saying which fight unlocks it, but clicking it does nothing.
+// A fight won often enough to pay no more XP (#77) is faded too, but stays
+// selectable — the player may still want to fight it.
 function buildMonsterSelectRow(fightId, label, detailText, selected, onSelect, spriteMarkup) {
   const locked = !fightUnlocked(unlockedFightCount, fightId);
 
@@ -284,6 +290,7 @@ function buildMonsterSelectRow(fightId, label, detailText, selected, onSelect, s
   const row = document.createElement('div');
   row.className = 'monster-row';
   row.classList.toggle('selected', selected);
+  row.classList.toggle('no-xp', !fightPaysXp(fightWins(fightId)));
   if (spriteMarkup) row.append(buildSprite(spriteMarkup, 'monster-sprite'));
   row.append(name, detail);
 
@@ -441,10 +448,10 @@ function updateMonsterPreview() {
 function renderSelectedFight() {
   if (selectedDungeonId) {
     selectedFightNameEl.textContent = DUNGEONS[selectedDungeonId].label;
-    selectedFightDetailEl.textContent = describeDungeon(selectedDungeonId);
+    selectedFightDetailEl.textContent = describeDungeon(selectedDungeonId, fightWins(selectedDungeonId));
   } else if (selectedGroupId) {
     selectedFightNameEl.textContent = MONSTER_GROUPS[selectedGroupId].label;
-    selectedFightDetailEl.textContent = describeMonsterGroup(selectedGroupId);
+    selectedFightDetailEl.textContent = describeMonsterGroup(selectedGroupId, fightWins(selectedGroupId));
   } else {
     selectedFightNameEl.textContent = 'No fight selected';
     selectedFightDetailEl.textContent = '';
@@ -647,7 +654,7 @@ function damageMonster(index, power) {
   monsterCards[index].hpEl.textContent = target.hp;
   if (target.hp > 0) return false;
 
-  awardXp(groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount));
+  awardXp(diminishedXp(groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount), fightWins(currentFightId())));
   groupKillCount += 1;
   updateXpDisplay();
   totalKills += 1;
@@ -678,7 +685,7 @@ function resolveFightProgress() {
     // Paid once, only here — reaching this point already means every fight
     // in the chain is cleared. Retreat and a loss both end the dungeon
     // elsewhere, without ever reaching this branch.
-    const bonus = DUNGEONS[activeDungeonId].completionBonusXp;
+    const bonus = diminishedXp(DUNGEONS[activeDungeonId].completionBonusXp, fightWins(activeDungeonId));
     awardXp(bonus);
     registerObjectiveEvent({ type: 'winDungeon' });
     recordFightWin(activeDungeonId);
@@ -695,8 +702,21 @@ function resolveFightProgress() {
 
 // Winning a fight unlocks the next one in FIGHT_UNLOCK_ORDER (#59). The
 // picker is closed during a fight, so it's rebuilt the next time it opens.
+// Also counts the win toward the fight's diminishing XP (#77) — only after
+// this win's own XP was paid, so the first win still pays in full.
 function recordFightWin(fightId) {
   unlockedFightCount = fightsUnlockedAfterWin(unlockedFightCount, fightId);
+  fightWinCounts[fightId] = fightWins(fightId) + 1;
+}
+
+function fightWins(fightId) {
+  return fightWinCounts[fightId] ?? 0;
+}
+
+// The fight option the current fight's XP is scaled by: the whole dungeon
+// while in one, otherwise the picked group.
+function currentFightId() {
+  return activeDungeonId ?? selectedGroupId;
 }
 
 // Max HP stat's own XP-funded value, plus any permanent bonus from purchased
@@ -979,16 +999,18 @@ function advanceDungeonFight() {
 // subtracts from `upgradePoints` directly — lifetimeXp and prestigeProgress
 // only ever move forward. maxXp caps what a cycle can add to Upgrade Points:
 // past it, XP only fills the prestige bar.
+// XP can have one decimal since #77, so each total is rounded back to one
+// decimal (roundXp) rather than accumulating floating-point noise.
 function awardXp(amount) {
-  upgradePoints += spendableXpGain(lifetimeXp, maxXp, amount);
-  lifetimeXp += amount;
+  upgradePoints = roundXp(upgradePoints + spendableXpGain(lifetimeXp, maxXp, amount));
+  lifetimeXp = roundXp(lifetimeXp + amount);
 
   if (lifetimeXp >= maxXp) {
     // Simplification: an award that itself crosses the threshold counts in
     // full toward the bar, rather than splitting the part that happened
     // before/after crossing — awards are small relative to the target (10%
     // of maxXp), so the possible overshoot is negligible.
-    prestigeProgress = Math.min(prestigeTarget(maxXp), prestigeProgress + amount);
+    prestigeProgress = Math.min(prestigeTarget(maxXp), roundXp(prestigeProgress + amount));
   }
 }
 
@@ -1012,7 +1034,9 @@ function renderXpBar() {
     : ['XP', lifetimeXp, maxXp];
   xpBarEl.classList.toggle('prestige', prestigeReady);
   xpBarFillEl.style.width = `${Math.min(100, (value / target) * 100)}%`;
-  xpBarLabelEl.textContent = `${label}: ${value}/${target} (UP: ${upgradePoints})`;
+  // Rounded for display only: spending a whole-number cost from a
+  // one-decimal balance (5.1 - 3) can leave floating-point noise behind.
+  xpBarLabelEl.textContent = `${label}: ${value}/${target} (UP: ${roundXp(upgradePoints)})`;
 }
 
 // Hidden until lifetime XP reaches maxXp; once visible, fills toward
@@ -1745,7 +1769,7 @@ function saveProgress() {
   if (wipingSave) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     upgradePoints, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
-    selectedGroupId, selectedDungeonId, unlockedFightCount, totalKills,
+    selectedGroupId, selectedDungeonId, unlockedFightCount, fightWinCounts, totalKills,
     lifetimeXp, prestigeProgress,
     completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
   }));
@@ -1804,6 +1828,7 @@ function loadProgress() {
   // selected that's now locked — dropped, so the player picks again.
   if (fightUnlocked(unlockedFightCount, saved.selectedGroupId)) selectedGroupId = saved.selectedGroupId;
   if (fightUnlocked(unlockedFightCount, saved.selectedDungeonId)) selectedDungeonId = saved.selectedDungeonId;
+  if (saved.fightWinCounts) fightWinCounts = saved.fightWinCounts;
   if (saved.totalKills) totalKills = saved.totalKills;
   if (saved.lifetimeXp) lifetimeXp = saved.lifetimeXp;
   if (saved.prestigeProgress) prestigeProgress = saved.prestigeProgress;

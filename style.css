@@ -186,6 +186,12 @@ body {
   cursor: not-allowed;
 }
 
+/* Won often enough to pay no more XP (#77) — faded like a locked fight, but
+   still clickable, so no not-allowed cursor. */
+.monster-row.no-xp {
+  opacity: 0.5;
+}
+
 .monster-lock-hint {
   flex-basis: 100%;
   font-style: italic;
