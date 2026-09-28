@@ -457,6 +457,15 @@ The four Character-tab stats are now point-based, RPG-style stats. This replaces
 - **Breakdown:** hovering a stat's name shows how its total adds up: base, upgrades, each bonus by source, the total, and what it does. On a phone, where there's no hover, tapping the name opens it and tapping anywhere else closes it.
 - **Old saves:** each old stat's level carries over to the stat that replaced it. Max HP maps exactly; a Health Regen level becomes one Fortitude point, which heals a little slower than the old level did.
 
+## Per-source diminishing XP ([#86](https://github.com/Dilbe/Demo-game/issues/86))
+
+Counting diminishing returns per fight win let the player dodge them: kill one monster of a multi-monster fight, retreat, repeat — the win count never went up. Now every XP payout keeps its own count instead.
+
+- **Per source, not per fight:** each monster slot in a fight (Two Small Slimes' 1st and 2nd slime), each multi-monster group's clear bonus, and each dungeon's completion bonus diminishes on its own (`fightXpSources` in `formulas.js`). A source's count goes up when it pays, so killing the first slime and retreating lowers only that slot's XP. A dungeon's fights have their own slots, separate from fighting the same group on its own.
+- **Group clear bonus replaces the per-kill ×1.25:** a kill pays only the monster's own XP. The group's bonus pays once every monster in it is dead — never on a retreat or loss — and is sized by the monsters in the group rather than kill order: what the old ×1.25-per-kill bonus paid if the highest-XP monster died last (`groupClearBonusXp`). Two Small Slimes' total is unchanged at 5 XP (2 + 2 + 1 bonus).
+- **Picker** still shows what a full clear pays now, summing each source after its own diminishing returns, and fades a fight only once none of its sources pays anything.
+- **Saved** as `xpClaimCounts` in the main save (reset by a prestige). An older save's `fightWinCounts` converts on load: every source of a fight won N times starts at N.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

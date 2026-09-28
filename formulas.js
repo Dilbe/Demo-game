@@ -255,21 +255,17 @@ function prestigeCount(maxXp) {
 
 // Rounds an upgrade/stat's cost the same way for all of them: compounding
 // baseCost by costGrowth per level, like statCost below.
-// Each win of the same fight pays 10% (of its full XP) less than the last
-// (#77): the 1st win pays 100%, the 2nd 90%, ... the 10th 10%, and from the
-// 11th on nothing. `winCount` is how many times this fight was already won.
-// Tracked per fight option (a monster group or a whole dungeon), not per
-// monster, so farming Small Slime doesn't touch Two Small Slimes' XP.
+// Each time the same XP source pays out, it pays 10% (of its full XP) less
+// than the last (#77): the 1st payout is 100%, the 2nd 90%, ... the 10th
+// 10%, and from the 11th on nothing. `claimCount` is how many times this
+// source already paid. Since #86 every payout tracks its own count — each
+// monster slot in a fight, each group's clear bonus, each dungeon's
+// completion bonus (see fightXpSources) — so retreating after one kill
+// doesn't lower the XP of the monsters that weren't killed.
 // XP keeps at most one decimal: `amount` is always a whole number, so
-// amount × (10 - winCount) / 10 never needs rounding beyond that.
-function diminishedXp(amount, winCount) {
-  return (amount * Math.max(0, 10 - winCount)) / 10;
-}
-
-// Whether a fight still pays any XP at all — the picker fades the ones that
-// don't (still selectable, just not worth it for XP).
-function fightPaysXp(winCount) {
-  return winCount < 10;
+// amount × (10 - claimCount) / 10 never needs rounding beyond that.
+function diminishedXp(amount, claimCount) {
+  return (amount * Math.max(0, 10 - claimCount)) / 10;
 }
 
 // Rounds away floating-point noise from adding one-decimal XP amounts
@@ -282,12 +278,10 @@ function costForLevel(baseCost, costGrowth, level) {
   return Math.round(baseCost * Math.pow(costGrowth, level));
 }
 
-// XP for one kill inside a multi-monster group, rewarding clearing bigger
-// groups: `killIndex` is how many monsters in this same group/fight have
-// already died (0 for the first kill), and each kill compounds ×1.25 on top
-// of the last — 1st kill at the monster's own XP, 2nd at ×1.25, 3rd at
-// ×1.25² and so on. A single-monster fight only ever has a killIndex of 0,
-// so this is a no-op (×1 = its own XP) without needing a special case.
+// The compounding ×1.25 group-kill multiplier from v7: with `killIndex`
+// monsters already dead in the group, ×1.25^killIndex on baseXp. Since #86
+// no kill is paid this way directly any more — groupClearBonusXp uses it to
+// size a group's clear bonus as if the kills had happened in the best order.
 //
 // Each call computes straight from baseXp and killIndex rather than chaining
 // off a previously-rounded result, so rounding one kill never drags down the
@@ -296,6 +290,88 @@ function costForLevel(baseCost, costGrowth, level) {
 // of a small base XP (e.g. 1) rounding a fractional bonus away entirely.
 function groupKillXp(baseXp, killIndex) {
   return Math.ceil(baseXp * Math.pow(1.25, killIndex));
+}
+
+// The extra XP a multi-monster group pays once every monster in it is dead
+// (#86) — nothing while any are still standing, so retreating mid-fight
+// never pays it. Sized as the v7 per-kill ×1.25 bonus would have paid had
+// the monsters died from lowest to highest XP (the highest-XP one last),
+// so it doesn't depend on kill order. 0 for a single-monster group.
+function groupClearBonusXp(monsterIds) {
+  const xps = monsterIds.map((monsterId) => MONSTERS[monsterId].xp).sort((a, b) => a - b);
+  return xps.reduce((sum, xp, index) => sum + groupKillXp(xp, index) - xp, 0);
+}
+
+// Total XP for clearing a group at full value: every monster's own XP plus
+// the group's clear bonus.
+function groupTotalXp(monsterIds) {
+  const monsterXp = monsterIds.reduce((sum, monsterId) => sum + MONSTERS[monsterId].xp, 0);
+  return monsterXp + groupClearBonusXp(monsterIds);
+}
+
+// Keys into the saved per-source claim counts (#86, see diminishedXp).
+// `fightKey` names one group being fought: a MONSTER_GROUPS id on its own,
+// or a fight within a dungeon (dungeonFightKey) — so a group fought inside
+// a dungeon has its own counts, separate from fighting it alone.
+function dungeonFightKey(dungeonId, fightIndex) {
+  return `${dungeonId}/${fightIndex}`;
+}
+
+function monsterXpKey(fightKey, monsterIndex) {
+  return `${fightKey}/${monsterIndex}`;
+}
+
+function groupBonusXpKey(fightKey) {
+  return `${fightKey}/bonus`;
+}
+
+function dungeonClearXpKey(dungeonId) {
+  return `${dungeonId}/clear`;
+}
+
+function groupXpSources(groupId, fightKey) {
+  const { monsterIds } = MONSTER_GROUPS[groupId];
+  const sources = monsterIds.map((monsterId, index) => ({ key: monsterXpKey(fightKey, index), xp: MONSTERS[monsterId].xp }));
+  const bonus = groupClearBonusXp(monsterIds);
+  if (bonus > 0) sources.push({ key: groupBonusXpKey(fightKey), xp: bonus });
+  return sources;
+}
+
+// Every separately-diminished XP payout a fight option (a MONSTER_GROUPS or
+// DUNGEONS id) can make, as { key, xp } at full value: one per monster
+// slot, one per multi-monster group's clear bonus, and a dungeon's
+// completion bonus.
+function fightXpSources(fightId) {
+  const dungeon = DUNGEONS[fightId];
+  if (!dungeon) return groupXpSources(fightId, fightId);
+  return [
+    ...dungeon.fightIds.flatMap((groupId, index) => groupXpSources(groupId, dungeonFightKey(fightId, index))),
+    { key: dungeonClearXpKey(fightId), xp: dungeon.completionBonusXp },
+  ];
+}
+
+// What a full clear of `fightId` pays right now, given `xpClaims` (claim
+// count per source key, see fightXpSources — a missing key is 0).
+function fightXpLeft(fightId, xpClaims = {}) {
+  return roundXp(fightXpSources(fightId).reduce((sum, { key, xp }) => sum + diminishedXp(xp, xpClaims[key] ?? 0), 0));
+}
+
+// Whether a fight still pays any XP at all — the picker fades the ones that
+// don't (still selectable, just not worth it for XP).
+function fightPaysXp(fightId, xpClaims = {}) {
+  return fightXpLeft(fightId, xpClaims) > 0;
+}
+
+// Converts a pre-#86 save's per-fight win counts into per-source claim
+// counts: a fight won N times had every one of its sources paid N times.
+// Ids no longer defined are dropped.
+function xpClaimsFromFightWins(fightWinCounts) {
+  const xpClaims = {};
+  for (const [fightId, wins] of Object.entries(fightWinCounts)) {
+    if (!MONSTER_GROUPS[fightId] && !DUNGEONS[fightId]) continue;
+    for (const { key } of fightXpSources(fightId)) xpClaims[key] = wins;
+  }
+  return xpClaims;
 }
 
 // Basic Attack is the ability the Fight tab has always had, now described as
@@ -799,50 +875,35 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus
   return `${effect}, ${cooldown}s cooldown`;
 }
 
-// `winCount` (how often this fight was already won) shows the XP after
-// diminishing returns (see diminishedXp) — 0 for the full amount.
-function describeMonster(monsterId, winCount = 0) {
+// `claimCount` (how often this monster slot already paid XP) shows the XP
+// after diminishing returns (see diminishedXp) — 0 for the full amount.
+function describeMonster(monsterId, claimCount = 0) {
   const monster = MONSTERS[monsterId];
-  return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${diminishedXp(monster.xp, winCount)} XP`;
-}
-
-// Total XP for clearing a group's monsters, including the ×1.25 compounding
-// kill bonus (see groupKillXp) — order matches monsterIds, which is fine as
-// long as a group stays homogeneous (see describeMonsterGroup's note): with
-// every monster worth the same XP, kill order doesn't change the total.
-function groupTotalXp(monsterIds) {
-  return monsterIds.reduce((sum, monsterId, index) => sum + groupKillXp(MONSTERS[monsterId].xp, index), 0);
+  return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${diminishedXp(monster.xp, claimCount)} XP`;
 }
 
 // Assumes a homogeneous group (every monster the same type) — true of every
 // group defined so far. A mixed group would need a richer description.
-function describeMonsterGroup(groupId, winCount = 0) {
+// `xpClaims` is the per-source claim counts (see fightXpLeft); the total
+// includes the group's clear bonus.
+function describeMonsterGroup(groupId, xpClaims = {}) {
   const { monsterIds } = MONSTER_GROUPS[groupId];
   const [firstId] = monsterIds;
 
-  if (monsterIds.length === 1) return describeMonster(firstId, winCount);
+  if (monsterIds.length === 1) return describeMonster(firstId, xpClaims[monsterXpKey(groupId, 0)] ?? 0);
 
   const monster = MONSTERS[firstId];
-  const totalXp = diminishedXp(groupTotalXp(monsterIds), winCount);
-  return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${totalXp} XP total`;
+  return `${monsterIds.length}× ${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${fightXpLeft(groupId, xpClaims)} XP total`;
 }
 
-// Chains describeMonsterGroup's summaries with the fight order, plus a
-// running total XP across the whole dungeon — mirrors describeMonsterGroup's
-// own total-XP line (group-kill bonus included), summed over every fight
-// instead of every monster, plus the dungeon's own completionBonusXp on top
-// (paid only on a full clear, which is exactly what this total assumes).
-// Each fight is its own group for the kill bonus's purposes, so that part
-// doesn't compound across fights, only within each one.
-// A dungeon counts as one fight for diminishing returns (see diminishedXp):
-// `winCount` is how often the whole dungeon was cleared, and it scales both
-// the monsters' XP and the completion bonus.
-function describeDungeon(dungeonId, winCount = 0) {
+// Chains describeMonsterGroup's summaries with the fight order, plus the
+// total XP a full clear pays right now — every fight's monsters and clear
+// bonuses plus the dungeon's own completionBonusXp, each after its own
+// diminishing returns (see fightXpSources).
+function describeDungeon(dungeonId, xpClaims = {}) {
   const dungeon = DUNGEONS[dungeonId];
   const labels = dungeon.fightIds.map((groupId) => MONSTER_GROUPS[groupId].label);
-  const monsterXp = dungeon.fightIds.reduce((sum, groupId) => sum + groupTotalXp(MONSTER_GROUPS[groupId].monsterIds), 0);
-  const totalXp = diminishedXp(monsterXp + dungeon.completionBonusXp, winCount);
-  return `${labels.join(' → ')} · ${totalXp} XP total`;
+  return `${labels.join(' → ')} · ${fightXpLeft(dungeonId, xpClaims)} XP total`;
 }
 
 // Advances passive HP regen by however much real time has actually passed,
@@ -913,7 +974,9 @@ if (typeof module !== 'undefined') {
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
-    groupKillXp, groupTotalXp, diminishedXp, fightPaysXp, roundXp,
+    groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,
+    dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
+    fightXpSources, fightXpLeft, fightPaysXp, xpClaimsFromFightWins,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
     perkSkillDamageBonus, perkStartingUpgradePoints,
   };
