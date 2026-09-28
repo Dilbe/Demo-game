@@ -63,9 +63,10 @@ let selectedDungeonId = null;
 // dungeon fight, including for a plain single-group fight.
 let activeDungeonId = null;
 let dungeonFightIndex = 0;
-// How many FIGHT_UNLOCK_ORDER entries the player can pick (#59) — starts at
-// just the first, and part of the main save, so a prestige resets it too.
-let unlockedFightCount = 1;
+// Every fight (group or dungeon) won at least once — what unlocks the next
+// ones (#59, see FIGHT_UNLOCKED_BY). Part of the main save, so a prestige
+// resets it too.
+let wonFightIds = [];
 // How often each XP source (a monster slot, a group's clear bonus, a
 // dungeon's completion bonus — keyed as in fightXpSources) has already paid
 // out — drives its own diminishing XP (#86, see diminishedXp), so killing
@@ -85,6 +86,9 @@ const skillTimeouts = new Map();
 // One interval per monster in activeMonsters — each attacks the player on
 // its own cooldown, independently of the others.
 let monsterAttackIntervals = [];
+// Parallel to monsterAttackIntervals: a self-healing monster's (see MONSTERS'
+// `regen`) once-a-second heal, or null for one that doesn't heal.
+let monsterRegenIntervals = [];
 // Active Heal-over-Time payouts in progress (see startHealOverTime) — one
 // interval per cast, so overlapping casts each run their own ticks
 // independently. Cleared by stopFightTimers, same as every other in-fight
@@ -268,7 +272,7 @@ function renderMonsterSelect() {
 // A fight won often enough to pay no more XP (#77) is faded too, but stays
 // selectable — the player may still want to fight it.
 function buildMonsterSelectRow(fightId, label, detailText, selected, onSelect, spriteMarkup) {
-  const locked = !fightUnlocked(unlockedFightCount, fightId);
+  const locked = !fightUnlocked(wonFightIds, fightId);
 
   const name = document.createElement('span');
   name.className = 'monster-name';
@@ -304,7 +308,7 @@ function buildMonsterSelectRow(fightId, label, detailText, selected, onSelect, s
 }
 
 function selectMonsterGroup(groupId) {
-  if (fightActive || !fightUnlocked(unlockedFightCount, groupId)) return;
+  if (fightActive || !fightUnlocked(wonFightIds, groupId)) return;
 
   selectedGroupId = groupId;
   selectedDungeonId = null;
@@ -315,7 +319,7 @@ function selectMonsterGroup(groupId) {
 }
 
 function selectDungeon(dungeonId) {
-  if (fightActive || !fightUnlocked(unlockedFightCount, dungeonId)) return;
+  if (fightActive || !fightUnlocked(wonFightIds, dungeonId)) return;
 
   selectedDungeonId = dungeonId;
   selectedGroupId = null;
@@ -770,10 +774,10 @@ function resolveFightProgress() {
   endGame('You win!');
 }
 
-// Winning a fight unlocks the next one in FIGHT_UNLOCK_ORDER (#59). The
-// picker is closed during a fight, so it's rebuilt the next time it opens.
+// Winning a fight unlocks every fight FIGHT_UNLOCKED_BY names it for (#59).
+// The picker is closed during a fight, so it's rebuilt the next time it opens.
 function recordFightWin(fightId) {
-  unlockedFightCount = fightsUnlockedAfterWin(unlockedFightCount, fightId);
+  if (!wonFightIds.includes(fightId)) wonFightIds.push(fightId);
 }
 
 // Pays one XP source (#86, see fightXpSources) after its own diminishing
@@ -847,6 +851,8 @@ function startHealOverTime(totalAmount) {
 function defeatMonster(index) {
   clearInterval(monsterAttackIntervals[index]);
   monsterAttackIntervals[index] = null;
+  clearInterval(monsterRegenIntervals[index]);
+  monsterRegenIntervals[index] = null;
 
   const card = monsterCards[index];
   card.cardEl.classList.add('defeated');
@@ -938,6 +944,8 @@ function monsterAttackTick(index) {
 function stopFightTimers() {
   monsterAttackIntervals.forEach(clearInterval);
   monsterAttackIntervals = [];
+  monsterRegenIntervals.forEach(clearInterval);
+  monsterRegenIntervals = [];
   // Each skill has two timeouts (its effect, and its cooldown finishing —
   // see useSkill) that both need clearing, or a not-yet-fired effect could
   // still land after the fight is already over.
@@ -1029,6 +1037,22 @@ function startFightGroup(groupId) {
     animateCooldownFill(monsterCards[index].cooldownFillEl, monster.cooldown);
     return setInterval(() => monsterAttackTick(index), monster.cooldown * 1000);
   });
+
+  monsterRegenIntervals = activeMonsters.map((entry, index) => {
+    const { regen } = MONSTERS[entry.monsterId];
+    return regen ? setInterval(() => monsterRegenTick(index), 1000) : null;
+  });
+}
+
+// Heals a self-healing monster (#85) by its `regen`, up to its max HP. It
+// only runs while the monster is alive — defeatMonster stops it.
+function monsterRegenTick(index) {
+  const entry = activeMonsters[index];
+  const monster = MONSTERS[entry.monsterId];
+  if (entry.hp >= monster.maxHp) return;
+
+  entry.hp = Math.min(monster.maxHp, entry.hp + monster.regen);
+  monsterCards[index].hpEl.textContent = entry.hp;
 }
 
 function beginFight() {
@@ -1837,7 +1861,7 @@ function saveProgress() {
   if (wipingSave) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     upgradePoints, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
-    selectedGroupId, selectedDungeonId, unlockedFightCount, xpClaimCounts, totalKills,
+    selectedGroupId, selectedDungeonId, wonFightIds, xpClaimCounts, totalKills,
     lifetimeXp, prestigeProgress,
     completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
   }));
@@ -1909,11 +1933,13 @@ function loadProgress() {
       if (saved.skillLevels[skillId]) skillLevels[skillId] = saved.skillLevels[skillId];
     }
   }
-  if (saved.unlockedFightCount) unlockedFightCount = saved.unlockedFightCount;
+  if (saved.wonFightIds) wonFightIds = saved.wonFightIds;
+  // A save from before #85 stored a position in a single unlock chain.
+  else if (saved.unlockedFightCount) wonFightIds = wonFightIdsFromUnlockCount(saved.unlockedFightCount);
   // A save from before fights unlocked one by one (#59) may have a fight
   // selected that's now locked — dropped, so the player picks again.
-  if (fightUnlocked(unlockedFightCount, saved.selectedGroupId)) selectedGroupId = saved.selectedGroupId;
-  if (fightUnlocked(unlockedFightCount, saved.selectedDungeonId)) selectedDungeonId = saved.selectedDungeonId;
+  if (fightUnlocked(wonFightIds, saved.selectedGroupId)) selectedGroupId = saved.selectedGroupId;
+  if (fightUnlocked(wonFightIds, saved.selectedDungeonId)) selectedDungeonId = saved.selectedDungeonId;
   if (saved.xpClaimCounts) xpClaimCounts = saved.xpClaimCounts;
   // A save from before #86 counted wins per fight instead.
   else if (saved.fightWinCounts) xpClaimCounts = xpClaimsFromFightWins(saved.fightWinCounts);
