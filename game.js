@@ -1267,9 +1267,14 @@ function buyPerk(perkId) {
   const cost = PERKS[perkId].cost;
   if (perkPoints < cost) return;
 
+  const maxHpBefore = effectiveMaxHp();
   perkPoints -= cost;
   purchasedPerkIds.push(perkId);
   savePermanentProgress();
+  // A Constitution perk also heals, once, by the Max HP it just added (#111)
+  // — measured rather than read off the perk, so any future perk that raises
+  // Max HP heals the same way.
+  healPlayer(effectiveMaxHp() - maxHpBefore);
   // A starting-Upgrade-Points perk pays out for the current cycle too, not
   // just from the next prestige on (#76) — a fresh game picks it up in
   // loadProgress instead.
