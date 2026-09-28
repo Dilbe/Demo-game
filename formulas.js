@@ -78,9 +78,9 @@ const STATS = {
 
   intelligence: {
     label: 'Intelligence',
-    description: 'Skill Points to equip skills (Skills tab)',
+    description: 'Focus to equip skills (Skills tab)',
     // A second limit alongside Wisdom: slots cap how many skills you equip,
-    // Skill Points cap how strong that combination can be.
+    // Focus caps how strong that combination can be.
     base: 3,
     perLevel: 2,
     baseCost: 20,
@@ -92,7 +92,7 @@ const STATS = {
       return points;
     },
     format(effect) {
-      return `${effect} Skill Points`;
+      return `${effect} Focus`;
     },
   },
 };
@@ -445,7 +445,7 @@ function xpClaimsFromFightWins(fightWinCounts) {
 }
 
 // Basic Attack is the ability the Fight tab has always had, now described as
-// data. `unlockCost` is XP paid once; `pointCost` is Skill Points held for as
+// data. `unlockCost` is XP paid once; `pointCost` is Focus held for as
 // long as the skill stays equipped. Strong Attack and Heal instead carry
 // `unlockObjectiveId` (see OBJECTIVES below) — completing that objective
 // unlocks them directly, free of charge, so they have no `unlockCost` at all.
@@ -467,7 +467,7 @@ function xpClaimsFromFightWins(fightWinCounts) {
 // entry unlocks once for a flat XP cost, then can be switched on/off freely
 // (see toggleKey/effectivePointCost) — unlike `upgrades`, which level up
 // continuously and can't be turned back off. Turning one on adds its
-// `pointSurcharge` to the skill's Skill Point cost while equipped. Gated as a
+// `pointSurcharge` to the skill's Focus cost while equipped. Gated as a
 // whole behind the 'winDungeon' objective (see OBJECTIVES) — visible even
 // before that, but not purchasable or switchable until it completes.
 //
@@ -623,7 +623,7 @@ const SKILLS = {
   },
 
   // Passive skills carry no combat button and no cooldown — while equipped
-  // (using a slot and Skill Points like any other skill), `boost` just
+  // (using a slot and Focus like any other skill), `boost` just
   // applies for as long as that stays true. A boost is one of two kinds:
   // `percent` on 'damage' (anything an attack skill deals — see
   // passiveMultiplier), or `points` added to a STATS id (see statBonuses).
@@ -918,7 +918,7 @@ function toggleKey(skillId, toggleId) {
   return `${skillId}:${toggleId}`;
 }
 
-// A skill's Skill Point cost while equipped, including the surcharge of
+// A skill's Focus cost while equipped, including the surcharge of
 // whichever of its own toggles are currently switched on. `activeToggleIds`
 // is the flat list of every currently-on toggle in the game (see
 // toggleKey) — filtered down here to the ones that belong to this skill.
