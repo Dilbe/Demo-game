@@ -859,7 +859,28 @@ const PERKS = {
     cost: 12,
     effect: { type: 'startingUpgradePoints', amount: 10 },
   },
+
+  // Lowers Intelligence's per-level cost growth from ×2 to ×1.75. Like every
+  // perk it leaves the stat's level alone — it only changes what the next
+  // XP-funded level costs, so already-bought levels keep their value.
+  intelligenceCostGrowth: {
+    label: 'Cheaper Intelligence',
+    description: 'Intelligence upgrade costs grow ×1.75 per level instead of ×2',
+    cost: 8,
+    effect: { type: 'statCostGrowth', stat: 'intelligence', costGrowth: 1.75 },
+  },
 };
+
+// A stat's per-level cost growth after perks: the lowest `statCostGrowth`
+// perk bought for it, or the stat's own costGrowth with none. Lowest rather
+// than multiplied, so two such perks for one stat couldn't compound below
+// what either promises on its own.
+function perkStatCostGrowth(statId, purchasedPerkIds = []) {
+  return purchasedPerkIds.reduce((growth, perkId) => {
+    const { effect } = PERKS[perkId];
+    return (effect.type === 'statCostGrowth' && effect.stat === statId) ? Math.min(growth, effect.costGrowth) : growth;
+  }, STATS[statId].costGrowth);
+}
 
 // Upgrade Points a fresh game (every prestige) starts with, summed across
 // every purchased perk — flat amounts, so they stack additively. game.js also pays a perk's amount out once on purchase.
@@ -1030,9 +1051,11 @@ function statEffect(statId, points) {
   return STATS[statId].effect(points);
 }
 
-function statCost(statId, level) {
+// `purchasedPerkIds` lets a cost-growth perk (see perkStatCostGrowth)
+// lower what each level costs.
+function statCost(statId, level, purchasedPerkIds = []) {
   const stat = STATS[statId];
-  return costForLevel(stat.baseCost, stat.costGrowth, level);
+  return costForLevel(stat.baseCost, perkStatCostGrowth(statId, purchasedPerkIds), level);
 }
 
 // Loaded as a plain <script> in the browser; required by the Node test runner.
@@ -1049,6 +1072,6 @@ if (typeof module !== 'undefined') {
     dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
     fightXpSources, fightXpLeft, fightXpLoss, fightPaysXp, xpClaimsFromFightWins,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
-    perkSkillDamageBonus, perkStartingUpgradePoints,
+    perkSkillDamageBonus, perkStartingUpgradePoints, perkStatCostGrowth,
   };
 }

@@ -12,7 +12,7 @@ const {
   dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
   fightXpSources, fightXpLeft, fightXpLoss, fightPaysXp, xpClaimsFromFightWins,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
-  PERKS, perkSkillDamageBonus, perkStartingUpgradePoints,
+  PERKS, perkSkillDamageBonus, perkStartingUpgradePoints, perkStatCostGrowth,
 } = require('./formulas.js');
 
 // --- Version ---------------------------------------------------------
@@ -897,8 +897,21 @@ test('every perk costs Perk Points and defines a targeted effect', () => {
   for (const perk of Object.values(PERKS)) {
     assert.ok(perk.cost > 0);
     assert.ok(perk.effect.type);
-    assert.ok((perk.effect.amount ?? perk.effect.points) > 0);
+    assert.ok((perk.effect.amount ?? perk.effect.points ?? perk.effect.costGrowth) > 0);
   }
+});
+
+test('the Cheaper Intelligence perk costs 8 and lowers Intelligence cost growth to 1.75', () => {
+  assert.strictEqual(PERKS.intelligenceCostGrowth.cost, 8);
+  assert.strictEqual(perkStatCostGrowth('intelligence', []), 2);
+  assert.strictEqual(perkStatCostGrowth('intelligence', ['intelligenceCostGrowth']), 1.75);
+  assert.strictEqual(statCost('intelligence', 0, ['intelligenceCostGrowth']), 20);
+  assert.strictEqual(statCost('intelligence', 4, []), 320);
+  assert.strictEqual(statCost('intelligence', 4, ['intelligenceCostGrowth']), Math.round(20 * Math.pow(1.75, 4)));
+});
+
+test('a stat cost-growth perk leaves other stats\' costs alone', () => {
+  assert.strictEqual(statCost('wisdom', 4, ['intelligenceCostGrowth']), statCost('wisdom', 4));
 });
 
 // --- Stat bonuses (#78) --------------------------------------------------
