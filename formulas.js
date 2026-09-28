@@ -951,6 +951,23 @@ function effectivePointCost(skillId, activeToggleIds) {
   return skill.pointCost + surcharge;
 }
 
+// Whether anything for this skill can be bought with Upgrade Points right
+// now (#99): unlocking it (objective-gated skills have no price), one of its
+// upgrade tracks, or one of its toggles once toggles are unlocked. Switching
+// an unlocked toggle on or off is free, so it never counts.
+function skillHasAffordablePurchase(skillId, { unlocked, levels, upgradePoints, togglesUnlocked, unlockedToggleIds }) {
+  const skill = SKILLS[skillId];
+  if (!unlocked) return !skill.unlockObjectiveId && upgradePoints >= skill.unlockCost;
+
+  const upgradeAffordable = skill.upgrades.some((upgrade) => {
+    return upgradePoints >= skillUpgradeCost(skillId, upgrade.id, levels[upgrade.id]);
+  });
+  const toggleAffordable = togglesUnlocked && skill.toggles.some((toggle) => {
+    return !unlockedToggleIds.includes(toggleKey(skillId, toggle.id)) && upgradePoints >= toggle.unlockCost;
+  });
+  return upgradeAffordable || toggleAffordable;
+}
+
 function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus = 0) {
   const skill = SKILLS[skillId];
 
@@ -1064,7 +1081,7 @@ if (typeof module !== 'undefined') {
     VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES, PERKS,
     statValue, statCost, statBonuses, statTotal, statEffect,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
-    findToggle, toggleKey, effectivePointCost,
+    findToggle, toggleKey, effectivePointCost, skillHasAffordablePurchase,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
     FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
