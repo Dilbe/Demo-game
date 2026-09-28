@@ -696,6 +696,40 @@ body {
   outline: 2px dashed #333;
 }
 
+/* The Focus budget as pips in the Skills tab header (#98) — see
+   renderFocusPips. Same blue as the cost badges, so a badge's number reads as
+   "this many of those pips". */
+#focus-pips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  vertical-align: middle;
+}
+
+.focus-pip {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid #1a4f8b;
+  border-radius: 50%;
+}
+
+.focus-pip.filled {
+  background: #1a4f8b;
+}
+
+.focus-pip.preview {
+  background: #a9c4e6;
+}
+
+.focus-pip.over {
+  border-color: #c62828;
+  background: #ef9a9a;
+}
+
+.focus-pip.overflow {
+  border-style: dashed;
+}
+
 /* A skill's Focus cost in the square's top-left corner, like a mana cost on a
    card (#97) — see buildCostBadge. */
 .skill-cost-badge {

@@ -500,6 +500,16 @@ A playtester with every tab open never noticed skills cost Focus, because the co
 - **Includes toggles:** the badge shows `effectivePointCost`, so turning a toggle on raises it right away, the same as the detail panel's cost line.
 - **Locked skills too:** their badge (dimmed with the square) shows what they'll cost once unlocked. Hovering a badge says "Costs N Focus while equipped".
 
+## Focus as a pip bar ([#98](https://github.com/Dilbe/Demo-game/issues/98))
+
+Same playtest as #97: Focus was a bare "X / Y" number, so it didn't read as a budget. The Skills tab header now shows it as a row of pips, one per point of Focus, filled by whatever is equipped, so unequipping visibly gives pips back.
+
+- **Preview:** while a skill is dragged, hovered, or open in the detail panel, the pips it would take show light blue after the filled ones. For a skill that's already equipped, the pips it holds are highlighted instead.
+- **Won't fit:** the preview turns red, and the pips past the budget are drawn dashed, one per point short.
+- **Drag onto a slot:** the preview accounts for the skill that drop would bump out, the same sum `equipInSlot` checks (both use `projectedPointsInSlot`).
+- **Touch:** there's no hover on a phone, so the inspected skill (the one whose detail panel is open) drives the preview there.
+- The exact numbers are in the pips' tooltip ("N / M Focus used"). The `points-used`/`points-total` elements #96 kept are gone, replaced by `focus-pips`.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

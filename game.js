@@ -21,8 +21,7 @@ const xpBarFillEl = document.getElementById('xp-bar-fill');
 const xpBarLabelEl = document.getElementById('xp-bar-label');
 const slotsUsedEl = document.getElementById('slots-used');
 const slotsTotalEl = document.getElementById('slots-total');
-const pointsUsedEl = document.getElementById('points-used');
-const pointsTotalEl = document.getElementById('points-total');
+const focusPipsEl = document.getElementById('focus-pips');
 const skillListEl = document.getElementById('skill-list');
 const skillSlotsEl = document.getElementById('skill-slots');
 const skillDetailPanelEl = document.getElementById('skill-detail-panel');
@@ -117,6 +116,12 @@ let skillLevels = Object.fromEntries(
 // list/slots — null when nothing is currently selected. Not persisted; every
 // reload starts with the panel closed.
 let inspectedSkillId = null;
+// The skill the Focus pips are previewing (#98) — whichever is being dragged
+// (slotIndex set while over a slot, so the preview accounts for the skill it
+// would bump out), or else hovered. Falls back to inspectedSkillId, so a
+// touch player, who can't hover, sees it too. Not persisted.
+let draggedFocusPreview = null;
+let hoveredFocusPreview = null;
 // The spendable balance (#76): XP earned adds the same amount of Upgrade
 // Points (up to maxXp per cycle, see awardXp), and upgrades/unlocks spend
 // them. Kept separate from XP itself, which only ever counts up.
@@ -201,6 +206,7 @@ showCompletedObjectivesEl.addEventListener('change', renderObjectives);
 skillListEl.addEventListener('dragover', (event) => event.preventDefault());
 skillListEl.addEventListener('drop', (event) => {
   event.preventDefault();
+  endFocusPreviewDrag();
   unequipSkill(event.dataTransfer.getData('text/plain'));
 });
 
@@ -1315,6 +1321,15 @@ function canEquip(skillId) {
     && pointsUsed() + effectivePointCost(skillId, activeToggleIds) <= currentStatEffect('intelligence');
 }
 
+// Focus in use if `skillId` were placed in `slotIndex` — moved out of its
+// current slot if it has one, and bumping out whatever sits in that slot.
+function projectedPointsInSlot(skillId, slotIndex) {
+  const previousIndex = equippedSkills.indexOf(skillId);
+  const otherIds = equippedSkills.filter((id, index) => id && index !== previousIndex && index !== slotIndex);
+  return otherIds.reduce((total, id) => total + effectivePointCost(id, activeToggleIds), 0)
+    + effectivePointCost(skillId, activeToggleIds);
+}
+
 // Equips `skillId` into `slotIndex`, moving it there if it's already
 // equipped somewhere else and bumping out whatever currently sits in that
 // slot. Refuses only if the result would exceed the Focus budget —
@@ -1327,9 +1342,7 @@ function equipInSlot(skillId, slotIndex) {
   hideSkillEquipMessage();
 
   const previousIndex = equippedSkills.indexOf(skillId);
-  const otherIds = equippedSkills.filter((id, index) => id && index !== previousIndex && index !== slotIndex);
-  const projectedPoints = otherIds.reduce((total, id) => total + effectivePointCost(id, activeToggleIds), 0)
-    + effectivePointCost(skillId, activeToggleIds);
+  const projectedPoints = projectedPointsInSlot(skillId, slotIndex);
   const budget = currentStatEffect('intelligence');
   if (projectedPoints > budget) {
     const shortfall = projectedPoints - budget;
@@ -1449,8 +1462,7 @@ function renderSkills() {
   const slots = currentStatEffect('wisdom');
   slotsUsedEl.textContent = equippedSkillIds().length;
   slotsTotalEl.textContent = slots;
-  pointsUsedEl.textContent = pointsUsed();
-  pointsTotalEl.textContent = currentStatEffect('intelligence');
+  renderFocusPips();
 
   for (const skillId of Object.keys(SKILLS)) {
     const skill = SKILLS[skillId];
@@ -1471,16 +1483,92 @@ function renderSkills() {
     square.classList.toggle('locked', !unlocked);
     square.append(buildCostBadge(skillId), icon, label);
     square.addEventListener('click', () => inspectSkill(skillId));
+    addFocusPreviewHover(square, skillId);
 
     if (unlocked) {
       // Draggable so it can be dropped onto a slot to equip it, or (if
       // already equipped) dragged back here to unequip it (see skill-slots).
       square.draggable = true;
-      square.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+      addFocusPreviewDrag(square, skillId);
     }
 
     skillListEl.append(square);
   }
+}
+
+// The Focus budget as a row of pips, one per point of Intelligence's Focus,
+// filled by what's equipped (#98) — reads as a capacity you get back on
+// unequip rather than a bare number. While a skill is dragged, hovered or
+// inspected, the pips it would take are shown light after the filled ones
+// (or, if it's already equipped, the ones it holds), red if it wouldn't fit,
+// spilling past the budget as dashed pips for the shortfall.
+function renderFocusPips() {
+  const budget = currentStatEffect('intelligence');
+  const used = pointsUsed();
+  const preview = draggedFocusPreview ?? hoveredFocusPreview
+    ?? (inspectedSkillId ? { skillId: inspectedSkillId, slotIndex: null } : null);
+
+  let base = used;
+  let projected = used;
+  if (preview) {
+    const { skillId, slotIndex } = preview;
+    const cost = effectivePointCost(skillId, activeToggleIds);
+    if (slotIndex !== null) projected = projectedPointsInSlot(skillId, slotIndex);
+    else if (!equippedSkills.includes(skillId)) projected = used + cost;
+    base = projected - cost;
+  }
+  const over = projected > budget;
+
+  focusPipsEl.replaceChildren();
+  for (let index = 0; index < Math.max(budget, projected); index += 1) {
+    const pip = document.createElement('span');
+    pip.className = 'focus-pip';
+    pip.classList.toggle('filled', index < base);
+    pip.classList.toggle('preview', index >= base && index < projected);
+    pip.classList.toggle('over', over && index >= base && index < projected);
+    pip.classList.toggle('overflow', index >= budget);
+    focusPipsEl.append(pip);
+  }
+
+  const label = `${used} / ${budget} Focus used`;
+  focusPipsEl.title = label;
+  focusPipsEl.setAttribute('aria-label', label);
+}
+
+function addFocusPreviewHover(element, skillId) {
+  element.addEventListener('mouseenter', () => {
+    hoveredFocusPreview = { skillId, slotIndex: null };
+    renderFocusPips();
+  });
+  element.addEventListener('mouseleave', () => {
+    hoveredFocusPreview = null;
+    renderFocusPips();
+  });
+}
+
+function addFocusPreviewDrag(element, skillId) {
+  element.addEventListener('dragstart', (event) => {
+    event.dataTransfer.setData('text/plain', skillId);
+    draggedFocusPreview = { skillId, slotIndex: null };
+    renderFocusPips();
+  });
+  element.addEventListener('dragend', endFocusPreviewDrag);
+}
+
+// Called from the drop handlers as well as dragend: a drop re-renders the
+// list and slots, and a dragged element removed that way may never get its
+// dragend. Clears the hover too, since no mouseleave arrives after a drag.
+function endFocusPreviewDrag() {
+  draggedFocusPreview = null;
+  hoveredFocusPreview = null;
+  renderFocusPips();
+}
+
+// Only re-renders the pips on an actual change — dragover fires constantly.
+function setDraggedFocusSlot(slotIndex) {
+  if (!draggedFocusPreview || draggedFocusPreview.slotIndex === slotIndex) return;
+  draggedFocusPreview = { ...draggedFocusPreview, slotIndex };
+  renderFocusPips();
 }
 
 // A small corner badge with the skill's Focus cost (#97), like a mana cost
@@ -1522,18 +1610,24 @@ function renderSkillSlots() {
 
     if (skillId) {
       box.draggable = true;
-      box.addEventListener('dragstart', (event) => event.dataTransfer.setData('text/plain', skillId));
+      addFocusPreviewDrag(box, skillId);
+      addFocusPreviewHover(box, skillId);
       box.addEventListener('click', () => inspectSkill(skillId));
     }
 
     box.addEventListener('dragover', (event) => {
       event.preventDefault();
       box.classList.add('drag-over');
+      setDraggedFocusSlot(index);
     });
-    box.addEventListener('dragleave', () => box.classList.remove('drag-over'));
+    box.addEventListener('dragleave', () => {
+      box.classList.remove('drag-over');
+      setDraggedFocusSlot(null);
+    });
     box.addEventListener('drop', (event) => {
       event.preventDefault();
       box.classList.remove('drag-over');
+      endFocusPreviewDrag();
       equipInSlot(event.dataTransfer.getData('text/plain'), index);
     });
 
