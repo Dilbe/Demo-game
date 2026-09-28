@@ -419,6 +419,13 @@ function fightXpLeft(fightId, xpClaims = {}) {
   return roundXp(fightXpSources(fightId).reduce((sum, { key, xp }) => sum + diminishedXp(xp, xpClaims[key] ?? 0), 0));
 }
 
+// How much of a fight's full-clear XP diminishing returns have taken away,
+// from 0 (never paid out) to 1 (pays nothing any more) — the picker and
+// fight summary colour the XP redder the higher this is (#90).
+function fightXpLoss(fightId, xpClaims = {}) {
+  return 1 - fightXpLeft(fightId, xpClaims) / fightXpLeft(fightId);
+}
+
 // Whether a fight still pays any XP at all — the picker fades the ones that
 // don't (still selectable, just not worth it for XP).
 function fightPaysXp(fightId, xpClaims = {}) {
@@ -1040,7 +1047,7 @@ if (typeof module !== 'undefined') {
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,
     dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
-    fightXpSources, fightXpLeft, fightPaysXp, xpClaimsFromFightWins,
+    fightXpSources, fightXpLeft, fightXpLoss, fightPaysXp, xpClaimsFromFightWins,
     STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
     perkSkillDamageBonus, perkStartingUpgradePoints,
   };

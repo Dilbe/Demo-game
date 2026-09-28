@@ -72,6 +72,10 @@ let wonFightIds = [];
 // out — drives its own diminishing XP (#86, see diminishedXp), so killing
 // one monster and retreating doesn't touch the others' XP.
 let xpClaimCounts = {};
+// xpClaimCounts as of the last time the fight screen was reset (startGame),
+// so the next reset can tell which fights' XP went down since and blink it
+// (#90). null until the first one — loading a save blinks nothing.
+let xpClaimsLastShown = null;
 let activeMonsters = [];
 // Which entry of activeMonsters the player's own attacks hit — selectable by
 // clicking a card once more than one monster is active, defaulting to the
@@ -280,7 +284,7 @@ function buildMonsterSelectRow(fightId, label, detailText, selected, onSelect, s
 
   const detail = document.createElement('span');
   detail.className = 'monster-detail';
-  detail.textContent = detailText;
+  fillFightDetail(detail, fightId, detailText);
 
   const row = document.createElement('div');
   row.className = 'monster-row';
@@ -438,15 +442,38 @@ function updateMonsterPreview() {
   renderSelectedFight();
 }
 
+// Puts a fight's describeMonsterGroup/describeDungeon text into `el`, with
+// its last part (the XP, always last) in its own span so it can show how far
+// diminishing returns have taken it (#90): redder the less it's worth now
+// (fightXpLoss), and blinking once when it went down since the fight screen
+// was last reset — i.e. right after the fight that lowered it.
+function fillFightDetail(el, fightId, detailText) {
+  const xpStart = detailText.lastIndexOf(' · ') + ' · '.length;
+  const xp = document.createElement('span');
+  xp.className = 'fight-xp';
+  xp.textContent = detailText.slice(xpStart);
+
+  const loss = fightXpLoss(fightId, xpClaimCounts);
+  if (loss > 0) {
+    xp.classList.add('xp-reduced');
+    xp.style.setProperty('--xp-loss', loss);
+  }
+  if (xpClaimsLastShown && fightXpLeft(fightId, xpClaimsLastShown) > fightXpLeft(fightId, xpClaimCounts)) {
+    xp.classList.add('xp-dropped');
+  }
+
+  el.replaceChildren(detailText.slice(0, xpStart), xp);
+}
+
 // The fight view's one-line summary of the current pick, above the monster
 // preview — the full list only shows once "Choose fight" opens the picker.
 function renderSelectedFight() {
   if (selectedDungeonId) {
     selectedFightNameEl.textContent = DUNGEONS[selectedDungeonId].label;
-    selectedFightDetailEl.textContent = describeDungeon(selectedDungeonId, xpClaimCounts);
+    fillFightDetail(selectedFightDetailEl, selectedDungeonId, describeDungeon(selectedDungeonId, xpClaimCounts));
   } else if (selectedGroupId) {
     selectedFightNameEl.textContent = MONSTER_GROUPS[selectedGroupId].label;
-    selectedFightDetailEl.textContent = describeMonsterGroup(selectedGroupId, xpClaimCounts);
+    fillFightDetail(selectedFightDetailEl, selectedGroupId, describeMonsterGroup(selectedGroupId, xpClaimCounts));
   } else {
     selectedFightNameEl.textContent = 'No fight selected';
     selectedFightDetailEl.textContent = '';
@@ -996,6 +1023,9 @@ function startGame() {
   renderMonsterSelect();
   updateMonsterPreview();
   chooseFightButton.hidden = false;
+  // Only this render blinks the XP that went down — picking another fight
+  // re-renders the same text, which shouldn't blink it again.
+  xpClaimsLastShown = { ...xpClaimCounts };
 
   resultMessageEl.hidden = true;
   restartButton.hidden = true;
