@@ -1159,6 +1159,20 @@ function updateXpDisplay() {
   renderSkillDetail();
   renderPrestige();
   renderPerks();
+  renderTabBadges();
+}
+
+// A dot on a tab button while something on that tab is affordable (#99) —
+// only "affordable", never "new", so the dot keeps meaning "go spend".
+function renderTabBadges() {
+  const affordableByTab = {
+    'character-tab': Object.keys(STATS).some((statId) => upgradePoints >= statCost(statId, stats[statId], purchasedPerkIds)),
+    'skills-tab': Object.keys(SKILLS).some(skillAffordable),
+    'perks-tab': Object.entries(PERKS).some(([perkId, perk]) => !purchasedPerkIds.includes(perkId) && perkPoints >= perk.cost),
+  };
+  for (const [tabId, affordable] of Object.entries(affordableByTab)) {
+    document.querySelector(`.tab-button[data-tab="${tabId}"] .tab-badge`).hidden = !affordable;
+  }
 }
 
 // Fills toward maxXp, then — once XP past it only feeds the prestige bar
@@ -1482,6 +1496,7 @@ function renderSkills() {
     square.classList.toggle('inspected', inspectedSkillId === skillId);
     square.classList.toggle('locked', !unlocked);
     square.append(buildCostBadge(skillId), icon, label);
+    if (skillAffordable(skillId)) square.append(buildUpgradeBadge());
     square.addEventListener('click', () => inspectSkill(skillId));
     addFocusPreviewHover(square, skillId);
 
@@ -1580,6 +1595,28 @@ function buildCostBadge(skillId) {
   badge.className = 'skill-cost-badge';
   badge.textContent = cost;
   badge.title = `Costs ${cost} Focus while equipped`;
+  return badge;
+}
+
+function skillAffordable(skillId) {
+  return skillHasAffordablePurchase(skillId, {
+    unlocked: unlockedSkills.includes(skillId),
+    levels: skillLevels[skillId],
+    upgradePoints,
+    togglesUnlocked,
+    unlockedToggleIds,
+  });
+}
+
+// The "↑" in a skill square's top-right corner (#99): something for this
+// skill can be bought right now, which also hints the square can be tapped.
+function buildUpgradeBadge() {
+  const badge = document.createElement('span');
+  badge.className = 'skill-upgrade-badge';
+  badge.setAttribute('role', 'img');
+  badge.setAttribute('aria-label', 'Upgrade available');
+  badge.title = 'Something to buy with Upgrade Points';
+  badge.textContent = '↑';
   return badge;
 }
 

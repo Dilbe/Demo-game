@@ -498,6 +498,26 @@ body {
   cursor: pointer;
 }
 
+/* A dot in the tab button's top-right corner while something on that tab is
+   affordable (#99). */
+.tab-button {
+  position: relative;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #2e7d32;
+}
+
+.tab-badge[hidden] {
+  display: none;
+}
+
 .tab-button.active {
   font-weight: bold;
   background: #ddd;
@@ -744,6 +764,23 @@ body {
   background: #1a4f8b;
   color: #fff;
   font-size: 0.7rem;
+  font-weight: bold;
+  line-height: 1.1rem;
+  text-align: center;
+}
+
+/* Top-right, opposite the cost badge (#99): something for this skill can be
+   bought right now. Green like the equipped outline, so it reads as "go". */
+.skill-upgrade-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 0.8rem;
   font-weight: bold;
   line-height: 1.1rem;
   text-align: center;

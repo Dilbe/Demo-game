@@ -4,7 +4,7 @@ const {
   VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES,
   statValue, statCost, statBonuses, statTotal, statEffect,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
-  findToggle, toggleKey, effectivePointCost,
+  findToggle, toggleKey, effectivePointCost, skillHasAffordablePurchase,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
@@ -337,6 +337,52 @@ test('effectivePointCost adds only the active toggle\'s own surcharge', () => {
     effectivePointCost('basicAttack', [toggleKey('heal', 'healOverTime')]),
     SKILLS.basicAttack.pointCost
   );
+});
+
+// --- Affordable badges (#99) --------------------------------------------
+
+function affordState(overrides = {}) {
+  return {
+    unlocked: true,
+    levels: { power: 0, speed: 0 },
+    upgradePoints: 0,
+    togglesUnlocked: false,
+    unlockedToggleIds: [],
+    ...overrides,
+  };
+}
+
+test('skillHasAffordablePurchase: an unlocked skill with an affordable upgrade track', () => {
+  const cheapest = Math.min(...SKILLS.basicAttack.upgrades.map((u) => skillUpgradeCost('basicAttack', u.id, 0)));
+  assert.strictEqual(skillHasAffordablePurchase('basicAttack', affordState({ upgradePoints: cheapest })), true);
+  assert.strictEqual(skillHasAffordablePurchase('basicAttack', affordState({ upgradePoints: cheapest - 1 })), false);
+});
+
+test('skillHasAffordablePurchase: a locked skill with an XP price', () => {
+  const skillId = Object.keys(SKILLS).find((id) => !SKILLS[id].unlockObjectiveId && SKILLS[id].unlockCost > 0);
+  const cost = SKILLS[skillId].unlockCost;
+  assert.strictEqual(skillHasAffordablePurchase(skillId, affordState({ unlocked: false, upgradePoints: cost })), true);
+  assert.strictEqual(skillHasAffordablePurchase(skillId, affordState({ unlocked: false, upgradePoints: cost - 1 })), false);
+});
+
+test('skillHasAffordablePurchase: an objective-gated locked skill is never affordable', () => {
+  const skillId = Object.keys(SKILLS).find((id) => SKILLS[id].unlockObjectiveId);
+  assert.strictEqual(skillHasAffordablePurchase(skillId, affordState({ unlocked: false, upgradePoints: 1e6 })), false);
+});
+
+test('skillHasAffordablePurchase: toggles count only once unlocked, and only if not yet bought', () => {
+  const skillId = Object.keys(SKILLS).find((id) => SKILLS[id].toggles.length > 0);
+  const skill = SKILLS[skillId];
+  // Levels high enough that no upgrade track is affordable, leaving only toggles.
+  const levels = Object.fromEntries(skill.upgrades.map((u) => [u.id, 100]));
+  const upgradePoints = Math.max(...skill.toggles.map((t) => t.unlockCost));
+  const allToggles = skill.toggles.map((t) => toggleKey(skillId, t.id));
+
+  assert.strictEqual(skillHasAffordablePurchase(skillId, affordState({ levels, upgradePoints })), false);
+  assert.strictEqual(skillHasAffordablePurchase(skillId, affordState({ levels, upgradePoints, togglesUnlocked: true })), true);
+  assert.strictEqual(skillHasAffordablePurchase(skillId, affordState({
+    levels, upgradePoints, togglesUnlocked: true, unlockedToggleIds: allToggles,
+  })), false);
 });
 
 test('effectivePointCost stacks every active toggle a skill has', () => {

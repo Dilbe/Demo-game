@@ -510,6 +510,14 @@ Same playtest as #97: Focus was a bare "X / Y" number, so it didn't read as a bu
 - **Touch:** there's no hover on a phone, so the inspected skill (the one whose detail panel is open) drives the preview there.
 - The exact numbers are in the pips' tooltip ("N / M Focus used"). The `points-used`/`points-total` elements #96 kept are gone, replaced by `focus-pips`.
 
+## Upgrade badges ([#99](https://github.com/Dilbe/Demo-game/issues/99))
+
+Same playtest again: a player with every tab open never noticed skills could be upgraded or equipped, since everything skill-related sat behind a tap. Now the game points at what can be bought without relying on text:
+
+- **"↑" on a skill square:** a green badge in the top-right corner (opposite the Focus cost) when something for that skill is affordable: unlocking it, one of its upgrade tracks, or one of its toggles once toggles are unlocked. Objective-gated skills never get it while locked, and switching a toggle on/off is free, so it doesn't count. The rule is `skillHasAffordablePurchase` in `formulas.js`. Only on the skill list, not the equipped slots, since every equipped skill is also in the list.
+- **Dot on a tab button:** Character (any stat upgrade affordable), Skills (any skill has a "↑") and Perks (any unowned perk affordable).
+- **Only "affordable", never "new"**, so a badge always means "you can spend here". A "new" marker could be a later issue.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
