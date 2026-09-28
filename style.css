@@ -508,8 +508,8 @@ body {
   position: absolute;
   top: 5px;
   right: 5px;
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
   background: #2e7d32;
 }
@@ -717,7 +717,7 @@ body {
 }
 
 /* The Focus budget as pips in the Skills tab header (#98) — see
-   renderFocusPips. Same blue as the cost badges, so a badge's number reads as
+   renderFocusPips. Same blue as the cost badges' circles, so a badge reads as
    "this many of those pips". */
 #focus-pips {
   display: inline-flex;
@@ -751,22 +751,26 @@ body {
 }
 
 /* A skill's Focus cost in the square's top-left corner, like a mana cost on a
-   card (#97) — see buildCostBadge. */
+   card (#97) — see buildCostBadge. One circle per point (#109), styled like a
+   filled .focus-pip. Capped at 3rem wide so a cost above 4 wraps to a second
+   row instead of reaching the upgrade badge top-right. */
 .skill-cost-badge {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  min-width: 1.1rem;
-  height: 1.1rem;
-  padding: 0 0.2rem;
-  box-sizing: border-box;
-  border-radius: 0.55rem;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 3rem;
+}
+
+/* The white ring keeps the circles visible over a dark sprite. */
+.skill-cost-pip {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
   background: #1a4f8b;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: bold;
-  line-height: 1.1rem;
-  text-align: center;
+  box-shadow: 0 0 0 1.5px #fff;
 }
 
 /* Top-right, opposite the cost badge (#99): something for this skill can be
