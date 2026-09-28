@@ -6,7 +6,7 @@ const {
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   findToggle, toggleKey, effectivePointCost,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
-  FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
+  FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
   groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,
   dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
@@ -416,6 +416,27 @@ test('the three single-monster groups mirror MONSTERS one-to-one', () => {
   }
 });
 
+test('describeMonster mentions a self-healing monster\'s regen (#85)', () => {
+  assert.strictEqual(describeMonster('troll'), '60 HP · heals 1 HP/s · 2 damage every 2s · 10 XP');
+});
+
+test('the #85 monsters match the issue\'s stats', () => {
+  const expected = {
+    troll: { maxHp: 60, damage: 2, cooldown: 2, xp: 10, regen: 1 },
+    ogre: { maxHp: 75, damage: 6, cooldown: 2, xp: 15 },
+    giant: { maxHp: 150, damage: 15, cooldown: 4, xp: 20 },
+  };
+  for (const [monsterId, stats] of Object.entries(expected)) {
+    for (const [field, value] of Object.entries(stats)) assert.strictEqual(MONSTERS[monsterId][field], value, `${monsterId}.${field}`);
+    assert.deepStrictEqual(MONSTER_GROUPS[monsterId].monsterIds, [monsterId]);
+  }
+});
+
+test('King of the Giants chains its three mixed fights in order (#85)', () => {
+  const fights = DUNGEONS.kingOfTheGiants.fightIds.map((groupId) => MONSTER_GROUPS[groupId].monsterIds);
+  assert.deepStrictEqual(fights, [['ogre', 'big', 'big'], ['giant', 'troll', 'troll'], ['troll', 'ogre', 'giant']]);
+});
+
 test('twoSmall groups two Small monsters together', () => {
   assert.deepStrictEqual(MONSTER_GROUPS.twoSmall.monsterIds, ['small', 'small']);
 });
@@ -625,35 +646,62 @@ test('roundXp strips floating-point noise down to one decimal', () => {
 
 // --- Fight unlocks ---------------------------------------------------------
 
-test('FIGHT_UNLOCK_ORDER lists every pickable monster group and dungeon exactly once', () => {
+test('FIGHT_UNLOCKED_BY lists every pickable monster group and dungeon exactly once', () => {
   const pickableGroupIds = Object.keys(MONSTER_GROUPS).filter((groupId) => !MONSTER_GROUPS[groupId].dungeonOnly);
   const allFightIds = [...pickableGroupIds, ...Object.keys(DUNGEONS)];
-  assert.deepStrictEqual([...FIGHT_UNLOCK_ORDER].sort(), allFightIds.sort());
+  assert.deepStrictEqual(Object.keys(FIGHT_UNLOCKED_BY).sort(), allFightIds.sort());
 });
 
-test('a new game can pick only the first fight', () => {
-  assert.strictEqual(fightUnlocked(1, FIGHT_UNLOCK_ORDER[0]), true);
-  for (const fightId of FIGHT_UNLOCK_ORDER.slice(1)) assert.strictEqual(fightUnlocked(1, fightId), false);
+test('every fight is unlocked by a real fight, or from the start', () => {
+  for (const [fightId, requiredId] of Object.entries(FIGHT_UNLOCKED_BY)) {
+    if (requiredId === null) continue;
+    assert.ok(FIGHT_UNLOCKED_BY[requiredId] !== undefined, `${fightId} is unlocked by an unknown fight ${requiredId}`);
+  }
 });
 
-test('winning the newest unlocked fight unlocks the next one', () => {
-  assert.strictEqual(fightsUnlockedAfterWin(1, 'small'), 2);
-  assert.strictEqual(fightsUnlockedAfterWin(4, 'big'), 5);
+test('a new game can pick only the Small Slime', () => {
+  for (const fightId of Object.keys(FIGHT_UNLOCKED_BY)) {
+    assert.strictEqual(fightUnlocked([], fightId), fightId === 'small', fightId);
+  }
 });
 
-test('winning an earlier fight again unlocks nothing new', () => {
-  assert.strictEqual(fightsUnlockedAfterWin(4, 'small'), 4);
+test('winning a fight unlocks the fights that require it', () => {
+  assert.strictEqual(fightUnlocked(['small'], 'medium'), true);
+  assert.strictEqual(fightUnlocked(['small'], 'twoSmall'), false);
 });
 
-test('winning the last fight keeps the count at the end of the list', () => {
-  const all = FIGHT_UNLOCK_ORDER.length;
-  assert.strictEqual(fightsUnlockedAfterWin(all, FIGHT_UNLOCK_ORDER[all - 1]), all);
+test('a dungeon-only group can never be picked', () => {
+  assert.strictEqual(fightUnlocked(Object.keys(FIGHT_UNLOCKED_BY), 'smallAndBig'), false);
+});
+
+test('winning the Orc unlocks the Troll, Ogre and Giant together, plus Goblin Gauntlet (#85)', () => {
+  const won = ['small', 'medium', 'twoSmall', 'big'];
+  for (const fightId of ['troll', 'ogre', 'giant', 'goblinGauntlet']) assert.strictEqual(fightUnlocked(won, fightId), true, fightId);
+});
+
+test('the Troll, Ogre and Giant unlock nothing themselves (#85)', () => {
+  for (const monsterId of ['troll', 'ogre', 'giant']) {
+    assert.ok(!Object.values(FIGHT_UNLOCKED_BY).includes(monsterId), `${monsterId} unlocks something`);
+  }
+});
+
+test('King of the Giants unlocks after Slime Companions (#85)', () => {
+  assert.strictEqual(FIGHT_UNLOCKED_BY.kingOfTheGiants, 'slimeCompanions');
+});
+
+test('a pre-#85 unlock count converts to every fight won before the last unlocked one', () => {
+  assert.deepStrictEqual(wonFightIdsFromUnlockCount(1), []);
+  assert.deepStrictEqual(wonFightIdsFromUnlockCount(4), ['small', 'medium', 'twoSmall']);
+  // Everything unlocked: the last dungeon itself may not have been won yet.
+  assert.deepStrictEqual(wonFightIdsFromUnlockCount(7), ['small', 'medium', 'twoSmall', 'big', 'goblinGauntlet', 'monsterRush']);
 });
 
 test('describeFightUnlock names the fight to win first, group or dungeon', () => {
   assert.strictEqual(describeFightUnlock('medium'), 'Locked — win Small Slime to unlock');
   assert.strictEqual(describeFightUnlock('monsterRush'), 'Locked — win Goblin Gauntlet to unlock');
   assert.strictEqual(describeFightUnlock('slimeCompanions'), 'Locked — win Monster Rush to unlock');
+  assert.strictEqual(describeFightUnlock('giant'), 'Locked — win Orc to unlock');
+  assert.strictEqual(describeFightUnlock('kingOfTheGiants'), 'Locked — win Slime Companions to unlock');
 });
 
 // --- Objectives ------------------------------------------------------------

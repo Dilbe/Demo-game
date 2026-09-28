@@ -470,6 +470,14 @@ Counting diminishing returns per fight win let the player dodge them: kill one m
 
 The objective that unlocks the Character tab now asks for 3 kills instead of 5 (v6's "Kill 5 enemies"), so the tab shows up sooner. Its id changed from `killFive` to `killThree`; a save that already completed `killFive` is mapped over on load. "Kill 10 enemies" → Skills tab is unchanged.
 
+## Troll, Ogre, Giant and King of the Giants ([#85](https://github.com/Dilbe/Demo-game/issues/85))
+
+Three new monsters and a dungeon that mixes them.
+
+- **Monsters:** Troll (60 HP, 2 damage every 2s, 10 XP, heals 1 HP/s), Ogre (75 HP, 6 damage every 2s, 15 XP) and Giant (150 HP, 15 damage every 4s, 20 XP), each also a single fight. The Troll is the first monster with `regen`: HP per second while it's alive, ticked once a second during the fight, never above its max HP.
+- **King of the Giants:** Ogre + Orc + Orc → Giant + Troll + Troll → Troll + Ogre + Giant, with a 45 XP completion bonus (about 30% of its monster XP, like the other dungeons).
+- **Unlocks are a map, not a chain:** winning the Orc now unlocks the Troll, Ogre, Giant and Goblin Gauntlet at once, and the three new monsters unlock nothing themselves — a single ordered list can't express that. `FIGHT_UNLOCKED_BY` names the fight that unlocks each one, and the save keeps `wonFightIds` instead of `unlockedFightCount`. An older save converts on load: every fight before its last unlocked one counts as won. King of the Giants unlocks after Slime Companions.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

@@ -143,15 +143,50 @@ const MONSTERS = {
     // reads as the toughest of the three at a glance.
     sprite: '<svg viewBox="0 0 40 40"><rect x="7" y="21" width="26" height="16" rx="5" fill="#6b7d4a"/><circle cx="20" cy="14" r="11" fill="#7d8f57"/><circle cx="15" cy="13" r="1.8" fill="#1b1b1b"/><circle cx="25" cy="13" r="1.8" fill="#1b1b1b"/><polygon points="15,19 17,24 19,19" fill="#f1f1f1"/><polygon points="25,19 23,24 21,19" fill="#f1f1f1"/></svg>',
   },
+
+  // #85: the Troll, Ogre and Giant unlock together after the Orc.
+  // `regen` (HP per second, only while alive) is optional — the Troll is the
+  // first monster that heals itself; game.js ticks it once a second.
+  troll: {
+    label: 'Troll',
+    maxHp: 60,
+    damage: 2,
+    cooldown: 2,
+    xp: 10,
+    regen: 1,
+    // Grey-blue and hunched, with a long nose — cool-toned so it doesn't
+    // read as another green goblinoid.
+    sprite: '<svg viewBox="0 0 40 40"><rect x="8" y="20" width="24" height="17" rx="6" fill="#5f7480"/><circle cx="20" cy="15" r="10" fill="#7890a0"/><circle cx="16" cy="12" r="1.7" fill="#1b1b1b"/><circle cx="24" cy="12" r="1.7" fill="#1b1b1b"/><ellipse cx="20" cy="18" rx="3" ry="4" fill="#5f7480"/></svg>',
+  },
+
+  ogre: {
+    label: 'Ogre',
+    maxHp: 75,
+    damage: 6,
+    cooldown: 2,
+    xp: 15,
+    // A wide brown body under a small head with a heavy brow.
+    sprite: '<svg viewBox="0 0 40 40"><rect x="4" y="19" width="32" height="18" rx="7" fill="#8a6a4a"/><circle cx="20" cy="13" r="9" fill="#a8845c"/><rect x="12" y="9" width="16" height="3" rx="1.5" fill="#6e5238"/><circle cx="16" cy="14" r="1.6" fill="#1b1b1b"/><circle cx="24" cy="14" r="1.6" fill="#1b1b1b"/></svg>',
+  },
+
+  giant: {
+    label: 'Giant',
+    maxHp: 150,
+    damage: 15,
+    cooldown: 4,
+    xp: 20,
+    // Fills the whole viewBox, with a beard, so it reads as the biggest.
+    sprite: '<svg viewBox="0 0 40 40"><rect x="3" y="18" width="34" height="21" rx="6" fill="#7a6f9b"/><circle cx="20" cy="11" r="10" fill="#d9b48f"/><circle cx="16" cy="9" r="1.8" fill="#1b1b1b"/><circle cx="24" cy="9" r="1.8" fill="#1b1b1b"/><path d="M11 14 Q20 26 29 14 Z" fill="#8d5a2b"/></svg>',
+  },
 };
 
 // A fight option groups one or more monsters to fight together. Reuses the
 // MONSTERS templates — a group is just an ordered list of monster ids — so
 // adding one is still a data entry, matching the monster/stat/skill pattern.
-// The three single-monster groups mirror MONSTERS one-to-one; twoSmall is
-// the first multi-monster option.
+// The single-monster groups mirror MONSTERS one-to-one; twoSmall is the
+// first multi-monster option.
 // `dungeonOnly` groups exist only as fights inside a dungeon (#79): they're
-// left out of the picker and FIGHT_UNLOCK_ORDER, so they can't be picked
+// left out of the picker and FIGHT_UNLOCKED_BY, so they can't be picked
 // on their own.
 const MONSTER_GROUPS = {
   small: { label: 'Small Slime', monsterIds: ['small'] },
@@ -160,6 +195,12 @@ const MONSTER_GROUPS = {
   big: { label: 'Orc', monsterIds: ['big'] },
   smallAndMedium: { label: 'Small Slime + Goblin', monsterIds: ['small', 'medium'], dungeonOnly: true },
   smallAndBig: { label: 'Small Slime + Orc', monsterIds: ['small', 'big'], dungeonOnly: true },
+  troll: { label: 'Troll', monsterIds: ['troll'] },
+  ogre: { label: 'Ogre', monsterIds: ['ogre'] },
+  giant: { label: 'Giant', monsterIds: ['giant'] },
+  ogreOrcOrc: { label: 'Ogre + Orc + Orc', monsterIds: ['ogre', 'big', 'big'], dungeonOnly: true },
+  giantTrollTroll: { label: 'Giant + Troll + Troll', monsterIds: ['giant', 'troll', 'troll'], dungeonOnly: true },
+  trollOgreGiant: { label: 'Troll + Ogre + Giant', monsterIds: ['troll', 'ogre', 'giant'], dungeonOnly: true },
 };
 
 // A dungeon chains several fights back-to-back, fought without returning to
@@ -190,35 +231,57 @@ const DUNGEONS = {
     fightIds: ['twoSmall', 'smallAndMedium', 'smallAndBig'],
     completionBonusXp: 12,
   },
+
+  // #85: the three new monsters mixed together, unlocked after the last
+  // dungeon before it.
+  kingOfTheGiants: {
+    label: 'King of the Giants',
+    fightIds: ['ogreOrcOrc', 'giantTrollTroll', 'trollOgreGiant'],
+    completionBonusXp: 45,
+  },
 };
 
-// The order fights unlock in (#59) — MONSTER_GROUPS and DUNGEONS ids mixed
-// in one list, since no id is used by both. A new game can pick only the
-// first; winning a fight unlocks the one after it. Every group and dungeon
-// must appear here, or it can never be picked — except `dungeonOnly` groups,
-// which are never picked on their own.
-const FIGHT_UNLOCK_ORDER = ['small', 'medium', 'twoSmall', 'big', 'goblinGauntlet', 'monsterRush', 'slimeCompanions'];
+// Which fight has to be won to unlock each fight (#59) — MONSTER_GROUPS and
+// DUNGEONS ids mixed in one map, since no id is used by both. `null` means
+// unlocked from the start. Every group and dungeon must appear here, or it
+// can never be picked — except `dungeonOnly` groups, which are never picked
+// on their own.
+// Until #85 this was a single chain; the Troll, Ogre and Giant broke that —
+// all three unlock off the Orc at once and unlock nothing themselves.
+const FIGHT_UNLOCKED_BY = {
+  small: null,
+  medium: 'small',
+  twoSmall: 'medium',
+  big: 'twoSmall',
+  troll: 'big',
+  ogre: 'big',
+  giant: 'big',
+  goblinGauntlet: 'big',
+  monsterRush: 'goblinGauntlet',
+  slimeCompanions: 'monsterRush',
+  kingOfTheGiants: 'slimeCompanions',
+};
 
-// Whether `fightId` can be picked, given how many FIGHT_UNLOCK_ORDER entries
-// are unlocked so far (always at least the first).
-function fightUnlocked(unlockedFightCount, fightId) {
-  const index = FIGHT_UNLOCK_ORDER.indexOf(fightId);
-  return index !== -1 && index < unlockedFightCount;
-}
-
-// How many fights are unlocked after winning `fightId`: always the one right
-// after it, never fewer than before — replaying an earlier fight changes
-// nothing, and the count stops at the end of the list.
-function fightsUnlockedAfterWin(unlockedFightCount, fightId) {
-  const index = FIGHT_UNLOCK_ORDER.indexOf(fightId);
-  return Math.min(FIGHT_UNLOCK_ORDER.length, Math.max(unlockedFightCount, index + 2));
+// Whether `fightId` can be picked, given the ids of every fight won so far.
+function fightUnlocked(wonFightIds, fightId) {
+  const requiredId = FIGHT_UNLOCKED_BY[fightId];
+  if (requiredId === undefined) return false;
+  return requiredId === null || wonFightIds.includes(requiredId);
 }
 
 // The hint a locked fight shows instead of being selectable.
 function describeFightUnlock(fightId) {
-  const previousId = FIGHT_UNLOCK_ORDER[FIGHT_UNLOCK_ORDER.indexOf(fightId) - 1];
-  const previous = MONSTER_GROUPS[previousId] ?? DUNGEONS[previousId];
-  return `Locked — win ${previous.label} to unlock`;
+  const requiredId = FIGHT_UNLOCKED_BY[fightId];
+  const required = MONSTER_GROUPS[requiredId] ?? DUNGEONS[requiredId];
+  return `Locked — win ${required.label} to unlock`;
+}
+
+// A save from before #85 stored how many entries of this single chain were
+// unlocked, which meant every fight before the last unlocked one was won.
+const LEGACY_FIGHT_UNLOCK_ORDER = ['small', 'medium', 'twoSmall', 'big', 'goblinGauntlet', 'monsterRush', 'slimeCompanions'];
+
+function wonFightIdsFromUnlockCount(unlockedFightCount) {
+  return LEGACY_FIGHT_UNLOCK_ORDER.slice(0, Math.max(0, unlockedFightCount - 1));
 }
 
 // A new game's starting Max XP — the most XP a single cycle can earn.
@@ -879,7 +942,8 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus
 // after diminishing returns (see diminishedXp) — 0 for the full amount.
 function describeMonster(monsterId, claimCount = 0) {
   const monster = MONSTERS[monsterId];
-  return `${monster.maxHp} HP · ${monster.damage} damage every ${monster.cooldown}s · ${diminishedXp(monster.xp, claimCount)} XP`;
+  const regen = monster.regen ? ` · heals ${monster.regen} HP/s` : '';
+  return `${monster.maxHp} HP${regen} · ${monster.damage} damage every ${monster.cooldown}s · ${diminishedXp(monster.xp, claimCount)} XP`;
 }
 
 // Assumes a homogeneous group (every monster the same type) — true of every
@@ -972,7 +1036,7 @@ if (typeof module !== 'undefined') {
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
-    FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
+    FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,
     dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
