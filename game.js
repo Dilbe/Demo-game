@@ -1726,9 +1726,14 @@ function buildUpgradeRow(skillId) {
   const row = document.createElement('div');
   row.className = 'skill-upgrades';
 
+  // The Power track's preview includes any skill-damage perk bonus, so it
+  // matches the summary line (see describeSkill) and the damage actually dealt.
+  const perkBonus = skill.healing ? 0 : perkSkillDamageBonus(purchasedPerkIds, skillId);
+
   for (const upgrade of skill.upgrades) {
     const level = skillLevels[skillId][upgrade.id];
     const cost = skillUpgradeCost(skillId, upgrade.id, level);
+    const bonus = upgrade.id === 'power' ? perkBonus : 0;
 
     const label = document.createElement('span');
     label.className = 'track-label';
@@ -1736,7 +1741,7 @@ function buildUpgradeRow(skillId) {
 
     const change = document.createElement('span');
     change.className = 'track-change';
-    change.textContent = `${upgrade.format(upgrade.value(skill, level))} → ${upgrade.format(upgrade.value(skill, level + 1))}`;
+    change.textContent = `${upgrade.format(upgrade.value(skill, level) + bonus)} → ${upgrade.format(upgrade.value(skill, level + 1) + bonus)}`;
 
     const button = document.createElement('button');
     button.className = 'upgrade-button';
