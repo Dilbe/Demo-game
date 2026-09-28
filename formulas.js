@@ -174,7 +174,7 @@ const MONSTERS = {
     maxHp: 150,
     damage: 15,
     cooldown: 4,
-    xp: 20,
+    xp: 40,
     // Fills the whole viewBox, with a beard, so it reads as the biggest.
     sprite: '<svg viewBox="0 0 40 40"><rect x="3" y="18" width="34" height="21" rx="6" fill="#7a6f9b"/><circle cx="20" cy="11" r="10" fill="#d9b48f"/><circle cx="16" cy="9" r="1.8" fill="#1b1b1b"/><circle cx="24" cy="9" r="1.8" fill="#1b1b1b"/><path d="M11 14 Q20 26 29 14 Z" fill="#8d5a2b"/></svg>',
   },

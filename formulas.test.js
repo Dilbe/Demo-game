@@ -424,7 +424,7 @@ test('the #85 monsters match the issue\'s stats', () => {
   const expected = {
     troll: { maxHp: 60, damage: 2, cooldown: 2, xp: 10, regen: 1 },
     ogre: { maxHp: 75, damage: 6, cooldown: 2, xp: 15 },
-    giant: { maxHp: 150, damage: 15, cooldown: 4, xp: 20 },
+    giant: { maxHp: 150, damage: 15, cooldown: 4, xp: 40 },
   };
   for (const [monsterId, stats] of Object.entries(expected)) {
     for (const [field, value] of Object.entries(stats)) assert.strictEqual(MONSTERS[monsterId][field], value, `${monsterId}.${field}`);
