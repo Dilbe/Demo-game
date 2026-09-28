@@ -192,6 +192,26 @@ body {
   opacity: 0.5;
 }
 
+/* A fight's XP once diminishing returns lowered it (#90): light red after
+   the first payout, deepening to full red as --xp-loss (fightXpLoss, 0-1)
+   goes up. */
+.fight-xp.xp-reduced {
+  color: color-mix(in srgb, #c00000 calc(var(--xp-loss) * 100%), #e87878);
+}
+
+/* ...and blinking bright red right after the fight that lowered it, before
+   settling on the colour above. */
+.fight-xp.xp-dropped {
+  animation: xp-blink 0.4s ease-in-out 4;
+}
+
+@keyframes xp-blink {
+  50% {
+    color: #ff0000;
+    font-weight: bold;
+  }
+}
+
 .monster-lock-hint {
   flex-basis: 100%;
   font-style: italic;

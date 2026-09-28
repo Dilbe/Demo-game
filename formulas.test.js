@@ -10,7 +10,7 @@ const {
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
   groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,
   dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
-  fightXpSources, fightXpLeft, fightPaysXp, xpClaimsFromFightWins,
+  fightXpSources, fightXpLeft, fightXpLoss, fightPaysXp, xpClaimsFromFightWins,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
   PERKS, perkSkillDamageBonus, perkStartingUpgradePoints,
 } = require('./formulas.js');
@@ -619,6 +619,13 @@ test('fightXpSources adds up to the fight\'s full XP', () => {
 test('killing one monster and retreating only lowers that slot\'s XP', () => {
   // The retreat exploit from #86: the first slot paid, nothing else did.
   assert.strictEqual(fightXpLeft('twoSmall', { 'twoSmall/0': 1 }), 1.8 + 2 + 1);
+});
+
+test('fightXpLoss goes from 0 for a fresh fight to 1 once it pays nothing', () => {
+  assert.strictEqual(fightXpLoss('small'), 0);
+  assert.ok(Math.abs(fightXpLoss('small', { 'small/0': 1 }) - 0.1) < 1e-9); // 1 - 1.8 / 2
+  assert.strictEqual(fightXpLoss('small', { 'small/0': 10 }), 1);
+  assert.strictEqual(fightXpLoss('twoSmall', { 'twoSmall/0': 5, 'twoSmall/1': 5, 'twoSmall/bonus': 5 }), 0.5);
 });
 
 test('fightPaysXp stays true while any one source still pays', () => {
