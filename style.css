@@ -696,6 +696,25 @@ body {
   outline: 2px dashed #333;
 }
 
+/* A skill's Focus cost in the square's top-left corner, like a mana cost on a
+   card (#97) — see buildCostBadge. */
+.skill-cost-badge {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.2rem;
+  box-sizing: border-box;
+  border-radius: 0.55rem;
+  background: #1a4f8b;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: bold;
+  line-height: 1.1rem;
+  text-align: center;
+}
+
 .skill-square.inspected,
 .skill-slot.inspected {
   background: #eaf1fb;

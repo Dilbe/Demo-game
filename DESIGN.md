@@ -493,6 +493,13 @@ Diminishing XP (#77, #86) only changed a number, which was easy to miss. Now the
 - **Code keeps its names:** `pointCost`, `pointSurcharge`, `pointsUsed`, `effectivePointCost` and the `points-used`/`points-total` element ids are unchanged, and so is the save — nothing about the mechanic changed.
 - Earlier sections of this document still say Skill Points; they describe what shipped at the time.
 
+## Focus cost on skill squares ([#97](https://github.com/Dilbe/Demo-game/issues/97))
+
+A playtester with every tab open never noticed skills cost Focus, because the cost only showed after tapping a skill. Now every skill square, both in the list and in the equipped slots, has a small badge in its top-left corner with its Focus cost, like a mana cost on a card, so a loadout can be planned at a glance.
+
+- **Includes toggles:** the badge shows `effectivePointCost`, so turning a toggle on raises it right away, the same as the detail panel's cost line.
+- **Locked skills too:** their badge (dimmed with the square) shows what they'll cost once unlocked. Hovering a badge says "Costs N Focus while equipped".
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
