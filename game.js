@@ -1589,12 +1589,20 @@ function setDraggedFocusSlot(slotIndex) {
 // A small corner badge with the skill's Focus cost (#97), like a mana cost
 // on a card, so a loadout can be planned without opening every skill.
 // Includes any active toggle surcharges, same as the detail panel's cost line.
+// Drawn as one circle per point (#109), matching the header's Focus pips.
 function buildCostBadge(skillId) {
   const cost = effectivePointCost(skillId, activeToggleIds);
   const badge = document.createElement('span');
   badge.className = 'skill-cost-badge';
-  badge.textContent = cost;
-  badge.title = `Costs ${cost} Focus while equipped`;
+  for (let index = 0; index < cost; index += 1) {
+    const circle = document.createElement('span');
+    circle.className = 'skill-cost-pip';
+    badge.append(circle);
+  }
+  const label = `Costs ${cost} Focus while equipped`;
+  badge.title = label;
+  badge.setAttribute('role', 'img');
+  badge.setAttribute('aria-label', label);
   return badge;
 }
 

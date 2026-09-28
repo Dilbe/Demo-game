@@ -518,6 +518,14 @@ Same playtest again: a player with every tab open never noticed skills could be 
 - **Dot on a tab button:** Character (any stat upgrade affordable), Skills (any skill has a "↑") and Perks (any unowned perk affordable).
 - **Only "affordable", never "new"**, so a badge always means "you can spend here". A "new" marker could be a later issue.
 
+## Focus cost as circles ([#109](https://github.com/Dilbe/Demo-game/issues/109))
+
+The #97 cost badge showed a number. It now shows that many small blue circles, one per point of Focus, styled like the filled pips in the header (#98), so "costs 2" reads as "takes two of those pips".
+
+- **Still includes toggles** and still dims with a locked square, same as before.
+- **Tooltip unchanged:** "Costs N Focus while equipped", now also the badge's aria-label, since the number is no longer visible text.
+- **Fits the corner:** up to 4 circles in one row (the most any skill costs today) stay clear of the "↑" badge top-right (#99); a cost above 4 would wrap to a second row.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
