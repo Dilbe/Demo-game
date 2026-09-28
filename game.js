@@ -1317,7 +1317,7 @@ function canEquip(skillId) {
 
 // Equips `skillId` into `slotIndex`, moving it there if it's already
 // equipped somewhere else and bumping out whatever currently sits in that
-// slot. Refuses only if the result would exceed the Skill Points budget —
+// slot. Refuses only if the result would exceed the Focus budget —
 // the slot count itself is never at risk, since a drop always targets one
 // of the slots already on screen.
 function equipInSlot(skillId, slotIndex) {
@@ -1334,7 +1334,7 @@ function equipInSlot(skillId, slotIndex) {
   if (projectedPoints > budget) {
     const shortfall = projectedPoints - budget;
     showSkillEquipMessage(
-      `Not enough Skill Points to equip ${SKILLS[skillId].label} — needs ${shortfall} more `
+      `Not enough Focus to equip ${SKILLS[skillId].label} — needs ${shortfall} more `
       + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Intelligence.`
     );
     // Mirrors the message inline if the detail panel is open — see there —
@@ -1399,7 +1399,7 @@ function unlockToggle(skillId, toggleId) {
 }
 
 // Switches an already-unlocked toggle on or off. Turning one on adds its
-// pointSurcharge to the skill's Skill Point cost while equipped — refused,
+// pointSurcharge to the skill's Focus cost while equipped — refused,
 // with the same shortfall message equipInSlot shows, if that would exceed
 // the budget.
 function setToggleActive(skillId, toggleId, active) {
@@ -1417,7 +1417,7 @@ function setToggleActive(skillId, toggleId, active) {
     if (projectedPoints > budget) {
       const shortfall = projectedPoints - budget;
       showSkillEquipMessage(
-        `Not enough Skill Points to turn on ${toggle.label} — needs ${shortfall} more `
+        `Not enough Focus to turn on ${toggle.label} — needs ${shortfall} more `
         + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Intelligence.`
       );
       // The toggle switch lives inside the detail panel, not near the shared
@@ -1593,7 +1593,7 @@ function renderSkillDetail() {
   const effectiveCost = effectivePointCost(skillId, activeToggleIds);
   const cost = document.createElement('p');
   cost.className = 'skill-detail-cost';
-  cost.textContent = `Costs ${effectiveCost} ${effectiveCost === 1 ? 'Skill Point' : 'Skill Points'} while equipped`;
+  cost.textContent = `Costs ${effectiveCost} Focus while equipped`;
 
   const children = [heading, summary, cost];
 
@@ -1645,7 +1645,7 @@ function buildToggleRow(skillId) {
 
     const description = document.createElement('span');
     description.className = 'toggle-description';
-    description.textContent = `${toggle.description} (+${toggle.pointSurcharge} ${toggle.pointSurcharge === 1 ? 'Skill Point' : 'Skill Points'} while on)`;
+    description.textContent = `${toggle.description} (+${toggle.pointSurcharge} Focus while on)`;
 
     const row = document.createElement('div');
     row.className = 'toggle-row';

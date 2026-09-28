@@ -451,7 +451,7 @@ The four Character-tab stats are now point-based, RPG-style stats. This replaces
 - **A stat is a number of points:** its base value plus levels bought with Upgrade Points, plus bonuses from equipped passive skills and purchased perks. Bonuses never change the stat's level, so they never make the next level cost more. Each stat's `effect` turns its total into what the game uses (`statBonuses`, `statTotal` and `statEffect` in `formulas.js`).
 - **Constitution** (was Max HP): starts at 4, and each point is 5 Max HP. 4 points is the same 20 HP a new game always had.
 - **Fortitude** (was Health Regen): starts at 0. Passive regen heals 1 HP every 60 × 0.9^Fortitude seconds.
-- **Wisdom** (was Skill Slots) and **Intelligence** (was Skill Points) work exactly as before. Skills still cost Skill Points; Intelligence is the stat that gives them.
+- **Wisdom** (was Skill Slots) and **Intelligence** (was Skill Points) work exactly as before. Skills still cost Skill Points (renamed to Focus by #96); Intelligence is the stat that gives them.
 - **Regen skill:** +6 Fortitude while equipped, instead of +100% regen rate.
 - **Perks:** Max HP +10/+25 became Constitution +2/+5 (the same HP), and Healing Speed +25% became Fortitude +2 (0.9² ≈ 0.81, about the same speed). Their ids didn't change, so saves that bought them still own them.
 - **Breakdown:** hovering a stat's name shows how its total adds up: base, upgrades, each bonus by source, the total, and what it does. On a phone, where there's no hover, tapping the name opens it and tapping anywhere else closes it.
@@ -484,6 +484,14 @@ Diminishing XP (#77, #86) only changed a number, which was easy to miss. Now the
 
 - **Redder the less it's worth:** once a fight has paid out at least once, its XP turns light red, deepening to full red as it approaches 0 (`fightXpLoss` in `formulas.js`: 0 = full XP, 1 = nothing left).
 - **Blinks when it drops:** the first time the fight screen comes back after a fight that lowered it (Restart, or Retreat after a kill), the XP blinks bright red a few times, then settles on its shade. Picking another fight, or loading a save, doesn't blink it again.
+
+## Skill Points renamed to Focus ([#96](https://github.com/Dilbe/Demo-game/issues/96))
+
+"Skill Points" read like a currency you spend once, but it's a capacity: equipped skills occupy it and give it back when unequipped. It's now called **Focus**, which reads as a capacity and fits Intelligence as its source.
+
+- **Player-facing text only:** the Skills tab header, the skill detail panel's cost line, toggle surcharges, both shortfall messages ("Not enough Focus to equip …") and Intelligence's description and value ("N Focus"). Focus is uncountable, so there's no singular/plural split any more.
+- **Code keeps its names:** `pointCost`, `pointSurcharge`, `pointsUsed`, `effectivePointCost` and the `points-used`/`points-total` element ids are unchanged, and so is the save — nothing about the mechanic changed.
+- Earlier sections of this document still say Skill Points; they describe what shipped at the time.
 
 ## Future ideas (parking lot — not yet planned)
 

@@ -169,7 +169,7 @@ test('every skill defines the full data-object shape', () => {
     for (const field of ['label', 'type', 'pointCost', 'icon']) {
       assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
     }
-    assert.ok(skill.pointCost > 0, `${skillId} costs no skill points to equip`);
+    assert.ok(skill.pointCost > 0, `${skillId} costs no Focus to equip`);
     assert.match(skill.icon, /^<svg viewBox="0 0 24 24">.*<\/svg>$/, `${skillId}'s icon is not a well-formed 24x24 SVG string`);
 
     // A skill unlocks either by spending XP or by completing a gameplay
@@ -222,7 +222,7 @@ test('every skill defines the full data-object shape', () => {
         assert.ok(toggle[field] !== undefined, `${skillId}'s ${toggle.id ?? '?'} toggle is missing ${field}`);
       }
       assert.ok(toggle.unlockCost > 0, `${skillId}'s ${toggle.id} toggle unlocks for free`);
-      assert.ok(toggle.pointSurcharge > 0, `${skillId}'s ${toggle.id} toggle costs no extra Skill Points`);
+      assert.ok(toggle.pointSurcharge > 0, `${skillId}'s ${toggle.id} toggle costs no extra Focus`);
     }
   }
 });
@@ -302,7 +302,7 @@ test('passiveMultiplier applies an equipped passive\'s boost to its own stat', (
 
 // --- Toggles ---------------------------------------------------------------
 // Optional per-skill upgrades: unlocked once with XP, then switched on/off
-// freely, adding a Skill Point surcharge only while on.
+// freely, adding a Focus surcharge only while on.
 
 test('toggleKey is unique per skill even for toggles sharing an id', () => {
   // Basic Attack and Strong Attack both have an 'autoTrigger' toggle — the
