@@ -1934,6 +1934,11 @@ function applyObjectiveReward(reward, { replaying = false } = {}) {
   if (reward.type === 'xp') {
     if (replaying) return;
     awardXp(reward.amount);
+  } else if (reward.type === 'upgradePoints') {
+    // Straight into the balance, not through awardXp: these aren't XP, so
+    // they neither fill the prestige bar nor count against maxXp.
+    if (replaying) return;
+    upgradePoints += reward.amount;
   } else if (reward.type === 'unlockTab') {
     document.querySelector(`.tab-button[data-tab="${reward.tabId}"]`).hidden = false;
   } else if (reward.type === 'unlockSkill') {
@@ -2146,6 +2151,14 @@ function loadProgress() {
   // same objective ids now, so they just move over.
   for (const questId of (saved.completedQuestIds ?? []).map(renamedObjectiveId)) {
     if (OBJECTIVES[questId] && !completedObjectiveIds.includes(questId)) completedObjectiveIds.push(questId);
+  }
+  // Before #114, killTen was the Skills-tab objective; killFiveForSkills took
+  // that over and killTen became a new one. A save with killTen but not
+  // killFiveForSkills is from before then (5 kills always come before 10), so
+  // it gets the Skills tab as killFiveForSkills and can still earn the new
+  // killTen reward.
+  if (completedObjectiveIds.includes('killTen') && !completedObjectiveIds.includes('killFiveForSkills')) {
+    completedObjectiveIds = completedObjectiveIds.map((id) => (id === 'killTen' ? 'killFiveForSkills' : id));
   }
   if (saved.togglesUnlocked) togglesUnlocked = saved.togglesUnlocked;
   if (saved.unlockedToggleIds) unlockedToggleIds = saved.unlockedToggleIds;
