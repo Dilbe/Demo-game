@@ -1742,7 +1742,7 @@ function applyCompletedObjectiveRewards() {
 // Checks `event` (e.g. `{ type: 'killMonster', monsterId: 'medium',
 // totalKills: 7 }`) against every objective that's available and not yet
 // completed. More than one can match the same event (a Goblin kill can be
-// both "Kill a Goblin" and the 5th kill), so this loops over all of them.
+// both "Kill a Goblin" and the 3rd kill), so this loops over all of them.
 // Always refreshes the tracker and tab afterwards, since a kill moves a
 // 'killCount' objective's progress even when nothing completes.
 function registerObjectiveEvent(event) {
@@ -1919,11 +1919,13 @@ function loadProgress() {
   if (saved.totalKills) totalKills = saved.totalKills;
   if (saved.lifetimeXp) lifetimeXp = saved.lifetimeXp;
   if (saved.prestigeProgress) prestigeProgress = saved.prestigeProgress;
-  if (saved.completedObjectiveIds) completedObjectiveIds = saved.completedObjectiveIds;
+  // killFive became killThree when its target dropped to 3 kills (#91).
+  const renamedObjectiveId = (id) => (id === 'killFive' ? 'killThree' : id);
+  if (saved.completedObjectiveIds) completedObjectiveIds = saved.completedObjectiveIds.map(renamedObjectiveId);
   // A save from before quests became objectives (#57) keeps its completed
   // quests in a list of their own. Their ids (killFive, killTen) are the
   // same objective ids now, so they just move over.
-  for (const questId of saved.completedQuestIds ?? []) {
+  for (const questId of (saved.completedQuestIds ?? []).map(renamedObjectiveId)) {
     if (OBJECTIVES[questId] && !completedObjectiveIds.includes(questId)) completedObjectiveIds.push(questId);
   }
   if (saved.togglesUnlocked) togglesUnlocked = saved.togglesUnlocked;

@@ -466,6 +466,10 @@ Counting diminishing returns per fight win let the player dodge them: kill one m
 - **Picker** still shows what a full clear pays now, summing each source after its own diminishing returns, and fades a fight only once none of its sources pays anything.
 - **Saved** as `xpClaimCounts` in the main save (reset by a prestige). An older save's `fightWinCounts` converts on load: every source of a fight won N times starts at N.
 
+## Character tab after 3 kills ([#91](https://github.com/Dilbe/Demo-game/issues/91))
+
+The objective that unlocks the Character tab now asks for 3 kills instead of 5 (v6's "Kill 5 enemies"), so the tab shows up sooner. Its id changed from `killFive` to `killThree`; a save that already completed `killFive` is mapped over on load. "Kill 10 enemies" → Skills tab is unchanged.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
