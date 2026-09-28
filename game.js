@@ -33,12 +33,6 @@ const questTrackerEl = document.getElementById('quest-tracker');
 const objectiveListEl = document.getElementById('objective-list');
 const showCompletedObjectivesEl = document.getElementById('show-completed-objectives');
 const versionValueEl = document.getElementById('version-value');
-const maxXpValueEl = document.getElementById('max-xp-value');
-const lifetimeXpValueEl = document.getElementById('lifetime-xp-value');
-const prestigeSectionEl = document.getElementById('prestige-section');
-const prestigeBarFillEl = document.getElementById('prestige-bar-fill');
-const prestigeProgressValueEl = document.getElementById('prestige-progress-value');
-const prestigeTargetValueEl = document.getElementById('prestige-target-value');
 const prestigeButton = document.getElementById('prestige-button');
 const perkPointsValueEl = document.getElementById('perk-points-value');
 const perkListEl = document.getElementById('perk-list');
@@ -196,14 +190,6 @@ retreatButton.addEventListener('click', retreat);
 resetCharacterButton.addEventListener('click', resetCharacter);
 prestigeButton.addEventListener('click', prestige);
 showCompletedObjectivesEl.addEventListener('change', renderObjectives);
-
-// Tapping anywhere other than a stat's name closes its open breakdown.
-document.addEventListener('click', (event) => {
-  if (openStatBreakdownId && !event.target.closest('.stat-name')) {
-    openStatBreakdownId = null;
-    renderStats();
-  }
-});
 
 // Dropping a skill back onto the list unequips it — the list itself is a
 // fixed element (only its rows get rebuilt), so this is wired up once here
@@ -467,6 +453,9 @@ function renderSelectedFight() {
   }
 }
 
+// One line per stat: name, total and what it does, with the upgrade button
+// on the right. Tapping the line opens its breakdown underneath (#78) —
+// inline rather than a hover tooltip, so it works the same on a phone.
 function renderStats() {
   statListEl.replaceChildren();
 
@@ -474,52 +463,60 @@ function renderStats() {
     const level = stats[statId];
     const bonuses = currentStatBonuses(statId);
     const total = statTotal(statId, level, bonuses);
+    const open = openStatBreakdownIds.has(statId);
+    const breakdownId = `stat-breakdown-${statId}`;
 
-    const name = document.createElement('button');
+    const toggle = document.createElement('button');
+    toggle.className = 'stat-toggle';
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-controls', breakdownId);
+    toggle.addEventListener('click', () => toggleStatBreakdown(statId));
+
+    const chevron = document.createElement('span');
+    chevron.className = 'stat-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '▶';
+
+    const name = document.createElement('span');
     name.className = 'stat-name';
-    name.textContent = stat.label;
-    name.setAttribute('aria-expanded', String(openStatBreakdownId === statId));
-    name.addEventListener('click', () => toggleStatBreakdown(statId));
+    name.textContent = `${stat.label} · ${total}`;
 
-    const breakdown = buildStatBreakdown(statId, level, bonuses, total);
+    const effect = document.createElement('span');
+    effect.className = 'stat-effect';
+    effect.textContent = stat.format(statEffect(statId, total));
 
-    const nameWrap = document.createElement('span');
-    nameWrap.className = 'stat-name-wrap';
-    nameWrap.classList.toggle('open', openStatBreakdownId === statId);
-    nameWrap.append(name, breakdown);
-
-    const points = document.createElement('span');
-    points.className = 'stat-level';
-    points.textContent = total;
-
-    const description = document.createElement('span');
-    description.className = 'stat-description';
-    description.textContent = stat.description;
-
-    // Shows what the next level buys in outcome terms, not just in points.
-    // Bonuses stay the same across a level, so they're counted on both sides.
-    const change = document.createElement('span');
-    change.className = 'stat-change';
-    change.textContent = `${stat.format(statEffect(statId, total))} → ${stat.format(statEffect(statId, total + stat.perLevel))}`;
+    const summary = document.createElement('span');
+    summary.className = 'stat-summary';
+    summary.append(name, effect);
+    toggle.append(chevron, summary);
 
     const cost = statCost(statId, level);
     const button = document.createElement('button');
     button.className = 'upgrade-button';
-    button.textContent = `Upgrade (${cost} UP)`;
+    button.textContent = `+1 for ${cost} UP`;
     button.disabled = upgradePoints < cost;
     button.addEventListener('click', () => upgradeStat(statId));
 
+    const line = document.createElement('div');
+    line.className = 'stat-line';
+    line.append(toggle, button);
+
+    const breakdown = buildStatBreakdown(statId, level, bonuses, total);
+    breakdown.id = breakdownId;
+    breakdown.hidden = !open;
+
     const row = document.createElement('div');
     row.className = 'stat-row';
-    row.append(nameWrap, points, description, change, button);
+    row.classList.toggle('open', open);
+    row.append(line, breakdown);
     statListEl.append(row);
   }
 }
 
-// How a stat's total adds up (#78): its base value, the levels bought on
-// top, each bonus by where it comes from, and what the total does. Shown on
-// hover with a mouse; on a phone, tapping the stat's name opens it instead
-// (see toggleStatBreakdown), since a touchscreen has no hover.
+// How a stat's total adds up (#78): what the stat does, its base value, the
+// levels bought on top, each bonus by where it comes from, and what the next
+// level would give. Bonuses stay the same across a level, so they're
+// counted on both sides of that comparison.
 function buildStatBreakdown(statId, level, bonuses, total) {
   const stat = STATS[statId];
   const lines = [
@@ -528,35 +525,39 @@ function buildStatBreakdown(statId, level, bonuses, total) {
     ...bonuses.map((bonus) => [bonus.source, `+${bonus.points}`]),
   ];
 
-  const breakdown = document.createElement('span');
+  const breakdown = document.createElement('div');
   breakdown.className = 'stat-breakdown';
-  breakdown.setAttribute('role', 'tooltip');
+
+  const description = document.createElement('p');
+  description.className = 'stat-description';
+  description.textContent = stat.description;
+  breakdown.append(description);
 
   for (const [label, value] of lines) {
-    const line = document.createElement('span');
+    const line = document.createElement('div');
     line.className = 'stat-breakdown-line';
     line.append(label, Object.assign(document.createElement('span'), { textContent: value }));
     breakdown.append(line);
   }
 
-  const totalLine = document.createElement('span');
+  const totalLine = document.createElement('div');
   totalLine.className = 'stat-breakdown-line stat-breakdown-total';
-  totalLine.append(stat.label, Object.assign(document.createElement('span'), { textContent: `${total}` }));
+  totalLine.append('Total', Object.assign(document.createElement('span'), { textContent: `${total}` }));
 
-  const effect = document.createElement('span');
-  effect.className = 'stat-breakdown-effect';
-  effect.textContent = `= ${stat.format(statEffect(statId, total))}`;
+  const next = document.createElement('p');
+  next.className = 'stat-next';
+  next.textContent = `Next level: ${stat.format(statEffect(statId, total + stat.perLevel))}`;
 
-  breakdown.append(totalLine, effect);
+  breakdown.append(totalLine, next);
   return breakdown;
 }
 
-// Which stat's breakdown was opened by a click/tap, if any — remembered so
-// the Character tab re-rendering (on every XP award, say) doesn't close it.
-let openStatBreakdownId = null;
+// Which stats have their breakdown open — remembered so the Character tab
+// re-rendering (on every XP award, say) doesn't close them.
+const openStatBreakdownIds = new Set();
 
 function toggleStatBreakdown(statId) {
-  openStatBreakdownId = openStatBreakdownId === statId ? null : statId;
+  if (!openStatBreakdownIds.delete(statId)) openStatBreakdownIds.add(statId);
   renderStats();
 }
 
@@ -1095,8 +1096,8 @@ function updateXpDisplay() {
 }
 
 // Fills toward maxXp, then — once XP past it only feeds the prestige bar
-// (see awardXp) — turns into a copy of the Character tab's prestige bar,
-// so progress stays visible from every tab.
+// (see awardXp) — shows prestige progress instead, so it stays visible
+// from every tab.
 function renderXpBar() {
   const prestigeReady = lifetimeXp >= maxXp;
   const [label, value, target] = prestigeReady
@@ -1109,21 +1110,11 @@ function renderXpBar() {
   xpBarLabelEl.textContent = `${label}: ${value}/${target} (UP: ${roundXp(upgradePoints)})`;
 }
 
-// Hidden until lifetime XP reaches maxXp; once visible, fills toward
-// prestigeTarget(maxXp) and reveals the Prestige button once full.
+// The top XP bar already shows Max XP and prestige progress (see
+// renderXpBar), so the Character tab only needs the Prestige button itself,
+// shown once that bar is full.
 function renderPrestige() {
-  maxXpValueEl.textContent = maxXp;
-  lifetimeXpValueEl.textContent = lifetimeXp;
-
-  const ready = lifetimeXp >= maxXp;
-  prestigeSectionEl.hidden = !ready;
-  if (!ready) return;
-
-  const target = prestigeTarget(maxXp);
-  prestigeProgressValueEl.textContent = prestigeProgress;
-  prestigeTargetValueEl.textContent = target;
-  prestigeBarFillEl.style.width = `${Math.min(100, (prestigeProgress / target) * 100)}%`;
-  prestigeButton.hidden = prestigeProgress < target;
+  prestigeButton.hidden = lifetimeXp < maxXp || prestigeProgress < prestigeTarget(maxXp);
 }
 
 // Resets everything a fresh game starts with — XP, stats, skills, quests,
