@@ -72,16 +72,12 @@ let dungeonFightIndex = 0;
 // How many FIGHT_UNLOCK_ORDER entries the player can pick (#59) — starts at
 // just the first, and part of the main save, so a prestige resets it too.
 let unlockedFightCount = 1;
-// How often each fight option (a MONSTER_GROUPS or DUNGEONS id) has been
-// won — drives its diminishing XP (#77, see diminishedXp). A dungeon counts
-// as one fight: clearing it bumps the dungeon's own count, not its groups'.
-let fightWinCounts = {};
+// How often each XP source (a monster slot, a group's clear bonus, a
+// dungeon's completion bonus — keyed as in fightXpSources) has already paid
+// out — drives its own diminishing XP (#86, see diminishedXp), so killing
+// one monster and retreating doesn't touch the others' XP.
+let xpClaimCounts = {};
 let activeMonsters = [];
-// How many monsters have died in the current group/fight so far — drives the
-// compounding ×1.25 group-kill XP bonus (see groupKillXp). Reset whenever a
-// new group starts (startFightGroup), including each fight within a dungeon,
-// so the bonus never carries over between them.
-let groupKillCount = 0;
 // Which entry of activeMonsters the player's own attacks hit — selectable by
 // clicking a card once more than one monster is active, defaulting to the
 // front.
@@ -249,7 +245,7 @@ function renderMonsterSelect() {
     // so Two Small Slimes' card just shows one Small Slime sprite.
     const sprite = MONSTERS[group.monsterIds[0]].sprite;
     monsterSelectEl.append(
-      buildMonsterSelectRow(groupId, group.label, describeMonsterGroup(groupId, fightWins(groupId)), selected, () => selectMonsterGroup(groupId), sprite)
+      buildMonsterSelectRow(groupId, group.label, describeMonsterGroup(groupId, xpClaimCounts), selected, () => selectMonsterGroup(groupId), sprite)
     );
   }
 
@@ -261,7 +257,7 @@ function renderMonsterSelect() {
   for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
     const selected = dungeonId === selectedDungeonId;
     monsterSelectEl.append(
-      buildMonsterSelectRow(dungeonId, dungeon.label, describeDungeon(dungeonId, fightWins(dungeonId)), selected, () => selectDungeon(dungeonId))
+      buildMonsterSelectRow(dungeonId, dungeon.label, describeDungeon(dungeonId, xpClaimCounts), selected, () => selectDungeon(dungeonId))
     );
   }
 }
@@ -290,7 +286,7 @@ function buildMonsterSelectRow(fightId, label, detailText, selected, onSelect, s
   const row = document.createElement('div');
   row.className = 'monster-row';
   row.classList.toggle('selected', selected);
-  row.classList.toggle('no-xp', !fightPaysXp(fightWins(fightId)));
+  row.classList.toggle('no-xp', !fightPaysXp(fightId, xpClaimCounts));
   if (spriteMarkup) row.append(buildSprite(spriteMarkup, 'monster-sprite'));
   row.append(name, detail);
 
@@ -448,10 +444,10 @@ function updateMonsterPreview() {
 function renderSelectedFight() {
   if (selectedDungeonId) {
     selectedFightNameEl.textContent = DUNGEONS[selectedDungeonId].label;
-    selectedFightDetailEl.textContent = describeDungeon(selectedDungeonId, fightWins(selectedDungeonId));
+    selectedFightDetailEl.textContent = describeDungeon(selectedDungeonId, xpClaimCounts);
   } else if (selectedGroupId) {
     selectedFightNameEl.textContent = MONSTER_GROUPS[selectedGroupId].label;
-    selectedFightDetailEl.textContent = describeMonsterGroup(selectedGroupId, fightWins(selectedGroupId));
+    selectedFightDetailEl.textContent = describeMonsterGroup(selectedGroupId, xpClaimCounts);
   } else {
     selectedFightNameEl.textContent = 'No fight selected';
     selectedFightDetailEl.textContent = '';
@@ -654,8 +650,7 @@ function damageMonster(index, power) {
   monsterCards[index].hpEl.textContent = target.hp;
   if (target.hp > 0) return false;
 
-  awardXp(diminishedXp(groupKillXp(MONSTERS[target.monsterId].xp, groupKillCount), fightWins(currentFightId())));
-  groupKillCount += 1;
+  claimXp(monsterXpKey(currentFightKey(), index), MONSTERS[target.monsterId].xp);
   updateXpDisplay();
   totalKills += 1;
   registerObjectiveEvent({ type: 'killMonster', monsterId: target.monsterId, totalKills });
@@ -676,6 +671,14 @@ function resolveFightProgress() {
     return;
   }
 
+  // Every monster in this group is down, so its clear bonus (#86) pays now —
+  // never on a retreat or loss, which end the fight before reaching here.
+  const groupBonus = groupClearBonusXp(activeMonsters.map((monster) => monster.monsterId));
+  if (groupBonus > 0) {
+    claimXp(groupBonusXpKey(currentFightKey()), groupBonus);
+    updateXpDisplay();
+  }
+
   if (activeDungeonId && dungeonFightIndex < DUNGEONS[activeDungeonId].fightIds.length - 1) {
     advanceDungeonFight();
     return;
@@ -685,8 +688,7 @@ function resolveFightProgress() {
     // Paid once, only here — reaching this point already means every fight
     // in the chain is cleared. Retreat and a loss both end the dungeon
     // elsewhere, without ever reaching this branch.
-    const bonus = diminishedXp(DUNGEONS[activeDungeonId].completionBonusXp, fightWins(activeDungeonId));
-    awardXp(bonus);
+    const bonus = claimXp(dungeonClearXpKey(activeDungeonId), DUNGEONS[activeDungeonId].completionBonusXp);
     registerObjectiveEvent({ type: 'winDungeon' });
     recordFightWin(activeDungeonId);
     updateXpDisplay();
@@ -702,21 +704,26 @@ function resolveFightProgress() {
 
 // Winning a fight unlocks the next one in FIGHT_UNLOCK_ORDER (#59). The
 // picker is closed during a fight, so it's rebuilt the next time it opens.
-// Also counts the win toward the fight's diminishing XP (#77) — only after
-// this win's own XP was paid, so the first win still pays in full.
 function recordFightWin(fightId) {
   unlockedFightCount = fightsUnlockedAfterWin(unlockedFightCount, fightId);
-  fightWinCounts[fightId] = fightWins(fightId) + 1;
 }
 
-function fightWins(fightId) {
-  return fightWinCounts[fightId] ?? 0;
+// Pays one XP source (#86, see fightXpSources) after its own diminishing
+// returns, then counts the payout — so the first one still pays in full.
+// Returns what was paid.
+function claimXp(key, fullXp) {
+  const claims = xpClaimCounts[key] ?? 0;
+  const paid = diminishedXp(fullXp, claims);
+  awardXp(paid);
+  xpClaimCounts[key] = claims + 1;
+  return paid;
 }
 
-// The fight option the current fight's XP is scaled by: the whole dungeon
-// while in one, otherwise the picked group.
-function currentFightId() {
-  return activeDungeonId ?? selectedGroupId;
+// The group currently being fought, as a key for its XP sources: the
+// dungeon plus which fight in its chain while in one, otherwise the picked
+// group.
+function currentFightKey() {
+  return activeDungeonId ? dungeonFightKey(activeDungeonId, dungeonFightIndex) : selectedGroupId;
 }
 
 // Max HP stat's own XP-funded value, plus any permanent bonus from purchased
@@ -942,7 +949,6 @@ function startFightGroup(groupId) {
   const group = MONSTER_GROUPS[groupId];
   activeMonsters = group.monsterIds.map((monsterId) => ({ monsterId, hp: MONSTERS[monsterId].maxHp }));
   targetIndex = 0;
-  groupKillCount = 0;
   renderMonsterList(activeMonsters, { interactive: true });
 
   // Every monster starts attacking as soon as the fight begins, each on its
@@ -992,7 +998,7 @@ function advanceDungeonFight() {
   saveProgress();
 }
 
-// Every XP-earning moment (a kill, a dungeon-clear bonus) should route
+// Every XP-earning moment (a kill, a group or dungeon clear bonus) should route
 // through here rather than adding to `upgradePoints` directly, so lifetime
 // tracking and the prestige bar can never drift out of sync with what was
 // actually earned. Spending Upgrade Points (upgrades, unlocks) still just
@@ -1769,7 +1775,7 @@ function saveProgress() {
   if (wipingSave) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({
     upgradePoints, stats, hp: playerHp, unlockedSkills, equippedSkills, skillLevels,
-    selectedGroupId, selectedDungeonId, unlockedFightCount, fightWinCounts, totalKills,
+    selectedGroupId, selectedDungeonId, unlockedFightCount, xpClaimCounts, totalKills,
     lifetimeXp, prestigeProgress,
     completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
   }));
@@ -1828,7 +1834,9 @@ function loadProgress() {
   // selected that's now locked — dropped, so the player picks again.
   if (fightUnlocked(unlockedFightCount, saved.selectedGroupId)) selectedGroupId = saved.selectedGroupId;
   if (fightUnlocked(unlockedFightCount, saved.selectedDungeonId)) selectedDungeonId = saved.selectedDungeonId;
-  if (saved.fightWinCounts) fightWinCounts = saved.fightWinCounts;
+  if (saved.xpClaimCounts) xpClaimCounts = saved.xpClaimCounts;
+  // A save from before #86 counted wins per fight instead.
+  else if (saved.fightWinCounts) xpClaimCounts = xpClaimsFromFightWins(saved.fightWinCounts);
   if (saved.totalKills) totalKills = saved.totalKills;
   if (saved.lifetimeXp) lifetimeXp = saved.lifetimeXp;
   if (saved.prestigeProgress) prestigeProgress = saved.prestigeProgress;

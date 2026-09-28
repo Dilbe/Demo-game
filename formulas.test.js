@@ -8,7 +8,9 @@ const {
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
   FIGHT_UNLOCK_ORDER, fightUnlocked, fightsUnlockedAfterWin, describeFightUnlock,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
-  groupKillXp, groupTotalXp, diminishedXp, fightPaysXp, roundXp,
+  groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,
+  dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
+  fightXpSources, fightXpLeft, fightPaysXp, xpClaimsFromFightWins,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
   PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus, perkStartingUpgradePoints,
 } = require('./formulas.js');
@@ -407,11 +409,16 @@ test('describeMonsterGroup matches describeMonster for a single-monster group', 
 });
 
 test('describeMonsterGroup totals XP across a multi-monster group', () => {
-  assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 5 XP total'); // 2, then ceil(2 * 1.25)
+  assert.strictEqual(describeMonsterGroup('twoSmall'), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 5 XP total'); // 2 + 2 + 1 clear bonus
 });
 
-test('describeMonsterGroup scales the group total by its own win count', () => {
-  assert.strictEqual(describeMonsterGroup('twoSmall', 3), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 3.5 XP total');
+test('describeMonsterGroup scales each part of the group total by its own claim count', () => {
+  const xpClaims = { 'twoSmall/0': 3, 'twoSmall/1': 3, 'twoSmall/bonus': 3 };
+  assert.strictEqual(describeMonsterGroup('twoSmall', xpClaims), '2\u00d7 5 HP \u00b7 1 damage every 3s \u00b7 3.5 XP total');
+});
+
+test('describeMonsterGroup uses the single monster\'s own slot for a single-monster group', () => {
+  assert.strictEqual(describeMonsterGroup('small', { 'small/0': 1 }), describeMonster('small', 1));
 });
 
 test('groupKillXp does not change the first kill in a group', () => {
@@ -434,8 +441,24 @@ test('groupKillXp computes each kill fresh from baseXp, not chained off the last
   assert.strictEqual(groupKillXp(1, 2), 2);
 });
 
-test('groupTotalXp sums every kill in order, bonus included', () => {
+test('groupTotalXp sums every monster\'s XP plus the clear bonus', () => {
   assert.strictEqual(groupTotalXp(['medium', 'medium']), 8 + 10); // 8, then 8 * 1.25
+});
+
+test('groupClearBonusXp is 0 for a single-monster group', () => {
+  assert.strictEqual(groupClearBonusXp(['big']), 0);
+});
+
+test('groupClearBonusXp is what the \u00d71.25 kill bonus paid on top of base XP', () => {
+  assert.strictEqual(groupClearBonusXp(['small', 'small']), 1); // ceil(2 * 1.25) - 2
+  assert.strictEqual(groupClearBonusXp(['medium', 'medium', 'medium']), 2 + 5); // (10 - 8) + (ceil(12.5) - 8)
+});
+
+test('groupClearBonusXp assumes the highest-XP monster dies last, whatever the listed order', () => {
+  // small (2) first, big (24) second: ceil(24 * 1.25) - 24 = 6. Big first
+  // would only have been ceil(2 * 1.25) - 2 = 1.
+  assert.strictEqual(groupClearBonusXp(['big', 'small']), 6);
+  assert.strictEqual(groupClearBonusXp(['small', 'big']), 6);
 });
 
 test('groupTotalXp matches a monster\'s own XP for a single-monster group', () => {
@@ -474,10 +497,15 @@ test('describeDungeon lists every fight in order and totals their XP, completion
   );
 });
 
-test('describeDungeon scales monster XP and bonus alike by the dungeon\'s win count', () => {
+test('describeDungeon scales each monster and the completion bonus by its own claim count', () => {
+  const allAtFive = Object.fromEntries(fightXpSources('goblinGauntlet').map(({ key }) => [key, 5]));
   assert.strictEqual(
-    describeDungeon('goblinGauntlet', 5),
+    describeDungeon('goblinGauntlet', allAtFive),
     'Small Slime → Small Slime → Goblin · 8.5 XP total', // 17 at 50%
+  );
+  assert.strictEqual(
+    describeDungeon('goblinGauntlet', { 'goblinGauntlet/0/0': 10 }),
+    'Small Slime → Small Slime → Goblin · 15 XP total', // only the first Small Slime pays nothing
   );
 });
 
@@ -501,11 +529,63 @@ test('diminishedXp keeps at most one decimal', () => {
   }
 });
 
-test('fightPaysXp turns false exactly when diminishedXp reaches zero', () => {
-  assert.strictEqual(fightPaysXp(9), true);
-  assert.ok(diminishedXp(1, 9) > 0);
-  assert.strictEqual(fightPaysXp(10), false);
-  assert.strictEqual(diminishedXp(1, 10), 0);
+// --- Per-source diminishing XP (#86) ---------------------------------------
+
+test('fightXpSources lists one source per monster slot plus the group\'s clear bonus', () => {
+  assert.deepStrictEqual(fightXpSources('twoSmall'), [
+    { key: 'twoSmall/0', xp: 2 },
+    { key: 'twoSmall/1', xp: 2 },
+    { key: 'twoSmall/bonus', xp: 1 },
+  ]);
+  assert.deepStrictEqual(fightXpSources('big'), [{ key: 'big/0', xp: 24 }]);
+});
+
+test('fightXpSources gives each fight in a dungeon its own keys, plus the completion bonus', () => {
+  assert.deepStrictEqual(fightXpSources('goblinGauntlet'), [
+    { key: 'goblinGauntlet/0/0', xp: 2 },
+    { key: 'goblinGauntlet/1/0', xp: 2 },
+    { key: 'goblinGauntlet/2/0', xp: 8 },
+    { key: 'goblinGauntlet/clear', xp: 5 },
+  ]);
+});
+
+test('the key helpers build the same keys fightXpSources uses', () => {
+  const fightKey = dungeonFightKey('goblinGauntlet', 2);
+  assert.strictEqual(monsterXpKey(fightKey, 0), 'goblinGauntlet/2/0');
+  assert.strictEqual(groupBonusXpKey('twoSmall'), 'twoSmall/bonus');
+  assert.strictEqual(dungeonClearXpKey('goblinGauntlet'), 'goblinGauntlet/clear');
+});
+
+test('fightXpSources adds up to the fight\'s full XP', () => {
+  assert.strictEqual(fightXpLeft('twoSmall'), groupTotalXp(MONSTER_GROUPS.twoSmall.monsterIds));
+  for (const dungeonId of Object.keys(DUNGEONS)) {
+    const dungeon = DUNGEONS[dungeonId];
+    const monsterXp = dungeon.fightIds.reduce((sum, groupId) => sum + groupTotalXp(MONSTER_GROUPS[groupId].monsterIds), 0);
+    assert.strictEqual(fightXpLeft(dungeonId), monsterXp + dungeon.completionBonusXp);
+  }
+});
+
+test('killing one monster and retreating only lowers that slot\'s XP', () => {
+  // The retreat exploit from #86: the first slot paid, nothing else did.
+  assert.strictEqual(fightXpLeft('twoSmall', { 'twoSmall/0': 1 }), 1.8 + 2 + 1);
+});
+
+test('fightPaysXp stays true while any one source still pays', () => {
+  assert.strictEqual(fightPaysXp('twoSmall', { 'twoSmall/0': 10, 'twoSmall/1': 10 }), true); // bonus unclaimed
+  assert.strictEqual(fightPaysXp('twoSmall', { 'twoSmall/0': 10, 'twoSmall/1': 10, 'twoSmall/bonus': 10 }), false);
+  assert.strictEqual(fightPaysXp('small', { 'small/0': 9 }), true);
+  assert.strictEqual(fightPaysXp('small', { 'small/0': 10 }), false);
+});
+
+test('xpClaimsFromFightWins gives every source of a won fight that fight\'s win count', () => {
+  assert.deepStrictEqual(xpClaimsFromFightWins({ twoSmall: 3, goblinGauntlet: 1 }), {
+    'twoSmall/0': 3, 'twoSmall/1': 3, 'twoSmall/bonus': 3,
+    'goblinGauntlet/0/0': 1, 'goblinGauntlet/1/0': 1, 'goblinGauntlet/2/0': 1, 'goblinGauntlet/clear': 1,
+  });
+});
+
+test('xpClaimsFromFightWins drops fights that no longer exist', () => {
+  assert.deepStrictEqual(xpClaimsFromFightWins({ removedFight: 4 }), {});
 });
 
 test('roundXp strips floating-point noise down to one decimal', () => {
