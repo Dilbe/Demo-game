@@ -58,7 +58,7 @@ const STATS = {
 
   wisdom: {
     label: 'Wisdom',
-    description: 'Skills you can equip',
+    description: 'Skill Slots to equip skills (Skills tab)',
     // How many skills can be equipped at once. Starts at 2 so a new player has
     // one empty slot, which advertises that unlocking a skill is worth doing.
     base: 2,
@@ -72,13 +72,13 @@ const STATS = {
       return points;
     },
     format(effect) {
-      return `${effect} skill slots`;
+      return `${effect} Skill Slots`;
     },
   },
 
   intelligence: {
     label: 'Intelligence',
-    description: 'Skill Points for equipped skills',
+    description: 'Skill Points to equip skills (Skills tab)',
     // A second limit alongside Wisdom: slots cap how many skills you equip,
     // Skill Points cap how strong that combination can be.
     base: 3,

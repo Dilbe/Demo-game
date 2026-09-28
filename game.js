@@ -1593,7 +1593,7 @@ function renderSkillDetail() {
   const effectiveCost = effectivePointCost(skillId, activeToggleIds);
   const cost = document.createElement('p');
   cost.className = 'skill-detail-cost';
-  cost.textContent = `${effectiveCost} ${effectiveCost === 1 ? 'pt' : 'pts'} while equipped`;
+  cost.textContent = `Costs ${effectiveCost} ${effectiveCost === 1 ? 'Skill Point' : 'Skill Points'} while equipped`;
 
   const children = [heading, summary, cost];
 
@@ -1645,7 +1645,7 @@ function buildToggleRow(skillId) {
 
     const description = document.createElement('span');
     description.className = 'toggle-description';
-    description.textContent = `${toggle.description} (+${toggle.pointSurcharge} ${toggle.pointSurcharge === 1 ? 'pt' : 'pts'} while on)`;
+    description.textContent = `${toggle.description} (+${toggle.pointSurcharge} ${toggle.pointSurcharge === 1 ? 'Skill Point' : 'Skill Points'} while on)`;
 
     const row = document.createElement('div');
     row.className = 'toggle-row';
