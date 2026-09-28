@@ -1200,6 +1200,7 @@ function buyPerk(perkId) {
   // loadProgress instead.
   upgradePoints += perkStartingUpgradePoints([perkId]);
   saveProgress();
+  updateUpgradeTabsVisibility();
 
   // A perk can change effective Max HP or the regen rate immediately, not
   // just future gains, so both need an explicit refresh alongside the
@@ -1949,8 +1950,20 @@ function updatePerksTabVisibility() {
   document.querySelector('.tab-button[data-tab="perks-tab"]').hidden = prestigeCount(maxXp) < 1;
 }
 
+// Owning any starting-Upgrade-Points perk reveals the Character and Skills
+// tabs from the start of every new game (#84), so those points can be spent
+// right away instead of waiting on the kill objectives that normally unlock
+// the tabs. Only ever reveals — never re-hides a tab an objective unlocked.
+function updateUpgradeTabsVisibility() {
+  if (perkStartingUpgradePoints(purchasedPerkIds) === 0) return;
+  for (const tabId of ['character-tab', 'skills-tab']) {
+    document.querySelector(`.tab-button[data-tab="${tabId}"]`).hidden = false;
+  }
+}
+
 loadProgress();
 updatePerksTabVisibility();
+updateUpgradeTabsVisibility();
 if (playerHp === null) playerHp = effectiveMaxHp();
 startGame();
 updateXpDisplay();
