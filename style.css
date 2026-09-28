@@ -361,7 +361,7 @@ body {
 /* Always visible below the health bar, on every tab, so the current XP
    balance never needs a tab switch to check. */
 /* Same shape as #health-bar, blue while XP climbs toward Max XP, then the
-   prestige bar's gold once XP is capped and only the prestige bar fills. */
+   gold once XP is capped and only prestige progress fills. */
 #xp-bar {
   position: relative;
   width: 100%;
@@ -483,36 +483,113 @@ body {
   background: #ddd;
 }
 
+/* One line per stat (#stat-list): a toggle showing the name, total and
+   effect, and the upgrade button on the right. The breakdown opens inline
+   under its line rather than floating as a tooltip, so a phone and a mouse
+   use it the same way. */
+#stat-list {
+  max-width: 34rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  text-align: left;
+}
+
 .stat-row {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+.stat-line {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  margin: 0.75rem auto;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+}
+
+.stat-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.stat-chevron {
+  flex-shrink: 0;
+  width: 1rem;
+  font-size: 0.75rem;
+  color: #777;
+  transition: transform 0.15s;
+}
+
+.stat-row.open .stat-chevron {
+  transform: rotate(90deg);
+}
+
+.stat-summary {
+  display: flex;
+  flex-direction: column;
 }
 
 .stat-name {
-  width: 7.5rem;
-  text-align: right;
+  font-weight: bold;
 }
 
-.stat-level {
-  width: 3.5rem;
-  text-align: left;
+.stat-effect {
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.stat-line .upgrade-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.stat-breakdown {
+  max-width: 16rem;
+  margin: 0 0 0.75rem 1.6rem;
+  font-size: 0.9rem;
+  color: #444;
 }
 
 .stat-description {
-  flex: 1 1 11.5rem;
-  max-width: 11.5rem;
-  text-align: left;
+  margin: 0 0 0.35rem;
   color: #555;
 }
 
-.stat-change {
-  flex: 1 1 8rem;
-  max-width: 8rem;
-  text-align: left;
+.stat-breakdown-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stat-breakdown-total {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid #ccc;
+  font-weight: bold;
+}
+
+.stat-next {
+  margin: 0.35rem 0 0;
+  color: #1b5e20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-chevron {
+    transition: none;
+  }
 }
 
 .upgrade-button,
@@ -793,45 +870,13 @@ body {
   color: #555;
 }
 
-/* Hidden until lifetime XP reaches Max XP (see renderPrestige) — matches
-   #health-bar's look, in gold rather than green to read as a distinct,
-   special-occasion meter rather than another health-style resource. */
-#prestige-section {
-  margin: 0 auto 1.5rem;
-}
-
-#prestige-section[hidden] {
-  display: none;
-}
-
-#prestige-bar {
-  position: relative;
-  width: 16rem;
-  height: 1.75rem;
-  margin: 0 auto 0.75rem;
-  border: 1px solid #999;
-  background: #eee;
-  overflow: hidden;
-}
-
-#prestige-bar-fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: 0%;
-  background: #d4af37;
-  transition: width 0.2s linear;
-}
-
-#prestige-bar-label {
-  position: relative;
-  line-height: 1.75rem;
-}
-
+/* Hidden until the top bar's prestige progress is full (see renderPrestige). */
 #prestige-button {
+  display: block;
+  margin: 0 auto 1rem;
   font-size: 1rem;
   padding: 0.5rem 1.5rem;
+  min-height: 2.75rem;
 }
 
 #prestige-button[hidden] {

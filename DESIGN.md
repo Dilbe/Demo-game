@@ -410,13 +410,19 @@ Everything unlocked by *doing* something is now one list: `OBJECTIVES` in `formu
 
 ## Fight unlocks ([#59](https://github.com/Dilbe/Demo-game/issues/59))
 
-Fights no longer all start selectable. `FIGHT_UNLOCK_ORDER` in `formulas.js` lists every monster group and dungeon in one order: Small Slime → Goblin → Two Small Slimes → Orc → Goblin Gauntlet → Monster Rush. This replaces v4/v5's "every fight and dungeon can be picked from the start".
+Fights no longer all start selectable. `FIGHT_UNLOCK_ORDER` in `formulas.js` lists every monster group and dungeon in one order: Small Slime → Goblin → Two Small Slimes → Orc → Goblin Gauntlet → Monster Rush → Slime Companions ([#79](https://github.com/Dilbe/Demo-game/issues/79)). This replaces v4/v5's "every fight and dungeon can be picked from the start".
 
 - **A new game** can pick only the first. The rest are listed in the picker, greyed out, with a "Locked — win <previous fight> to unlock" hint, and clicking them does nothing.
 - **Winning a fight** unlocks the next one (for a dungeon, clearing all of it). Winning an earlier fight again unlocks nothing new.
 - **Saved** as `unlockedFightCount` in the main save, so a prestige resets it to just the first fight, same as the rest of the save.
 - **Old saves** start back at one unlocked fight; a selected fight that's now locked is dropped on load.
 - `MONSTER_GROUPS` was reordered to match, so the picker reads top-down in unlock order.
+
+## Slime Companions ([#79](https://github.com/Dilbe/Demo-game/issues/79))
+
+A third dungeon, unlocked by clearing Monster Rush: Two Small Slimes → Small Slime + Goblin → Small Slime + Orc, with a 12 XP completion bonus.
+
+- **First mixed groups.** Its last two fights pair different monsters. They're `MONSTER_GROUPS` entries marked `dungeonOnly`, which keeps them out of the picker and `FIGHT_UNLOCK_ORDER`, so they can only be fought inside the dungeon.
 
 ## Upgrade Points ([#76](https://github.com/Dilbe/Demo-game/issues/76))
 
@@ -437,6 +443,19 @@ Winning the same fight over and over pays less and less XP. This replaces "a kil
 - **Per fight, not per monster:** each monster group and each dungeon keeps its own win count. Farming Small Slime doesn't lower Two Small Slimes' XP. A dungeon counts as one fight: clearing it bumps only the dungeon's count, and that count scales both its monsters' XP and its completion bonus.
 - **Picker and fight summary** show the XP left after diminishing returns. A fight that pays nothing any more is faded, like a locked one, but stays selectable.
 - **Saved** as `fightWinCounts` in the main save, so a prestige resets it, same as fight unlocks.
+
+## Stats ([#78](https://github.com/Dilbe/Demo-game/issues/78))
+
+The four Character-tab stats are now point-based, RPG-style stats. This replaces the v2/v3 stat names and v12's "Max HP +10/+25" and "Healing Speed +25%" perk effects.
+
+- **A stat is a number of points:** its base value plus levels bought with Upgrade Points, plus bonuses from equipped passive skills and purchased perks. Bonuses never change the stat's level, so they never make the next level cost more. Each stat's `effect` turns its total into what the game uses (`statBonuses`, `statTotal` and `statEffect` in `formulas.js`).
+- **Constitution** (was Max HP): starts at 4, and each point is 5 Max HP. 4 points is the same 20 HP a new game always had.
+- **Fortitude** (was Health Regen): starts at 0. Passive regen heals 1 HP every 60 × 0.9^Fortitude seconds.
+- **Wisdom** (was Skill Slots) and **Intelligence** (was Skill Points) work exactly as before. Skills still cost Skill Points; Intelligence is the stat that gives them.
+- **Regen skill:** +6 Fortitude while equipped, instead of +100% regen rate.
+- **Perks:** Max HP +10/+25 became Constitution +2/+5 (the same HP), and Healing Speed +25% became Fortitude +2 (0.9² ≈ 0.81, about the same speed). Their ids didn't change, so saves that bought them still own them.
+- **Breakdown:** hovering a stat's name shows how its total adds up: base, upgrades, each bonus by source, the total, and what it does. On a phone, where there's no hover, tapping the name opens it and tapping anywhere else closes it.
+- **Old saves:** each old stat's level carries over to the stat that replaced it. Max HP maps exactly; a Health Regen level becomes one Fortitude point, which heals a little slower than the old level did.
 
 ## Per-source diminishing XP ([#86](https://github.com/Dilbe/Demo-game/issues/86))
 

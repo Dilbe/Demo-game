@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const {
   VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES,
-  statValue, statCost,
+  statValue, statCost, statBonuses, statTotal, statEffect,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   findToggle, toggleKey, effectivePointCost,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
@@ -12,7 +12,7 @@ const {
   dungeonFightKey, monsterXpKey, groupBonusXpKey, dungeonClearXpKey,
   fightXpSources, fightXpLeft, fightPaysXp, xpClaimsFromFightWins,
   STARTING_MAX_XP, PRESTIGE_BONUS_PER_CYCLE, prestigeTarget, prestigeCount, spendableXpGain,
-  PERKS, perkMaxHpBonus, perkHealingSpeedMultiplier, perkSkillDamageBonus, perkStartingUpgradePoints,
+  PERKS, perkSkillDamageBonus, perkStartingUpgradePoints,
 } = require('./formulas.js');
 
 // --- Version ---------------------------------------------------------
@@ -80,28 +80,34 @@ test('no stat ever gets cheaper as levels rise', () => {
   }
 });
 
-test('skillSlots grows by whole slots and always allows at least one skill', () => {
+test('wisdom grows by whole slots and always allows at least one skill', () => {
   for (let level = 0; level < 10; level += 1) {
-    const slots = statValue('skillSlots', level);
+    const slots = statEffect('wisdom', statValue('wisdom', level));
     assert.strictEqual(slots % 1, 0, `level ${level} gave a fractional slot count`);
     assert.ok(slots >= 1, `level ${level} left no room for any skill`);
-    assert.ok(statValue('skillSlots', level + 1) > slots, `slots did not grow at level ${level + 1}`);
+    assert.ok(statEffect('wisdom', statValue('wisdom', level + 1)) > slots, `slots did not grow at level ${level + 1}`);
   }
 });
 
-test('upgrading maxHp always increases it', () => {
-  for (let level = 0; level < 10; level += 1) {
-    assert.ok(statValue('maxHp', level + 1) > statValue('maxHp', level), `maxHp did not increase at level ${level + 1}`);
+test('every stat point gives more of its effect than the last', () => {
+  for (const statId of Object.keys(STATS)) {
+    for (let points = 0; points < 10; points += 1) {
+      const better = statId === 'fortitude'
+        ? statEffect(statId, points + 1) < statEffect(statId, points)
+        : statEffect(statId, points + 1) > statEffect(statId, points);
+      assert.ok(better, `${statId} did not improve at ${points + 1} points`);
+    }
   }
 });
 
-test('healthRegen shortens its interval but never reaches zero', () => {
-  for (let level = 0; level < 10; level += 1) {
-    assert.ok(statValue('healthRegen', level + 1) < statValue('healthRegen', level), `did not shorten at level ${level + 1}`);
+test('fortitude shortens the regen interval but never reaches zero', () => {
+  for (const points of [0, 1, 10, 100, 1000]) {
+    assert.ok(statEffect('fortitude', points) > 0, `${points} points produced a non-positive interval`);
   }
-  for (const level of [0, 1, 10, 100, 1000]) {
-    assert.ok(statValue('healthRegen', level) > 0, `level ${level} produced a non-positive interval`);
-  }
+});
+
+test('constitution starts at the 20 Max HP a new game always had', () => {
+  assert.strictEqual(statEffect('constitution', statValue('constitution', 0)), 20);
 });
 
 test('every skill gets stronger and faster as its tracks level up', () => {
@@ -150,8 +156,9 @@ test('every stat defines the full data-object shape', () => {
       assert.ok(stat[field] !== undefined, `${statId} is missing ${field}`);
     }
     assert.strictEqual(typeof stat.value, 'function', `${statId} is missing value()`);
+    assert.strictEqual(typeof stat.effect, 'function', `${statId} is missing effect()`);
     assert.strictEqual(typeof stat.format, 'function', `${statId} is missing format()`);
-    assert.ok(stat.format(stat.value(0)).length > 0, `${statId} format() produced nothing`);
+    assert.ok(stat.format(stat.effect(stat.value(0))).length > 0, `${statId} format() produced nothing`);
   }
 });
 
@@ -177,10 +184,18 @@ test('every skill defines the full data-object shape', () => {
 
     if (skill.type === 'passive') {
       assert.ok(skill.boost, `${skillId} is passive but has no boost`);
-      for (const field of ['stat', 'percent', 'label']) {
-        assert.ok(skill.boost[field] !== undefined, `${skillId}'s boost is missing ${field}`);
+      // Either a percentage (with a label to describe it) or points added
+      // to a real stat.
+      const { boost } = skill;
+      if (boost.points !== undefined) {
+        assert.ok(STATS[boost.stat], `${skillId}'s boost names an unknown stat`);
+        assert.ok(boost.points > 0, `${skillId}'s boost does nothing`);
+      } else {
+        for (const field of ['stat', 'percent', 'label']) {
+          assert.ok(boost[field] !== undefined, `${skillId}'s boost is missing ${field}`);
+        }
+        assert.ok(boost.percent > 0, `${skillId}'s boost does nothing`);
       }
-      assert.ok(skill.boost.percent > 0, `${skillId}'s boost does nothing`);
       continue;
     }
 
@@ -226,8 +241,8 @@ test('starting skills are real skills and cost nothing', () => {
 });
 
 test('a new player can afford to equip every starting skill at once', () => {
-  const budget = statValue('skillPoints', 0);
-  const slots = statValue('skillSlots', 0);
+  const budget = statEffect('intelligence', statValue('intelligence', 0));
+  const slots = statEffect('wisdom', statValue('wisdom', 0));
   const needed = STARTING_SKILLS.reduce((total, skillId) => total + SKILLS[skillId].pointCost, 0);
 
   assert.ok(needed <= budget, `starting skills need ${needed} points but a new player has ${budget}`);
@@ -236,7 +251,7 @@ test('a new player can afford to equip every starting skill at once', () => {
 
 test('the cheapest skill always fits a new player budget', () => {
   const cheapest = Math.min(...Object.values(SKILLS).map((skill) => skill.pointCost));
-  assert.ok(cheapest <= statValue('skillPoints', 0), 'no skill is affordable at skillPoints level 0');
+  assert.ok(cheapest <= statEffect('intelligence', statValue('intelligence', 0)), 'no skill is affordable at intelligence level 0');
 });
 
 test('every skill that must be bought with XP costs something', () => {
@@ -269,7 +284,7 @@ test('describeSkill adds a perk damage bonus to a damage skill but not to healin
 // --- Passive skills ------------------------------------------------------
 
 test('describeSkill reports a passive skill\'s boost instead of damage/cooldown', () => {
-  assert.strictEqual(describeSkill('regen'), '+100% HP regen rate while equipped');
+  assert.strictEqual(describeSkill('regen'), '+6 Fortitude while equipped');
   assert.strictEqual(describeSkill('strength'), '+25% damage while equipped');
 });
 
@@ -281,7 +296,7 @@ test('passiveMultiplier is 1 with no matching passive equipped', () => {
 
 test('passiveMultiplier applies an equipped passive\'s boost to its own stat', () => {
   assert.strictEqual(passiveMultiplier(['strength'], 'damage'), 1.25);
-  assert.strictEqual(passiveMultiplier(['regen'], 'healthRegen'), 2);
+  assert.strictEqual(passiveMultiplier(['regen'], 'fortitude'), 1, 'Regen adds points, not a percentage');
   assert.strictEqual(passiveMultiplier(['strength', 'regen', 'basicAttack'], 'damage'), 1.25);
 });
 
@@ -337,8 +352,8 @@ test('effectivePointCost stacks every active toggle a skill has', () => {
 // rebalance on purpose — update it to match, deliberately.
 
 test('BALANCE SNAPSHOT: current tuning', () => {
-  assert.strictEqual(statValue('maxHp', 0), 20);
-  assert.strictEqual(statValue('maxHp', 1), 25);
+  assert.strictEqual(statValue('constitution', 0), 4);
+  assert.strictEqual(statEffect('constitution', 5), 25);
 
   assert.strictEqual(skillPower('basicAttack', 0), 1);
   assert.strictEqual(skillPower('basicAttack', 3), 4);
@@ -350,18 +365,19 @@ test('BALANCE SNAPSHOT: current tuning', () => {
   assert.strictEqual(skillUpgradeCost('basicAttack', 'power', 0), 5);
   assert.strictEqual(skillUpgradeCost('basicAttack', 'power', 1), 8);
 
-  assert.strictEqual(statValue('healthRegen', 0), 60);
-  assert.strictEqual(statValue('healthRegen', 1), 48);
-  assert.strictEqual(statValue('healthRegen', 4), 30);
+  assert.strictEqual(statValue('fortitude', 0), 0);
+  assert.strictEqual(statEffect('fortitude', 0), 60);
+  assert.strictEqual(statEffect('fortitude', 1), 54);
+  assert.strictEqual(Math.round(statEffect('fortitude', 6)), 32);
 
-  assert.strictEqual(statValue('skillSlots', 0), 2);
-  assert.strictEqual(statValue('skillSlots', 2), 4);
+  assert.strictEqual(statValue('wisdom', 0), 2);
+  assert.strictEqual(statValue('wisdom', 2), 4);
 
-  assert.strictEqual(statValue('skillPoints', 0), 3);
-  assert.strictEqual(statValue('skillPoints', 2), 7);
+  assert.strictEqual(statValue('intelligence', 0), 3);
+  assert.strictEqual(statValue('intelligence', 2), 7);
 
-  assert.strictEqual(statCost('maxHp', 0), 5);
-  assert.strictEqual(statCost('maxHp', 1), 7);
+  assert.strictEqual(statCost('constitution', 0), 5);
+  assert.strictEqual(statCost('constitution', 1), 7);
 });
 
 test('every monster defines a well-formed sprite', () => {
@@ -483,6 +499,20 @@ test('every dungeon fight reuses a real MONSTER_GROUPS entry', () => {
   }
 });
 
+test('every dungeon-only group is used by some dungeon', () => {
+  const usedGroupIds = Object.values(DUNGEONS).flatMap((dungeon) => dungeon.fightIds);
+  for (const [groupId, group] of Object.entries(MONSTER_GROUPS)) {
+    if (group.dungeonOnly) assert.ok(usedGroupIds.includes(groupId), `${groupId} is dungeon-only but no dungeon uses it`);
+  }
+});
+
+test('Slime Companions pairs a Small Slime with each companion in turn', () => {
+  assert.deepStrictEqual(
+    DUNGEONS.slimeCompanions.fightIds.map((groupId) => MONSTER_GROUPS[groupId].monsterIds),
+    [['small', 'small'], ['small', 'medium'], ['small', 'big']],
+  );
+});
+
 test('a dungeon chains more than one fight', () => {
   for (const [dungeonId, dungeon] of Object.entries(DUNGEONS)) {
     assert.ok(dungeon.fightIds.length > 1, `${dungeonId} has only one fight, so isn't really a chain`);
@@ -595,8 +625,9 @@ test('roundXp strips floating-point noise down to one decimal', () => {
 
 // --- Fight unlocks ---------------------------------------------------------
 
-test('FIGHT_UNLOCK_ORDER lists every monster group and dungeon exactly once', () => {
-  const allFightIds = [...Object.keys(MONSTER_GROUPS), ...Object.keys(DUNGEONS)];
+test('FIGHT_UNLOCK_ORDER lists every pickable monster group and dungeon exactly once', () => {
+  const pickableGroupIds = Object.keys(MONSTER_GROUPS).filter((groupId) => !MONSTER_GROUPS[groupId].dungeonOnly);
+  const allFightIds = [...pickableGroupIds, ...Object.keys(DUNGEONS)];
   assert.deepStrictEqual([...FIGHT_UNLOCK_ORDER].sort(), allFightIds.sort());
 });
 
@@ -622,6 +653,7 @@ test('winning the last fight keeps the count at the end of the list', () => {
 test('describeFightUnlock names the fight to win first, group or dungeon', () => {
   assert.strictEqual(describeFightUnlock('medium'), 'Locked — win Small Slime to unlock');
   assert.strictEqual(describeFightUnlock('monsterRush'), 'Locked — win Goblin Gauntlet to unlock');
+  assert.strictEqual(describeFightUnlock('slimeCompanions'), 'Locked — win Monster Rush to unlock');
 });
 
 // --- Objectives ------------------------------------------------------------
@@ -810,28 +842,37 @@ test('every perk costs Perk Points and defines a targeted effect', () => {
   for (const perk of Object.values(PERKS)) {
     assert.ok(perk.cost > 0);
     assert.ok(perk.effect.type);
-    assert.ok(perk.effect.amount > 0);
+    assert.ok((perk.effect.amount ?? perk.effect.points) > 0);
   }
 });
 
-test('perkMaxHpBonus is 0 with no Max HP perk purchased', () => {
-  assert.strictEqual(perkMaxHpBonus([]), 0);
-  assert.strictEqual(perkMaxHpBonus(['basicAttackDamage']), 0);
+// --- Stat bonuses (#78) --------------------------------------------------
+
+test('statBonuses is empty with nothing equipped or purchased that boosts the stat', () => {
+  assert.deepStrictEqual(statBonuses('constitution', [], []), []);
+  assert.deepStrictEqual(statBonuses('constitution', ['regen', 'strength'], ['basicAttackDamage', 'healingSpeed25']), []);
 });
 
-test('perkMaxHpBonus adds flat Max HP perks together', () => {
-  assert.strictEqual(perkMaxHpBonus(['maxHp10']), 10);
-  assert.strictEqual(perkMaxHpBonus(['maxHp25']), 25);
-  assert.strictEqual(perkMaxHpBonus(['maxHp10', 'maxHp25']), 35);
+test('statBonuses lists each equipped passive and purchased perk that boosts the stat', () => {
+  assert.deepStrictEqual(statBonuses('fortitude', ['basicAttack', 'regen'], ['healingSpeed25']), [
+    { source: 'Regen', points: 6 },
+    { source: 'Fortitude +2', points: 2 },
+  ]);
+  assert.deepStrictEqual(statBonuses('constitution', [], ['maxHp10', 'maxHp25']), [
+    { source: 'Constitution +2', points: 2 },
+    { source: 'Constitution +5', points: 5 },
+  ]);
 });
 
-test('perkHealingSpeedMultiplier is 1 with no Healing Speed perk purchased', () => {
-  assert.strictEqual(perkHealingSpeedMultiplier([]), 1);
-  assert.strictEqual(perkHealingSpeedMultiplier(['maxHp10']), 1);
+test('statTotal adds every bonus on top of the stat base points', () => {
+  assert.strictEqual(statTotal('constitution', 0, []), 4);
+  assert.strictEqual(statTotal('constitution', 2, statBonuses('constitution', [], ['maxHp10', 'maxHp25'])), 13);
 });
 
-test('perkHealingSpeedMultiplier applies a purchased Healing Speed perk', () => {
-  assert.strictEqual(perkHealingSpeedMultiplier(['healingSpeed25']), 1.25);
+test('the Max HP perks give the same HP as before they became Constitution', () => {
+  const base = statEffect('constitution', statTotal('constitution', 0, []));
+  const withBoth = statEffect('constitution', statTotal('constitution', 0, statBonuses('constitution', [], ['maxHp10', 'maxHp25'])));
+  assert.strictEqual(withBoth - base, 35);
 });
 
 test('perkSkillDamageBonus only applies to the skill a perk targets', () => {
