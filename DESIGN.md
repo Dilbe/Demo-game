@@ -534,6 +534,14 @@ Last fix from the same playtest: the detail panel, with the upgrade rows and Upg
 - **Closing it is temporary:** tapping the selected skill still closes the panel, but the next time the tab opens it picks the first equipped skill again.
 - **Nothing equipped:** the "Tap a skill" placeholder shows as before.
 
+## Constitution perks heal once ([#111](https://github.com/Dilbe/Demo-game/issues/111))
+
+Buying a Constitution +x perk now also heals the player by the Max HP it adds (+10 for Constitution +2, +25 for Constitution +5), so the new HP starts filled instead of empty.
+
+- **Once, at purchase:** it's a one-time heal when the perk is bought, not something that repeats on reload or prestige.
+- **Measured, not hard-coded:** the heal is the Max HP after buying minus before, so any future perk that raises Max HP heals the same way.
+- **Perks only:** a Constitution level bought with Upgrade Points still raises Max HP without healing.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
