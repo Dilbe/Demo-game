@@ -542,6 +542,14 @@ Buying a Constitution +x perk now also heals the player by the Max HP it adds (+
 - **Measured, not hard-coded:** the heal is the Max HP after buying minus before, so any future perk that raises Max HP heals the same way.
 - **Perks only:** a Constitution level bought with Upgrade Points still raises Max HP without healing.
 
+## Skills tab after 5 kills ([#114](https://github.com/Dilbe/Demo-game/issues/114))
+
+The Skills tab now unlocks after 5 kills instead of 10, so it shows up sooner. "Kill 10 enemies" stays, but now pays +5 Upgrade Points.
+
+- **New reward type `upgradePoints`:** added straight to the Upgrade Points balance, not through `awardXp`, so it doesn't fill the prestige bar or count against the XP cap. Paid once, not again on reload.
+- **Ids:** the Skills-tab objective is now `killFiveForSkills` (`killFive` is already taken by old saves, see #91); `killTen` is the new Upgrade Points one.
+- **Old saves:** a save with `killTen` but not `killFiveForSkills` is from before this change. Its `killTen` becomes `killFiveForSkills` on load, so the Skills tab stays unlocked and the player can still earn the new +5 on their next kill.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

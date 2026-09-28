@@ -704,10 +704,20 @@ const OBJECTIVES = {
     prerequisites: [],
   },
 
+  // Not `killFive`: that id is taken by old saves, where it meant the
+  // Character-tab objective before killThree replaced it (#91) — see
+  // game.js's loadProgress.
+  killFiveForSkills: {
+    description: 'Kill 5 enemies',
+    condition: { type: 'killCount', target: 5 },
+    reward: { type: 'unlockTab', tabId: 'skills-tab' },
+    prerequisites: [],
+  },
+
   killTen: {
     description: 'Kill 10 enemies',
     condition: { type: 'killCount', target: 10 },
-    reward: { type: 'unlockTab', tabId: 'skills-tab' },
+    reward: { type: 'upgradePoints', amount: 5 },
     prerequisites: [],
   },
 
@@ -773,6 +783,7 @@ function describeObjectiveProgress(objective, totalKills) {
 function describeReward(reward) {
   if (!reward) return '';
   if (reward.type === 'xp') return `+${reward.amount} XP`;
+  if (reward.type === 'upgradePoints') return `+${reward.amount} Upgrade Points`;
   if (reward.type === 'unlockTab') return `Unlocks the ${TAB_LABELS[reward.tabId]} tab`;
   if (reward.type === 'unlockSkill') return `Unlocks ${SKILLS[reward.skillId].label}`;
   if (reward.type === 'unlockToggles') return 'Unlocks skill toggles';

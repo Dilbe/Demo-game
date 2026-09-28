@@ -814,9 +814,12 @@ test('describeReward is empty for an objective with no reward', () => {
   assert.strictEqual(describeReward(null), '');
 });
 
-test('killThree unlocks the Character tab and killTen unlocks the Skills tab', () => {
+test('killThree unlocks the Character tab, killFiveForSkills the Skills tab, and killTen pays 5 Upgrade Points', () => {
   assert.deepStrictEqual(OBJECTIVES.killThree.reward, { type: 'unlockTab', tabId: 'character-tab' });
-  assert.deepStrictEqual(OBJECTIVES.killTen.reward, { type: 'unlockTab', tabId: 'skills-tab' });
+  assert.deepStrictEqual(OBJECTIVES.killFiveForSkills.condition, { type: 'killCount', target: 5 });
+  assert.deepStrictEqual(OBJECTIVES.killFiveForSkills.reward, { type: 'unlockTab', tabId: 'skills-tab' });
+  assert.deepStrictEqual(OBJECTIVES.killTen.condition, { type: 'killCount', target: 10 });
+  assert.deepStrictEqual(OBJECTIVES.killTen.reward, { type: 'upgradePoints', amount: 5 });
 });
 
 test('objectiveMatches completes a killCount condition once the kill total reaches its target', () => {
@@ -848,6 +851,7 @@ test('describeReward names what each reward unlocks', () => {
   assert.strictEqual(describeReward(OBJECTIVES.killThree.reward), 'Unlocks the Character tab');
   assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Heal');
   assert.strictEqual(describeReward(OBJECTIVES.winDungeon.reward), 'Unlocks skill toggles');
+  assert.strictEqual(describeReward(OBJECTIVES.killTen.reward), '+5 Upgrade Points');
 });
 
 test('killMedium and killBig unlock Heal and Strong Attack (#71)', () => {
