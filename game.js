@@ -1469,7 +1469,7 @@ function renderSkills() {
     square.classList.toggle('equipped', equipped);
     square.classList.toggle('inspected', inspectedSkillId === skillId);
     square.classList.toggle('locked', !unlocked);
-    square.append(icon, label);
+    square.append(buildCostBadge(skillId), icon, label);
     square.addEventListener('click', () => inspectSkill(skillId));
 
     if (unlocked) {
@@ -1481,6 +1481,18 @@ function renderSkills() {
 
     skillListEl.append(square);
   }
+}
+
+// A small corner badge with the skill's Focus cost (#97), like a mana cost
+// on a card, so a loadout can be planned without opening every skill.
+// Includes any active toggle surcharges, same as the detail panel's cost line.
+function buildCostBadge(skillId) {
+  const cost = effectivePointCost(skillId, activeToggleIds);
+  const badge = document.createElement('span');
+  badge.className = 'skill-cost-badge';
+  badge.textContent = cost;
+  badge.title = `Costs ${cost} Focus while equipped`;
+  return badge;
 }
 
 // A loadout bar matching the in-combat skill bar's look, one box per Skill
@@ -1505,7 +1517,7 @@ function renderSkillSlots() {
     box.type = 'button';
     box.className = 'cooldown-button skill-slot';
     box.classList.toggle('inspected', Boolean(skillId) && inspectedSkillId === skillId);
-    if (skillId) box.append(buildSprite(SKILLS[skillId].icon, 'skill-icon'));
+    if (skillId) box.append(buildCostBadge(skillId), buildSprite(SKILLS[skillId].icon, 'skill-icon'));
     box.append(label);
 
     if (skillId) {
