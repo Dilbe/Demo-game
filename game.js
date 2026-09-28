@@ -205,7 +205,7 @@ skillListEl.addEventListener('drop', (event) => {
 });
 
 function upgradeStat(statId) {
-  const cost = statCost(statId, stats[statId]);
+  const cost = statCost(statId, stats[statId], purchasedPerkIds);
   if (upgradePoints < cost) return;
 
   upgradePoints -= cost;
@@ -517,7 +517,7 @@ function renderStats() {
     summary.append(name, effect);
     toggle.append(chevron, summary);
 
-    const cost = statCost(statId, level);
+    const cost = statCost(statId, level, purchasedPerkIds);
     const button = document.createElement('button');
     button.className = 'upgrade-button';
     button.textContent = `+1 for ${cost} UP`;
