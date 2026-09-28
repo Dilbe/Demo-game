@@ -526,6 +526,14 @@ The #97 cost badge showed a number. It now shows that many small blue circles, o
 - **Tooltip unchanged:** "Costs N Focus while equipped", now also the badge's aria-label, since the number is no longer visible text.
 - **Fits the corner:** up to 4 circles in one row (the most any skill costs today) stay clear of the "↑" badge top-right (#99); a cost above 4 would wrap to a second row.
 
+## Auto-selected skill ([#100](https://github.com/Dilbe/Demo-game/issues/100))
+
+Last fix from the same playtest: the detail panel, with the upgrade rows and Upgrade buttons, only appeared after tapping a skill. Now opening the Skills tab with no skill selected selects the first equipped skill (first filled slot), so the panel is showing straight away.
+
+- **Only when nothing is selected:** a skill the player picked stays picked when they leave the tab and come back.
+- **Closing it is temporary:** tapping the selected skill still closes the panel, but the next time the tab opens it picks the first equipped skill again.
+- **Nothing equipped:** the "Tap a skill" placeholder shows as before.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

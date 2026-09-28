@@ -114,7 +114,8 @@ let skillLevels = Object.fromEntries(
 );
 // Which skill's square was last clicked, shown in the detail panel below the
 // list/slots — null when nothing is currently selected. Not persisted; every
-// reload starts with the panel closed.
+// reload starts with the panel closed, until the Skills tab opens and
+// autoInspectSkill picks one.
 let inspectedSkillId = null;
 // The skill the Focus pips are previewing (#98) — whichever is being dragged
 // (slotIndex set while over a slot, so the preview accounts for the skill it
@@ -2209,7 +2210,17 @@ tabButtons.forEach((button) => {
     tabButtons.forEach((btn) => {
       btn.classList.toggle('active', btn === button);
     });
+    if (targetId === 'skills-tab') autoInspectSkill();
   });
 });
+
+// Opening the Skills tab with nothing inspected picks the first equipped
+// skill (#100), so the upgrade rows are on screen instead of the "Tap a
+// skill" placeholder. With nothing equipped the placeholder stays.
+function autoInspectSkill() {
+  if (inspectedSkillId) return;
+  const [firstEquipped] = equippedSkillIds();
+  if (firstEquipped) inspectSkill(firstEquipped);
+}
 
 document.querySelector('[data-tab="fight-tab"]').classList.add('active');
