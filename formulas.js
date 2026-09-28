@@ -627,9 +627,9 @@ const OBJECTIVES = {
     prerequisites: ['hitSmall'],
   },
 
-  killFive: {
-    description: 'Kill 5 enemies',
-    condition: { type: 'killCount', target: 5 },
+  killThree: {
+    description: 'Kill 3 enemies',
+    condition: { type: 'killCount', target: 3 },
     reward: { type: 'unlockTab', tabId: 'character-tab' },
     prerequisites: [],
   },

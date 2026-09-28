@@ -713,16 +713,16 @@ test('describeReward is empty for an objective with no reward', () => {
   assert.strictEqual(describeReward(null), '');
 });
 
-test('killFive unlocks the Character tab and killTen unlocks the Skills tab', () => {
-  assert.deepStrictEqual(OBJECTIVES.killFive.reward, { type: 'unlockTab', tabId: 'character-tab' });
+test('killThree unlocks the Character tab and killTen unlocks the Skills tab', () => {
+  assert.deepStrictEqual(OBJECTIVES.killThree.reward, { type: 'unlockTab', tabId: 'character-tab' });
   assert.deepStrictEqual(OBJECTIVES.killTen.reward, { type: 'unlockTab', tabId: 'skills-tab' });
 });
 
 test('objectiveMatches completes a killCount condition once the kill total reaches its target', () => {
-  const condition = OBJECTIVES.killFive.condition;
-  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 4 }), false);
-  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 5 }), true);
-  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 6 }), true);
+  const condition = OBJECTIVES.killThree.condition;
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 2 }), false);
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 3 }), true);
+  assert.strictEqual(objectiveMatches(condition, { type: 'killMonster', monsterId: 'small', totalKills: 4 }), true);
   assert.strictEqual(objectiveMatches(condition, { type: 'winDungeon' }), false);
 });
 
@@ -735,8 +735,8 @@ test('objectiveAvailable is true only once every prerequisite is completed', () 
 });
 
 test('describeObjectiveProgress shows capped progress for a killCount objective', () => {
-  assert.strictEqual(describeObjectiveProgress(OBJECTIVES.killFive, 3), 'Kill 5 enemies (3/5)');
-  assert.strictEqual(describeObjectiveProgress(OBJECTIVES.killFive, 9), 'Kill 5 enemies (5/5)');
+  assert.strictEqual(describeObjectiveProgress(OBJECTIVES.killThree, 2), 'Kill 3 enemies (2/3)');
+  assert.strictEqual(describeObjectiveProgress(OBJECTIVES.killThree, 9), 'Kill 3 enemies (3/3)');
 });
 
 test('describeObjectiveProgress is just the description for a one-off objective', () => {
@@ -744,7 +744,7 @@ test('describeObjectiveProgress is just the description for a one-off objective'
 });
 
 test('describeReward names what each reward unlocks', () => {
-  assert.strictEqual(describeReward(OBJECTIVES.killFive.reward), 'Unlocks the Character tab');
+  assert.strictEqual(describeReward(OBJECTIVES.killThree.reward), 'Unlocks the Character tab');
   assert.strictEqual(describeReward(OBJECTIVES.killMedium.reward), 'Unlocks Heal');
   assert.strictEqual(describeReward(OBJECTIVES.winDungeon.reward), 'Unlocks skill toggles');
 });
