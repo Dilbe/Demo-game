@@ -241,7 +241,7 @@ test('starting skills are real skills and cost nothing', () => {
 });
 
 test('a new player can afford to equip every starting skill at once', () => {
-  const budget = statEffect('intelligence', statValue('intelligence', 0));
+  const budget = statEffect('focus', statValue('focus', 0));
   const slots = statEffect('wisdom', statValue('wisdom', 0));
   const needed = STARTING_SKILLS.reduce((total, skillId) => total + SKILLS[skillId].pointCost, 0);
 
@@ -251,7 +251,7 @@ test('a new player can afford to equip every starting skill at once', () => {
 
 test('the cheapest skill always fits a new player budget', () => {
   const cheapest = Math.min(...Object.values(SKILLS).map((skill) => skill.pointCost));
-  assert.ok(cheapest <= statEffect('intelligence', statValue('intelligence', 0)), 'no skill is affordable at intelligence level 0');
+  assert.ok(cheapest <= statEffect('focus', statValue('focus', 0)), 'no skill is affordable at Focus level 0');
 });
 
 test('every skill that must be bought with XP costs something', () => {
@@ -419,8 +419,8 @@ test('BALANCE SNAPSHOT: current tuning', () => {
   assert.strictEqual(statValue('wisdom', 0), 2);
   assert.strictEqual(statValue('wisdom', 2), 4);
 
-  assert.strictEqual(statValue('intelligence', 0), 3);
-  assert.strictEqual(statValue('intelligence', 2), 7);
+  assert.strictEqual(statValue('focus', 0), 3);
+  assert.strictEqual(statValue('focus', 2), 5);
 
   assert.strictEqual(statCost('constitution', 0), 5);
   assert.strictEqual(statCost('constitution', 1), 7);
@@ -973,17 +973,17 @@ test('every perk costs Perk Points and defines a targeted effect', () => {
   }
 });
 
-test('the Cheaper Intelligence perk costs 8 and lowers Intelligence cost growth to 1.75', () => {
-  assert.strictEqual(PERKS.intelligenceCostGrowth.cost, 8);
-  assert.strictEqual(perkStatCostGrowth('intelligence', []), 2);
-  assert.strictEqual(perkStatCostGrowth('intelligence', ['intelligenceCostGrowth']), 1.75);
-  assert.strictEqual(statCost('intelligence', 0, ['intelligenceCostGrowth']), 20);
-  assert.strictEqual(statCost('intelligence', 4, []), 320);
-  assert.strictEqual(statCost('intelligence', 4, ['intelligenceCostGrowth']), Math.round(20 * Math.pow(1.75, 4)));
+test('the Cheaper Focus perk costs 8 and lowers Focus cost growth to 1.3', () => {
+  assert.strictEqual(PERKS.focusCostGrowth.cost, 8);
+  assert.strictEqual(perkStatCostGrowth('focus', []), 1.4);
+  assert.strictEqual(perkStatCostGrowth('focus', ['focusCostGrowth']), 1.3);
+  assert.strictEqual(statCost('focus', 0, ['focusCostGrowth']), 8);
+  assert.strictEqual(statCost('focus', 4, []), Math.round(8 * Math.pow(1.4, 4)));
+  assert.strictEqual(statCost('focus', 4, ['focusCostGrowth']), Math.round(8 * Math.pow(1.3, 4)));
 });
 
 test('a stat cost-growth perk leaves other stats\' costs alone', () => {
-  assert.strictEqual(statCost('wisdom', 4, ['intelligenceCostGrowth']), statCost('wisdom', 4));
+  assert.strictEqual(statCost('wisdom', 4, ['focusCostGrowth']), statCost('wisdom', 4));
 });
 
 // --- Stat bonuses (#78) --------------------------------------------------

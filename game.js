@@ -1342,7 +1342,7 @@ function firstEmptySlotIndex() {
 // points cap how strong that combination is.
 function canEquip(skillId) {
   return equippedSkillIds().length < currentStatEffect('wisdom')
-    && pointsUsed() + effectivePointCost(skillId, activeToggleIds) <= currentStatEffect('intelligence');
+    && pointsUsed() + effectivePointCost(skillId, activeToggleIds) <= currentStatEffect('focus');
 }
 
 // Focus in use if `skillId` were placed in `slotIndex` — moved out of its
@@ -1367,12 +1367,12 @@ function equipInSlot(skillId, slotIndex) {
 
   const previousIndex = equippedSkills.indexOf(skillId);
   const projectedPoints = projectedPointsInSlot(skillId, slotIndex);
-  const budget = currentStatEffect('intelligence');
+  const budget = currentStatEffect('focus');
   if (projectedPoints > budget) {
     const shortfall = projectedPoints - budget;
     showSkillEquipMessage(
       `Not enough Focus to equip ${SKILLS[skillId].label} — needs ${shortfall} more `
-      + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Intelligence.`
+      + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Focus (Character tab).`
     );
     // Mirrors the message inline if the detail panel is open — see there —
     // since a tap-to-equip attempt (unlike a drag) is triggered from inside
@@ -1450,12 +1450,12 @@ function setToggleActive(skillId, toggleId, active) {
   if (active && equippedSkills.includes(skillId)) {
     const toggle = findToggle(skillId, toggleId);
     const projectedPoints = pointsUsed() + toggle.pointSurcharge;
-    const budget = currentStatEffect('intelligence');
+    const budget = currentStatEffect('focus');
     if (projectedPoints > budget) {
       const shortfall = projectedPoints - budget;
       showSkillEquipMessage(
         `Not enough Focus to turn on ${toggle.label} — needs ${shortfall} more `
-        + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Intelligence.`
+        + `(would use ${projectedPoints}/${budget}). Unequip something else or level up Focus (Character tab).`
       );
       // The toggle switch lives inside the detail panel, not near the shared
       // message slot below the skill list — mirror it inline (see there) so
@@ -1521,14 +1521,14 @@ function renderSkills() {
   }
 }
 
-// The Focus budget as a row of pips, one per point of Intelligence's Focus,
+// The Focus budget as a row of pips, one per point of the Focus stat,
 // filled by what's equipped (#98) — reads as a capacity you get back on
 // unequip rather than a bare number. While a skill is dragged, hovered or
 // inspected, the pips it would take are shown light after the filled ones
 // (or, if it's already equipped, the ones it holds), red if it wouldn't fit,
 // spilling past the budget as dashed pips for the shortfall.
 function renderFocusPips() {
-  const budget = currentStatEffect('intelligence');
+  const budget = currentStatEffect('focus');
   const used = pointsUsed();
   const preview = draggedFocusPreview ?? hoveredFocusPreview
     ?? (inspectedSkillId ? { skillId: inspectedSkillId, slotIndex: null } : null);
@@ -2083,7 +2083,22 @@ const RENAMED_STAT_IDS = {
   maxHp: 'constitution',
   healthRegen: 'fortitude',
   skillSlots: 'wisdom',
-  skillPoints: 'intelligence',
+  skillPoints: 'focus',
+  // Intelligence became the Focus stat, which gives +1 per level instead of
+  // +2 — see STAT_LEVEL_SCALE, which doubles the level so no Focus is lost.
+  intelligence: 'focus',
+};
+
+// Old stat ids whose levels were worth more points each than the stat that
+// replaced them: an old level becomes this many levels of the new stat.
+const STAT_LEVEL_SCALE = {
+  skillPoints: 2,
+  intelligence: 2,
+};
+
+// Pre-Focus-rename perk ids → their current ids.
+const RENAMED_PERK_IDS = {
+  intelligenceCostGrowth: 'focusCostGrowth',
 };
 
 function loadProgress() {
@@ -2101,7 +2116,9 @@ function loadProgress() {
     } else {
       maxXp = savedPermanent.maxXp;
       perkPoints = savedPermanent.perkPoints ?? 0;
-      purchasedPerkIds = savedPermanent.purchasedPerkIds ?? [];
+      purchasedPerkIds = (savedPermanent.purchasedPerkIds ?? [])
+        .map((perkId) => RENAMED_PERK_IDS[perkId] ?? perkId)
+        .filter((perkId) => PERKS[perkId]);
     }
   }
 
@@ -2122,7 +2139,7 @@ function loadProgress() {
   if (saved.stats) {
     for (const [statId, level] of Object.entries(saved.stats)) {
       const currentId = RENAMED_STAT_IDS[statId] ?? statId;
-      if (STATS[currentId]) stats[currentId] = level;
+      if (STATS[currentId]) stats[currentId] = level * (STAT_LEVEL_SCALE[statId] ?? 1);
     }
   }
   if (saved.hp !== undefined) playerHp = saved.hp;

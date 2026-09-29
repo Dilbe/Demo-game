@@ -76,15 +76,17 @@ const STATS = {
     },
   },
 
-  intelligence: {
-    label: 'Intelligence',
-    description: 'Focus to equip skills (Skills tab)',
+  focus: {
+    label: 'Focus',
+    description: 'Budget for equipping skills (Skills tab)',
     // A second limit alongside Wisdom: slots cap how many skills you equip,
-    // Focus caps how strong that combination can be.
+    // Focus caps how strong that combination can be. Was Intelligence (+2
+    // Focus per level, cost 20 ×2 per level); renamed and rebalanced to +1
+    // per level at a gentler ×1.4 growth.
     base: 3,
-    perLevel: 2,
-    baseCost: 20,
-    costGrowth: 2,
+    perLevel: 1,
+    baseCost: 8,
+    costGrowth: 1.4,
     value(level) {
       return this.base + level * this.perLevel;
     },
@@ -871,14 +873,14 @@ const PERKS = {
     effect: { type: 'startingUpgradePoints', amount: 10 },
   },
 
-  // Lowers Intelligence's per-level cost growth from ×2 to ×1.75. Like every
+  // Lowers Focus's per-level cost growth from ×1.4 to ×1.3. Like every
   // perk it leaves the stat's level alone — it only changes what the next
   // XP-funded level costs, so already-bought levels keep their value.
-  intelligenceCostGrowth: {
-    label: 'Cheaper Intelligence',
-    description: 'Intelligence upgrade costs grow ×1.75 per level instead of ×2',
+  focusCostGrowth: {
+    label: 'Cheaper Focus',
+    description: 'Focus upgrade costs grow ×1.3 per level instead of ×1.4',
     cost: 8,
-    effect: { type: 'statCostGrowth', stat: 'intelligence', costGrowth: 1.75 },
+    effect: { type: 'statCostGrowth', stat: 'focus', costGrowth: 1.3 },
   },
 };
 
