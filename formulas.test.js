@@ -969,17 +969,25 @@ test('every perk costs Perk Points and defines a targeted effect', () => {
   for (const perk of Object.values(PERKS)) {
     assert.ok(perk.cost > 0);
     assert.ok(perk.effect.type);
-    assert.ok((perk.effect.amount ?? perk.effect.points ?? perk.effect.costGrowth) > 0);
+    assert.ok((perk.effect.amount ?? perk.effect.points ?? perk.effect.reduction) > 0);
   }
 });
 
-test('the Cheaper Focus perk costs 8 and lowers Focus cost growth to 1.3', () => {
+test('the Cheaper Focus perks cost 8, 12 and 18 and each lower Focus cost growth by 0.05', () => {
   assert.strictEqual(PERKS.focusCostGrowth.cost, 8);
+  assert.strictEqual(PERKS.focusCostGrowth2.cost, 12);
+  assert.strictEqual(PERKS.focusCostGrowth3.cost, 18);
   assert.strictEqual(perkStatCostGrowth('focus', []), 1.4);
-  assert.strictEqual(perkStatCostGrowth('focus', ['focusCostGrowth']), 1.3);
+  assert.strictEqual(perkStatCostGrowth('focus', ['focusCostGrowth']), 1.35);
+  assert.strictEqual(perkStatCostGrowth('focus', ['focusCostGrowth', 'focusCostGrowth2']), 1.3);
+  assert.strictEqual(perkStatCostGrowth('focus', ['focusCostGrowth', 'focusCostGrowth2', 'focusCostGrowth3']), 1.25);
   assert.strictEqual(statCost('focus', 0, ['focusCostGrowth']), 8);
   assert.strictEqual(statCost('focus', 4, []), Math.round(8 * Math.pow(1.4, 4)));
-  assert.strictEqual(statCost('focus', 4, ['focusCostGrowth']), Math.round(8 * Math.pow(1.3, 4)));
+  assert.strictEqual(statCost('focus', 4, ['focusCostGrowth']), Math.round(8 * Math.pow(1.35, 4)));
+  assert.strictEqual(
+    statCost('focus', 4, ['focusCostGrowth', 'focusCostGrowth2', 'focusCostGrowth3']),
+    Math.round(8 * Math.pow(1.25, 4)),
+  );
 });
 
 test('a stat cost-growth perk leaves other stats\' costs alone', () => {
