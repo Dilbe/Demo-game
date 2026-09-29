@@ -873,26 +873,45 @@ const PERKS = {
     effect: { type: 'startingUpgradePoints', amount: 10 },
   },
 
-  // Lowers Focus's per-level cost growth from ×1.4 to ×1.3. Like every
-  // perk it leaves the stat's level alone — it only changes what the next
-  // XP-funded level costs, so already-bought levels keep their value.
+  // Three separate perks rather than tiers of one, like the Starting Upgrade
+  // Points perks (#76): each lowers Focus's per-level cost growth by 0.05 and
+  // they stack, from ×1.4 down to ×1.25 with all three. Like every perk they
+  // leave the stat's level alone — they only change what the next XP-funded
+  // level costs, so already-bought levels keep their value. The first keeps
+  // its pre-stacking id (it used to set growth to a fixed ×1.3) so saves that
+  // bought it still own it.
   focusCostGrowth: {
-    label: 'Cheaper Focus',
-    description: 'Focus upgrade costs grow ×1.3 per level instead of ×1.4',
+    label: 'Cheaper Focus (I)',
+    description: 'Focus upgrade costs grow 0.05 slower per level (×1.4 → ×1.35)',
     cost: 8,
-    effect: { type: 'statCostGrowth', stat: 'focus', costGrowth: 1.3 },
+    effect: { type: 'statCostGrowth', stat: 'focus', reduction: 0.05 },
+  },
+
+  focusCostGrowth2: {
+    label: 'Cheaper Focus (II)',
+    description: 'Focus upgrade costs grow another 0.05 slower per level',
+    cost: 12,
+    effect: { type: 'statCostGrowth', stat: 'focus', reduction: 0.05 },
+  },
+
+  focusCostGrowth3: {
+    label: 'Cheaper Focus (III)',
+    description: 'Focus upgrade costs grow another 0.05 slower per level',
+    cost: 18,
+    effect: { type: 'statCostGrowth', stat: 'focus', reduction: 0.05 },
   },
 };
 
-// A stat's per-level cost growth after perks: the lowest `statCostGrowth`
-// perk bought for it, or the stat's own costGrowth with none. Lowest rather
-// than multiplied, so two such perks for one stat couldn't compound below
-// what either promises on its own.
+// A stat's per-level cost growth after perks: the stat's own costGrowth minus
+// the `reduction` of every `statCostGrowth` perk bought for it, so they stack
+// additively. Rounded to 2 decimals so repeated 0.05 steps don't drift
+// (1.4 - 0.05 * 3 is 1.2500000000000002 in floating point).
 function perkStatCostGrowth(statId, purchasedPerkIds = []) {
-  return purchasedPerkIds.reduce((growth, perkId) => {
+  const reduction = purchasedPerkIds.reduce((total, perkId) => {
     const { effect } = PERKS[perkId];
-    return (effect.type === 'statCostGrowth' && effect.stat === statId) ? Math.min(growth, effect.costGrowth) : growth;
-  }, STATS[statId].costGrowth);
+    return (effect.type === 'statCostGrowth' && effect.stat === statId) ? total + effect.reduction : total;
+  }, 0);
+  return Math.round((STATS[statId].costGrowth - reduction) * 100) / 100;
 }
 
 // Upgrade Points a fresh game (every prestige) starts with, summed across
