@@ -85,7 +85,7 @@ const STATS = {
     // per level at a gentler ×1.4 growth.
     base: 3,
     perLevel: 1,
-    baseCost: 14,
+    baseCost: 9,
     costGrowth: 1.4,
     value(level) {
       return this.base + level * this.perLevel;

@@ -560,7 +560,7 @@ Ideas worth remembering but not yet worth breaking into milestones — needs mor
 
 The stat that gives Focus was called Intelligence, so the game had a stat and a resource with different names for one thing. The stat is now just **Focus** — it still sets the Focus budget for equipping skills, exactly as before.
 
-- **Rebalanced:** +1 Focus per level (was +2), starting cost 14 (was 20), cost growth ×1.4 per level (was ×2). Base is still 3.
+- **Rebalanced:** +1 Focus per level (was +2), starting cost 9 (was 20), cost growth ×1.4 per level (was ×2). The lower start keeps the total cost of reaching a given Focus close to the old one, since each level now gives half as much. Base is still 3.
 - **Perk:** "Cheaper Intelligence" is now **Cheaper Focus**, lowering growth to ×1.3 (was ×1.75). Still 8 Perk Points.
 - **Old saves:** an Intelligence level becomes two Focus levels, so a player keeps exactly the Focus they had. The old perk id maps to the new one, so an owned perk stays owned.
 - **Text:** the Skills-tab header drops "(from Intelligence)", and the shortfall messages now say "level up Focus (Character tab)".
