@@ -5,7 +5,7 @@ const {
   statValue, statCost, statBonuses, statTotal, statEffect,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   findToggle, toggleKey, effectivePointCost, skillHasAffordablePurchase,
-  describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
+  describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
   FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
   groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,
@@ -903,6 +903,28 @@ test('advanceRegen stops at maxHp and does not carry leftover progress past full
 
 test('advanceRegen is a no-op once already at maxHp', () => {
   const result = advanceRegen({ hp: 20, maxHp: 20, progress: 45, secondsPerHp: 60 }, 100);
+  assert.deepStrictEqual(result, { hp: 20, progress: 0 });
+});
+
+// --- offlineRegenSeconds ---------------------------------------------------
+
+test('offlineRegenSeconds is the time since the save, in seconds', () => {
+  assert.strictEqual(offlineRegenSeconds(1_000_000, 1_000_000 + 3 * 3600 * 1000), 3 * 3600);
+});
+
+test('offlineRegenSeconds is 0 for a save from before offline regen (no timestamp)', () => {
+  assert.strictEqual(offlineRegenSeconds(undefined, Date.now()), 0);
+  assert.strictEqual(offlineRegenSeconds(null, Date.now()), 0);
+  assert.strictEqual(offlineRegenSeconds('yesterday', Date.now()), 0);
+});
+
+test('offlineRegenSeconds never goes negative when the clock moved backwards', () => {
+  assert.strictEqual(offlineRegenSeconds(2_000_000, 1_000_000), 0);
+});
+
+test('a long absence heals up to max HP through advanceRegen', () => {
+  const eightHours = offlineRegenSeconds(0, 8 * 3600 * 1000);
+  const result = advanceRegen({ hp: 1, maxHp: 20, progress: 0, secondsPerHp: 60 }, eightHours);
   assert.deepStrictEqual(result, { hp: 20, progress: 0 });
 });
 
