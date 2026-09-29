@@ -955,9 +955,9 @@ test('the Cheaper Focus perk costs 8 and lowers Focus cost growth to 1.3', () =>
   assert.strictEqual(PERKS.focusCostGrowth.cost, 8);
   assert.strictEqual(perkStatCostGrowth('focus', []), 1.4);
   assert.strictEqual(perkStatCostGrowth('focus', ['focusCostGrowth']), 1.3);
-  assert.strictEqual(statCost('focus', 0, ['focusCostGrowth']), 9);
-  assert.strictEqual(statCost('focus', 4, []), Math.round(9 * Math.pow(1.4, 4)));
-  assert.strictEqual(statCost('focus', 4, ['focusCostGrowth']), Math.round(9 * Math.pow(1.3, 4)));
+  assert.strictEqual(statCost('focus', 0, ['focusCostGrowth']), 8);
+  assert.strictEqual(statCost('focus', 4, []), Math.round(8 * Math.pow(1.4, 4)));
+  assert.strictEqual(statCost('focus', 4, ['focusCostGrowth']), Math.round(8 * Math.pow(1.3, 4)));
 });
 
 test('a stat cost-growth perk leaves other stats\' costs alone', () => {
