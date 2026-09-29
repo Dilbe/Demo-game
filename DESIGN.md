@@ -555,3 +555,12 @@ The Skills tab now unlocks after 5 kills instead of 10, so it shows up sooner. "
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.
 
 - **Legal/privacy disclosures.** Not a lawyer, not legal advice — but worth a note: currently the site has no backend, no accounts, no analytics/tracking scripts, and no cookies; `localStorage` for saving progress is generally treated as functionally-necessary storage, not something requiring cookie-consent banners. As it stands, there's likely nothing legally required beyond normal copyright. Revisit this if the project ever adds anything that processes visitor data — analytics, ads, accounts, or real multiplayer — since that's the point a real privacy policy (and, depending on country/monetization, an "imprint"/legal-notice page) could become necessary.
+
+## Intelligence renamed to Focus
+
+The stat that gives Focus was called Intelligence, so the game had a stat and a resource with different names for one thing. The stat is now just **Focus** — it still sets the Focus budget for equipping skills, exactly as before.
+
+- **Rebalanced:** +1 Focus per level (was +2), starting cost 14 (was 20), cost growth ×1.4 per level (was ×2). Base is still 3.
+- **Perk:** "Cheaper Intelligence" is now **Cheaper Focus**, lowering growth to ×1.3 (was ×1.75). Still 8 Perk Points.
+- **Old saves:** an Intelligence level becomes two Focus levels, so a player keeps exactly the Focus they had. The old perk id maps to the new one, so an owned perk stays owned.
+- **Text:** the Skills-tab header drops "(from Intelligence)", and the shortfall messages now say "level up Focus (Character tab)".
