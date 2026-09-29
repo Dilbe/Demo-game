@@ -1048,6 +1048,15 @@ function advanceRegen({ hp, maxHp, progress, secondsPerHp }, elapsedSeconds) {
   return { hp: newHp, progress: newProgress };
 }
 
+// Seconds of passive regen owed for the time the game was closed: from the
+// save's regen timestamp to now. A save from before offline regen (no
+// timestamp), a corrupt value, or a clock that has since gone backwards all
+// count as no time away rather than healing or un-healing anything.
+function offlineRegenSeconds(savedAt, now) {
+  if (!Number.isFinite(savedAt) || !Number.isFinite(now)) return 0;
+  return Math.max(0, (now - savedAt) / 1000);
+}
+
 // A stat's base points: its starting value plus whatever levels were bought.
 function statValue(statId, level) {
   return STATS[statId].value(level);
@@ -1093,7 +1102,7 @@ if (typeof module !== 'undefined') {
     statValue, statCost, statBonuses, statTotal, statEffect,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost, skillHasAffordablePurchase,
-    describeMonster, describeMonsterGroup, describeDungeon, advanceRegen,
+    describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
     FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
     groupKillXp, groupClearBonusXp, groupTotalXp, diminishedXp, roundXp,

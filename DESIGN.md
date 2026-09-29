@@ -550,6 +550,14 @@ The Skills tab now unlocks after 5 kills instead of 10, so it shows up sooner. "
 - **Ids:** the Skills-tab objective is now `killFiveForSkills` (`killFive` is already taken by old saves, see #91); `killTen` is the new Upgrade Points one.
 - **Old saves:** a save with `killTen` but not `killFiveForSkills` is from before this change. Its `killTen` becomes `killFiveForSkills` on load, so the Skills tab stays unlocked and the player can still earn the new +5 on their next kill.
 
+## Offline regen
+
+Passive HP regen now keeps running while the game is closed. Coming back after a while heals whatever that time would have healed, up to max HP.
+
+- **Same clock, saved:** the save now stores the regen clock (`regenTimestamp`) and the partial progress toward the next HP (`regenProgress`). On load the clock resumes from there, and the first regen tick, run right at startup, credits the whole time away through the same `advanceRegen` as a backgrounded tab.
+- **Current rate:** the time away heals at the Fortitude rate in effect when the game is opened, which is the same as the rate it was saved with, since nothing changes it while closed.
+- **Old saves:** a save from before this has no timestamp, so it heals nothing for the time already away and starts the clock on load. A clock that has since moved backwards also counts as no time away (`offlineRegenSeconds`).
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

@@ -929,11 +929,15 @@ function updateRegenIndicator() {
 // 1-second timer can end up firing only once a minute. Without this, regen
 // already in progress would still land on the rare tick that does fire, but
 // the next one would take far longer than it should to even start.
+//
+// The same clock keeps running while the game is closed: saveProgress stores
+// lastRegenTimestamp and regenProgress, loadProgress restores them, and the
+// first tick after loading credits the whole time away in one step.
 let lastRegenTimestamp = Date.now();
 
 function regenTick() {
   const now = Date.now();
-  const elapsedSeconds = (now - lastRegenTimestamp) / 1000;
+  const elapsedSeconds = offlineRegenSeconds(lastRegenTimestamp, now);
   lastRegenTimestamp = now;
 
   const result = advanceRegen({
@@ -2061,6 +2065,7 @@ function saveProgress() {
     selectedGroupId, selectedDungeonId, wonFightIds, xpClaimCounts, totalKills,
     lifetimeXp, prestigeProgress,
     completedObjectiveIds, togglesUnlocked, unlockedToggleIds, activeToggleIds,
+    regenProgress, regenTimestamp: lastRegenTimestamp,
   }));
 }
 
@@ -2121,6 +2126,11 @@ function loadProgress() {
     }
   }
   if (saved.hp !== undefined) playerHp = saved.hp;
+  // Offline regen: pick the regen clock up where the save left it, so the
+  // first regenTick credits the time the game was closed. A save from before
+  // this has no timestamp and simply starts the clock now.
+  if (Number.isFinite(saved.regenTimestamp)) lastRegenTimestamp = saved.regenTimestamp;
+  if (Number.isFinite(saved.regenProgress)) regenProgress = saved.regenProgress;
   if (saved.unlockedSkills) unlockedSkills = saved.unlockedSkills.filter((id) => !isRemovedSkillId(id));
   if (saved.equippedSkills) equippedSkills = saved.equippedSkills.map((id) => (isRemovedSkillId(id) ? null : id));
   // Merged key-by-key against today's SKILLS, rather than Object.assign, so a
@@ -2209,6 +2219,8 @@ renderObjectives();
 // of the literal placeholder token.
 const buildLabel = BUILD_SHA === '__BUILD_SHA__' ? 'unreleased build' : BUILD_SHA;
 versionValueEl.textContent = `${VERSION} (${buildLabel})`;
+// Credit the time the game was closed right away, rather than a second in.
+regenTick();
 setInterval(regenTick, REGEN_TICK_SECONDS * 1000);
 
 const tabButtons = document.querySelectorAll('.tab-button');
