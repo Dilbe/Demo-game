@@ -245,8 +245,9 @@ test('Block matches its spec (#119)', () => {
   assert.strictEqual(skillPower('block', 0), 3);
   assert.strictEqual(skillPower('block', 2), 5);
   assert.strictEqual(skillCooldown('block', 0), 5);
-  assert.ok(Math.abs(skillCooldown('block', 1) - 4.5) < 1e-9);
-  assert.ok(Math.abs(skillCooldown('block', 2) - 4.05) < 1e-9);
+  // +10% speed per level: +100% (level 10) halves the cooldown.
+  assert.ok(Math.abs(skillCooldown('block', 1) - 5 / 1.1) < 1e-9);
+  assert.strictEqual(skillCooldown('block', 10), 2.5);
 
   assert.deepStrictEqual([0, 1, 2].map((level) => skillUpgradeCost('block', 'power', level)), [20, 40, 80]);
   assert.deepStrictEqual([0, 1, 2].map((level) => skillUpgradeCost('block', 'speed', level)), [20, 30, 45]);

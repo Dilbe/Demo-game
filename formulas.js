@@ -680,12 +680,12 @@ const SKILLS = {
       {
         id: 'speed',
         label: 'Speed',
-        // Each level takes 10% off the current cooldown, so it shrinks
-        // towards zero without ever reaching it.
+        // +10% speed per level, same divide-not-subtract formula as every
+        // other skill's Speed track: +100% speed halves the cooldown.
         perLevel: 0.1,
         baseCost: 20,
         costGrowth: 1.5,
-        value(skill, level) { return skill.cooldown * (1 - this.perLevel) ** level; },
+        value(skill, level) { return skill.cooldown / (1 + level * this.perLevel); },
         format(value) { return `${value.toFixed(1)}s cooldown`; },
       },
     ],
