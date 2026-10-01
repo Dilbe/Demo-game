@@ -540,7 +540,7 @@ Buying a Constitution +x perk now also heals the player by the Max HP it adds (+
 
 - **Once, at purchase:** it's a one-time heal when the perk is bought, not something that repeats on reload or prestige.
 - **Measured, not hard-coded:** the heal is the Max HP after buying minus before, so any future perk that raises Max HP heals the same way.
-- **Perks only:** a Constitution level bought with Upgrade Points still raises Max HP without healing.
+- **Upgrade Points too:** since [#124](https://github.com/Dilbe/Demo-game/issues/124), a Constitution level bought on the Character tab heals the same way (+5 per level).
 
 ## Skills tab after 5 kills ([#114](https://github.com/Dilbe/Demo-game/issues/114))
 
@@ -566,6 +566,13 @@ A new skill, **Block**: while equipped and ready, it takes 3 damage off the next
 - **Upgrades:** Block +1 per level (20 UP, cost ×2 per level); Speed +10% per level (20 UP, cost ×1.5), using the same formula as every other skill's Speed track — cooldown ÷ (1 + speed), so +100% speed halves it.
 - **Two Charges toggle:** 50 UP, +2 Focus while on. Holds 2 blocks at once. Using one starts the recharge; using the second while it runs doesn't speed it up. Each recharge gains one charge, and a second recharge only starts once the first has finished. A toggle grants this through a `charges` field (`skillMaxCharges`), so another skill could reuse it.
 - **Per fight:** charges fill up at the start of each fight and carry over between the fights of a dungeon, like any other skill's cooldown.
+
+## Constitution levels heal ([#124](https://github.com/Dilbe/Demo-game/issues/124))
+
+Upgrading Constitution on the Character tab now heals the player by the Max HP the level adds (+5), the same way Constitution perks do (#111).
+
+- **Measured, not hard-coded:** the heal is the Max HP after the upgrade minus before, so it also covers anything that changes how much HP a point gives.
+- **Other stats:** upgrading any other stat doesn't change Max HP, so it heals nothing.
 
 ## Future ideas (parking lot — not yet planned)
 

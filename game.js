@@ -219,8 +219,12 @@ function upgradeStat(statId) {
   const cost = statCost(statId, stats[statId], purchasedPerkIds);
   if (upgradePoints < cost) return;
 
+  const maxHpBefore = effectiveMaxHp();
   upgradePoints -= cost;
   stats[statId] += 1;
+  // A Constitution level heals by the Max HP it just added (#124), like a
+  // Constitution perk (#111), so the new HP starts filled instead of empty.
+  healPlayer(effectiveMaxHp() - maxHpBefore);
 
   updateHealthBar();
   updateRegenIndicator();
