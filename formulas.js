@@ -474,8 +474,9 @@ function xpClaimsFromFightWins(fightWinCounts) {
 // before that, but not purchasable or switchable until it completes.
 //
 // `type: 'passive'` (see Regen/Strength below) is the one kind that skips
-// all of that: no cooldown, no combat button, no `upgrades`/`toggles` track —
-// instead a `boost` applies for as long as the skill stays equipped.
+// most of that: no cooldown and no combat button — instead a `boost` applies
+// for as long as the skill stays equipped. Its `upgrades`/`toggles`, if any,
+// grow that boost or add to it rather than to a power/speed track.
 // Every other skill is `type: 'active'` and keeps the shape described above.
 //
 // `type: 'reactive'` (see Block below) has a cooldown and upgrade/toggle
@@ -642,8 +643,32 @@ const SKILLS = {
     unlockCost: 20,
     pointCost: 2,
     boost: { stat: 'fortitude', points: 6 },
-    upgrades: [],
-    toggles: [],
+    // A passive skill's upgrade track grows its boost while equipped (#120).
+    // The track's id is the boosted stat's id, which is how passiveBoostPoints
+    // finds it.
+    upgrades: [
+      {
+        id: 'fortitude',
+        label: 'Fortitude',
+        perLevel: 1,
+        baseCost: 40,
+        costGrowth: 2,
+        value(skill, level) { return skill.boost.points + level * this.perLevel; },
+        format(value) { return `+${value} Fortitude`; },
+      },
+    ],
+    // Unlocked by a perk (see PERKS.regenHealAmount) rather than the
+    // 'winDungeon' objective every other toggle waits on (see toggleAvailable).
+    toggles: [
+      {
+        id: 'strongerRegen',
+        label: 'Stronger Regen',
+        description: 'Passive regen heals 1 more HP every time its bar fills',
+        unlockCost: 30,
+        pointSurcharge: 2,
+        regenHealBonus: 1,
+      },
+    ],
   },
 
   strength: {
@@ -950,7 +975,32 @@ const PERKS = {
     cost: 18,
     effect: { type: 'statCostGrowth', stat: 'focus', reduction: 0.05 },
   },
+
+  // Makes Regen's Stronger Regen toggle buyable (#120) — the perk only
+  // unlocks it; the toggle itself still costs Upgrade Points every cycle.
+  regenHealAmount: {
+    label: 'Stronger Regen',
+    description: "Unlocks Regen's Stronger Regen upgrade: passive regen heals 2 HP per fill instead of 1",
+    cost: 8,
+    effect: { type: 'unlockToggle', skillId: 'regen', toggleId: 'strongerRegen' },
+  },
 };
+
+// The perk that unlocks this toggle (see PERKS.regenHealAmount), or
+// undefined for a toggle gated by the 'winDungeon' objective as usual.
+function toggleUnlockPerkId(skillId, toggleId) {
+  return Object.keys(PERKS).find((perkId) => {
+    const { effect } = PERKS[perkId];
+    return effect.type === 'unlockToggle' && effect.skillId === skillId && effect.toggleId === toggleId;
+  });
+}
+
+// Whether a toggle can be bought and switched yet: once its perk is bought
+// if one gates it, otherwise once toggles are unlocked.
+function toggleAvailable(skillId, toggleId, { togglesUnlocked, purchasedPerkIds = [] }) {
+  const perkId = toggleUnlockPerkId(skillId, toggleId);
+  return perkId ? purchasedPerkIds.includes(perkId) : togglesUnlocked;
+}
 
 // A stat's per-level cost growth after perks: the stat's own costGrowth minus
 // the `reduction` of every `statCostGrowth` perk bought for it, so they stack
@@ -1042,6 +1092,18 @@ function skillMaxCharges(skillId, activeToggleIds) {
   }, 1);
 }
 
+// HP passive regen heals each time its bar fills: 1, plus the
+// `regenHealBonus` of every switched-on toggle on an equipped skill (see
+// SKILLS.regen's Stronger Regen).
+function regenHealAmount(equippedSkillIds, activeToggleIds) {
+  return equippedSkillIds.reduce((total, skillId) => {
+    return SKILLS[skillId].toggles.reduce((sum, toggle) => {
+      const active = toggle.regenHealBonus && activeToggleIds.includes(toggleKey(skillId, toggle.id));
+      return active ? sum + toggle.regenHealBonus : sum;
+    }, total);
+  }, 1);
+}
+
 // An attack's damage after a block takes `blocking` off it — never below 0.
 function blockedDamage(damage, blocking) {
   return Math.max(0, damage - blocking);
@@ -1051,15 +1113,16 @@ function blockedDamage(damage, blocking) {
 // now (#99): unlocking it (objective-gated skills have no price), one of its
 // upgrade tracks, or one of its toggles once toggles are unlocked. Switching
 // an unlocked toggle on or off is free, so it never counts.
-function skillHasAffordablePurchase(skillId, { unlocked, levels, upgradePoints, togglesUnlocked, unlockedToggleIds }) {
+function skillHasAffordablePurchase(skillId, { unlocked, levels, upgradePoints, togglesUnlocked, unlockedToggleIds, purchasedPerkIds = [] }) {
   const skill = SKILLS[skillId];
   if (!unlocked) return !skill.unlockObjectiveId && upgradePoints >= skill.unlockCost;
 
   const upgradeAffordable = skill.upgrades.some((upgrade) => {
     return upgradePoints >= skillUpgradeCost(skillId, upgrade.id, levels[upgrade.id]);
   });
-  const toggleAffordable = togglesUnlocked && skill.toggles.some((toggle) => {
-    return !unlockedToggleIds.includes(toggleKey(skillId, toggle.id)) && upgradePoints >= toggle.unlockCost;
+  const toggleAffordable = skill.toggles.some((toggle) => {
+    return toggleAvailable(skillId, toggle.id, { togglesUnlocked, purchasedPerkIds })
+      && !unlockedToggleIds.includes(toggleKey(skillId, toggle.id)) && upgradePoints >= toggle.unlockCost;
   });
   return upgradeAffordable || toggleAffordable;
 }
@@ -1069,7 +1132,7 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus
 
   if (skill.type === 'passive') {
     const { boost } = skill;
-    if (boost.points) return `+${boost.points} ${STATS[boost.stat].label} while equipped`;
+    if (boost.points) return `+${passiveBoostPoints(skillId, levels)} ${STATS[boost.stat].label} while equipped`;
     return `+${boost.percent}% ${boost.label} while equipped`;
   }
 
@@ -1121,7 +1184,10 @@ function describeDungeon(dungeonId, xpClaims = {}) {
 // timer can end up firing only once a minute — so driving regen off elapsed
 // wall-clock time (instead of counting ticks) means a long gap still credits
 // the HP it should, catching up in one step instead of nearly stalling.
-function advanceRegen({ hp, maxHp, progress, secondsPerHp }, elapsedSeconds) {
+//
+// `hpPerFill` is how much each full bar heals (see regenHealAmount) — the
+// bar still takes secondsPerHp to fill either way, and never overheals.
+function advanceRegen({ hp, maxHp, progress, secondsPerHp, hpPerFill = 1 }, elapsedSeconds) {
   if (hp >= maxHp) return { hp, progress: 0 };
 
   let newHp = hp;
@@ -1129,7 +1195,7 @@ function advanceRegen({ hp, maxHp, progress, secondsPerHp }, elapsedSeconds) {
 
   while (newProgress >= secondsPerHp && newHp < maxHp) {
     newProgress -= secondsPerHp;
-    newHp += 1;
+    newHp = Math.min(maxHp, newHp + hpPerFill);
   }
 
   if (newHp >= maxHp) newProgress = 0;
@@ -1146,6 +1212,15 @@ function offlineRegenSeconds(savedAt, now) {
   return Math.max(0, (now - savedAt) / 1000);
 }
 
+// A `points` passive's boost at its current upgrade level: the value of the
+// upgrade track named after the boosted stat (see SKILLS.regen), or the
+// flat boost for a passive without one.
+function passiveBoostPoints(skillId, levels = {}) {
+  const skill = SKILLS[skillId];
+  const track = findUpgrade(skillId, skill.boost.stat);
+  return track ? track.value(skill, levels[track.id] ?? 0) : skill.boost.points;
+}
+
 // A stat's base points: its starting value plus whatever levels were bought.
 function statValue(statId, level) {
   return STATS[statId].value(level);
@@ -1155,11 +1230,16 @@ function statValue(statId, level) {
 // so the Character tab can show how the total adds up: equipped passive
 // skills with a `points` boost for it, and purchased stat perks. Neither
 // touches the stat's level, so a bonus never makes the next level cost more.
-function statBonuses(statId, equippedSkillIds, purchasedPerkIds) {
+//
+// `skillLevels` (every skill's upgrade levels, keyed by skill id) lets a
+// passive skill's upgrade track grow its boost (see passiveBoostPoints).
+function statBonuses(statId, equippedSkillIds, purchasedPerkIds, skillLevels = {}) {
   const bonuses = [];
   for (const skillId of equippedSkillIds) {
     const { boost } = SKILLS[skillId];
-    if (boost && boost.stat === statId && boost.points) bonuses.push({ source: SKILLS[skillId].label, points: boost.points });
+    if (boost && boost.stat === statId && boost.points) {
+      bonuses.push({ source: SKILLS[skillId].label, points: passiveBoostPoints(skillId, skillLevels[skillId]) });
+    }
   }
   for (const perkId of purchasedPerkIds) {
     const { effect } = PERKS[perkId];
@@ -1191,6 +1271,7 @@ if (typeof module !== 'undefined') {
     statValue, statCost, statBonuses, statTotal, statEffect,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost, skillMaxCharges, blockedDamage, skillHasAffordablePurchase,
+    toggleUnlockPerkId, toggleAvailable, regenHealAmount, passiveBoostPoints,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
     FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,

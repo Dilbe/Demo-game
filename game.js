@@ -904,7 +904,7 @@ function currentFightKey() {
 // Where each bonus on a stat comes from right now — the equipped passive
 // skills and purchased perks that add to it (see statBonuses).
 function currentStatBonuses(statId) {
-  return statBonuses(statId, equippedSkillIds(), purchasedPerkIds);
+  return statBonuses(statId, equippedSkillIds(), purchasedPerkIds, skillLevels);
 }
 
 // What a stat currently does — Max HP, seconds per HP, and so on — from its
@@ -1014,6 +1014,7 @@ function regenTick() {
     maxHp: effectiveMaxHp(),
     progress: regenProgress,
     secondsPerHp: effectiveSecondsPerHp(),
+    hpPerFill: regenHealAmount(equippedSkillIds(), activeToggleIds),
   }, elapsedSeconds);
 
   const healed = result.hp !== playerHp;
@@ -1492,11 +1493,17 @@ function unequipSkill(skillId) {
   saveProgress();
 }
 
+// Whether this toggle can be bought and switched yet — after the
+// 'winDungeon' objective, or its perk for a perk-gated one (see toggleAvailable).
+function isToggleAvailable(skillId, toggleId) {
+  return toggleAvailable(skillId, toggleId, { togglesUnlocked, purchasedPerkIds });
+}
+
 // A one-time XP purchase, independent of switching the toggle on/off
-// afterwards (see setToggleActive). Locked entirely (like every toggle)
-// until the 'winDungeon' objective completes.
+// afterwards (see setToggleActive). Locked entirely until the toggle is
+// available (see isToggleAvailable).
 function unlockToggle(skillId, toggleId) {
-  if (!togglesUnlocked) return;
+  if (!isToggleAvailable(skillId, toggleId)) return;
 
   const key = toggleKey(skillId, toggleId);
   if (unlockedToggleIds.includes(key)) return;
@@ -1515,7 +1522,7 @@ function unlockToggle(skillId, toggleId) {
 // with the same shortfall message equipInSlot shows, if that would exceed
 // the budget.
 function setToggleActive(skillId, toggleId, active) {
-  if (!togglesUnlocked) return;
+  if (!isToggleAvailable(skillId, toggleId)) return;
 
   const key = toggleKey(skillId, toggleId);
   if (!unlockedToggleIds.includes(key) || activeToggleIds.includes(key) === active) return;
@@ -1698,6 +1705,7 @@ function skillAffordable(skillId) {
     upgradePoints,
     togglesUnlocked,
     unlockedToggleIds,
+    purchasedPerkIds,
   });
 }
 
@@ -1863,7 +1871,10 @@ function buildToggleRow(skillId) {
   const container = document.createElement('div');
   container.className = 'skill-toggles';
 
-  if (!togglesUnlocked) {
+  // Only for toggles the objective gates — a perk-gated one says which perk
+  // it needs on its own row instead.
+  const objectiveGated = skill.toggles.some((toggle) => !toggleUnlockPerkId(skillId, toggle.id));
+  if (!togglesUnlocked && objectiveGated) {
     const lockedMessage = document.createElement('p');
     lockedMessage.className = 'toggles-locked-message';
     lockedMessage.textContent = `Toggles are locked — ${OBJECTIVES.winDungeon.description} to unlock them.`;
@@ -1874,6 +1885,8 @@ function buildToggleRow(skillId) {
     const key = toggleKey(skillId, toggle.id);
     const unlocked = unlockedToggleIds.includes(key);
     const active = activeToggleIds.includes(key);
+    const available = isToggleAvailable(skillId, toggle.id);
+    const perkId = toggleUnlockPerkId(skillId, toggle.id);
 
     const label = document.createElement('span');
     label.className = 'toggle-label';
@@ -1882,6 +1895,7 @@ function buildToggleRow(skillId) {
     const description = document.createElement('span');
     description.className = 'toggle-description';
     description.textContent = `${toggle.description} (+${toggle.pointSurcharge} Focus while on)`;
+    if (perkId && !available) description.textContent += ` — requires the ${PERKS[perkId].label} perk`;
 
     const row = document.createElement('div');
     row.className = 'toggle-row';
@@ -1892,14 +1906,14 @@ function buildToggleRow(skillId) {
       button.className = 'toggle-switch';
       button.classList.toggle('active', active);
       button.textContent = active ? 'On' : 'Off';
-      button.disabled = !togglesUnlocked;
+      button.disabled = !available;
       button.addEventListener('click', () => setToggleActive(skillId, toggle.id, !active));
       row.append(button);
     } else {
       const button = document.createElement('button');
       button.className = 'toggle-unlock-button';
       button.textContent = `Unlock (${toggle.unlockCost} UP)`;
-      button.disabled = !togglesUnlocked || upgradePoints < toggle.unlockCost;
+      button.disabled = !available || upgradePoints < toggle.unlockCost;
       button.addEventListener('click', () => unlockToggle(skillId, toggle.id));
       row.append(button);
     }
@@ -1998,6 +2012,8 @@ function upgradeSkillTrack(skillId, upgradeId) {
   upgradePoints -= cost;
   skillLevels[skillId][upgradeId] += 1;
   updateXpDisplay();
+  // A passive's track (e.g. Regen's Fortitude) can change the regen rate.
+  updateRegenIndicator();
   saveProgress();
 }
 
@@ -2229,7 +2245,9 @@ function loadProgress() {
   // removed skill's stray levels (e.g. autoAttack's) don't tag along.
   if (saved.skillLevels) {
     for (const skillId of Object.keys(SKILLS)) {
-      if (saved.skillLevels[skillId]) skillLevels[skillId] = saved.skillLevels[skillId];
+      // Spread over the defaults so a track added since the save (e.g.
+      // Regen's Fortitude, #120) starts at level 0 rather than undefined.
+      if (saved.skillLevels[skillId]) skillLevels[skillId] = { ...skillLevels[skillId], ...saved.skillLevels[skillId] };
     }
   }
   if (saved.wonFightIds) wonFightIds = saved.wonFightIds;

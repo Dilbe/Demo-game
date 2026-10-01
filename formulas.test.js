@@ -5,6 +5,7 @@ const {
   statValue, statCost, statBonuses, statTotal, statEffect,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   findToggle, toggleKey, effectivePointCost, skillMaxCharges, blockedDamage, skillHasAffordablePurchase,
+  toggleUnlockPerkId, toggleAvailable, regenHealAmount, passiveBoostPoints,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
   FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
@@ -949,6 +950,11 @@ test('advanceRegen is a no-op once already at maxHp', () => {
   assert.deepStrictEqual(result, { hp: 20, progress: 0 });
 });
 
+test('advanceRegen heals hpPerFill per full bar, never past maxHp', () => {
+  assert.deepStrictEqual(advanceRegen({ hp: 10, maxHp: 20, progress: 0, secondsPerHp: 60, hpPerFill: 2 }, 125), { hp: 14, progress: 5 });
+  assert.deepStrictEqual(advanceRegen({ hp: 19, maxHp: 20, progress: 0, secondsPerHp: 60, hpPerFill: 2 }, 60), { hp: 20, progress: 0 });
+});
+
 // --- offlineRegenSeconds ---------------------------------------------------
 
 test('offlineRegenSeconds is the time since the save, in seconds', () => {
@@ -1012,8 +1018,58 @@ test('every perk costs Perk Points and defines a targeted effect', () => {
   for (const perk of Object.values(PERKS)) {
     assert.ok(perk.cost > 0);
     assert.ok(perk.effect.type);
-    assert.ok((perk.effect.amount ?? perk.effect.points ?? perk.effect.reduction) > 0);
+    if (perk.effect.type === 'unlockToggle') {
+      assert.ok(findToggle(perk.effect.skillId, perk.effect.toggleId), 'unlockToggle perk names an unknown toggle');
+    } else {
+      assert.ok((perk.effect.amount ?? perk.effect.points ?? perk.effect.reduction) > 0);
+    }
   }
+});
+
+// --- Upgradable Regen (#120) ----------------------------------------------
+
+test('Regen\'s Fortitude track adds 1 Fortitude per level, costing 40 UP and doubling', () => {
+  assert.strictEqual(passiveBoostPoints('regen', { fortitude: 0 }), 6);
+  assert.strictEqual(passiveBoostPoints('regen', { fortitude: 3 }), 9);
+  assert.strictEqual(passiveBoostPoints('regen'), 6, 'a save from before the track counts as level 0');
+  assert.strictEqual(skillUpgradeCost('regen', 'fortitude', 0), 40);
+  assert.strictEqual(skillUpgradeCost('regen', 'fortitude', 1), 80);
+  assert.strictEqual(describeSkill('regen', { fortitude: 2 }), '+8 Fortitude while equipped');
+  assert.deepStrictEqual(statBonuses('fortitude', ['regen'], [], { regen: { fortitude: 2 } }), [
+    { source: 'Regen', points: 8 },
+  ]);
+});
+
+test('the Stronger Regen perk costs 8 and alone unlocks Regen\'s Stronger Regen toggle', () => {
+  assert.strictEqual(PERKS.regenHealAmount.cost, 8);
+  assert.strictEqual(toggleUnlockPerkId('regen', 'strongerRegen'), 'regenHealAmount');
+  assert.strictEqual(toggleUnlockPerkId('basicAttack', 'multiAttack'), undefined);
+
+  assert.strictEqual(toggleAvailable('regen', 'strongerRegen', { togglesUnlocked: true, purchasedPerkIds: [] }), false);
+  assert.strictEqual(toggleAvailable('regen', 'strongerRegen', { togglesUnlocked: false, purchasedPerkIds: ['regenHealAmount'] }), true);
+  assert.strictEqual(toggleAvailable('basicAttack', 'multiAttack', { togglesUnlocked: false, purchasedPerkIds: ['regenHealAmount'] }), false);
+  assert.strictEqual(toggleAvailable('basicAttack', 'multiAttack', { togglesUnlocked: true }), true);
+});
+
+test('Stronger Regen costs 30 UP and 2 more Focus while on', () => {
+  const toggle = findToggle('regen', 'strongerRegen');
+  assert.strictEqual(toggle.unlockCost, 30);
+  assert.strictEqual(effectivePointCost('regen', [toggleKey('regen', 'strongerRegen')]), SKILLS.regen.pointCost + 2);
+});
+
+test('regenHealAmount is 2 only with Stronger Regen on and Regen equipped', () => {
+  const on = [toggleKey('regen', 'strongerRegen')];
+  assert.strictEqual(regenHealAmount([], []), 1);
+  assert.strictEqual(regenHealAmount(['regen'], []), 1);
+  assert.strictEqual(regenHealAmount(['basicAttack'], on), 1);
+  assert.strictEqual(regenHealAmount(['regen'], on), 2);
+});
+
+test('skillHasAffordablePurchase counts a perk-gated toggle only once its perk is bought', () => {
+  const levels = { fortitude: 100 };
+  const state = { unlocked: true, levels, upgradePoints: 30, togglesUnlocked: true, unlockedToggleIds: [] };
+  assert.strictEqual(skillHasAffordablePurchase('regen', state), false);
+  assert.strictEqual(skillHasAffordablePurchase('regen', { ...state, togglesUnlocked: false, purchasedPerkIds: ['regenHealAmount'] }), true);
 });
 
 test('the Cheaper Focus perks cost 8, 12 and 18 and each lower Focus cost growth by 0.05', () => {
