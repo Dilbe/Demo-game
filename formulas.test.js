@@ -5,7 +5,7 @@ const {
   statValue, statCost, statBonuses, statTotal, statEffect,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
   findToggle, toggleKey, effectivePointCost, skillMaxCharges, blockedDamage, skillHasAffordablePurchase,
-  toggleUnlockPerkId, toggleAvailable, regenHealAmount, passiveBoostPoints,
+  toggleUnlockPerkId, toggleAvailable, regenHealAmount, passiveBoostPoints, passiveBoostPercent,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
   FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
@@ -1070,6 +1070,20 @@ test('skillHasAffordablePurchase counts a perk-gated toggle only once its perk i
   const state = { unlocked: true, levels, upgradePoints: 30, togglesUnlocked: true, unlockedToggleIds: [] };
   assert.strictEqual(skillHasAffordablePurchase('regen', state), false);
   assert.strictEqual(skillHasAffordablePurchase('regen', { ...state, togglesUnlocked: false, purchasedPerkIds: ['regenHealAmount'] }), true);
+});
+
+// --- Upgradable Strength (#121) -------------------------------------------
+
+test('Strength\'s Damage track adds 5% damage per level, costing 30 UP with growth 1.6', () => {
+  assert.strictEqual(passiveBoostPercent('strength', { damage: 0 }), 25);
+  assert.strictEqual(passiveBoostPercent('strength', { damage: 3 }), 40);
+  assert.strictEqual(passiveBoostPercent('strength'), 25, 'a save from before the track counts as level 0');
+  assert.strictEqual(skillUpgradeCost('strength', 'damage', 0), 30);
+  assert.strictEqual(skillUpgradeCost('strength', 'damage', 1), 48);
+  assert.strictEqual(skillUpgradeCost('strength', 'damage', 2), 77);
+  assert.strictEqual(describeSkill('strength', { damage: 2 }), '+35% damage while equipped');
+  assert.strictEqual(passiveMultiplier(['strength'], 'damage', { strength: { damage: 1 } }), 1.3);
+  assert.strictEqual(passiveMultiplier(['basicAttack'], 'damage', { strength: { damage: 1 } }), 1, 'only while equipped');
 });
 
 test('the Cheaper Focus perks cost 8, 12 and 18 and each lower Focus cost growth by 0.05', () => {
