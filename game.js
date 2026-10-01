@@ -783,7 +783,7 @@ function applySkill(skillId) {
     + (skill.healing ? 0 : perkSkillDamageBonus(purchasedPerkIds, skillId));
   // Strength (a passive skill) boosts attacks only, never healing. Rounded
   // so a boosted hit still deals a whole number of damage.
-  const power = skill.healing ? basePower : Math.round(basePower * passiveMultiplier(equippedSkillIds(), 'damage'));
+  const power = skill.healing ? basePower : Math.round(basePower * passiveMultiplier(equippedSkillIds(), 'damage', skillLevels));
 
   if (skill.healing) {
     if (isToggleActive(skillId, 'healOverTime')) {

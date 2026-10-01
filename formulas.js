@@ -678,7 +678,19 @@ const SKILLS = {
     unlockCost: 20,
     pointCost: 2,
     boost: { stat: 'damage', percent: 25, label: 'damage' },
-    upgrades: [],
+    // Grows the boost by 5 percentage points per level (#121) — named after
+    // the boosted stat, like Regen's Fortitude track (see passiveBoostPercent).
+    upgrades: [
+      {
+        id: 'damage',
+        label: 'Damage',
+        perLevel: 5,
+        baseCost: 30,
+        costGrowth: 1.6,
+        value(skill, level) { return skill.boost.percent + level * this.perLevel; },
+        format(value) { return `+${value}% damage`; },
+      },
+    ],
     toggles: [],
   },
 
@@ -871,11 +883,14 @@ function describeReward(reward) {
 // percentage `boost` contributes — 1 (no change) if none apply. Stacks
 // multiplicatively rather than adding percentages, so a second future source
 // of the same boost compounds instead of just summing.
-function passiveMultiplier(equippedSkillIds, statId) {
+//
+// `skillLevels` (every skill's upgrade levels, keyed by skill id) lets a
+// passive skill's upgrade track grow its percentage (see passiveBoostPercent).
+function passiveMultiplier(equippedSkillIds, statId, skillLevels = {}) {
   return equippedSkillIds.reduce((multiplier, skillId) => {
     const skill = SKILLS[skillId];
     if (skill.type !== 'passive' || skill.boost.stat !== statId || !skill.boost.percent) return multiplier;
-    return multiplier * (1 + skill.boost.percent / 100);
+    return multiplier * (1 + passiveBoostPercent(skillId, skillLevels[skillId]) / 100);
   }, 1);
 }
 
@@ -1133,7 +1148,7 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus
   if (skill.type === 'passive') {
     const { boost } = skill;
     if (boost.points) return `+${passiveBoostPoints(skillId, levels)} ${STATS[boost.stat].label} while equipped`;
-    return `+${boost.percent}% ${boost.label} while equipped`;
+    return `+${passiveBoostPercent(skillId, levels)}% ${boost.label} while equipped`;
   }
 
   const cooldown = skillCooldown(skillId, levels.speed).toFixed(1);
@@ -1221,6 +1236,15 @@ function passiveBoostPoints(skillId, levels = {}) {
   return track ? track.value(skill, levels[track.id] ?? 0) : skill.boost.points;
 }
 
+// A `percent` passive's boost at its current upgrade level: the value of the
+// upgrade track named after the boosted stat (see SKILLS.strength), or the
+// flat percentage for a passive without one.
+function passiveBoostPercent(skillId, levels = {}) {
+  const skill = SKILLS[skillId];
+  const track = findUpgrade(skillId, skill.boost.stat);
+  return track ? track.value(skill, levels[track.id] ?? 0) : skill.boost.percent;
+}
+
 // A stat's base points: its starting value plus whatever levels were bought.
 function statValue(statId, level) {
   return STATS[statId].value(level);
@@ -1271,7 +1295,7 @@ if (typeof module !== 'undefined') {
     statValue, statCost, statBonuses, statTotal, statEffect,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
     findToggle, toggleKey, effectivePointCost, skillMaxCharges, blockedDamage, skillHasAffordablePurchase,
-    toggleUnlockPerkId, toggleAvailable, regenHealAmount, passiveBoostPoints,
+    toggleUnlockPerkId, toggleAvailable, regenHealAmount, passiveBoostPoints, passiveBoostPercent,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
     FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
