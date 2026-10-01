@@ -4,7 +4,7 @@ const {
   VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES,
   statValue, statCost, statBonuses, statTotal, statEffect,
   skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
-  findToggle, toggleKey, effectivePointCost, skillHasAffordablePurchase,
+  findToggle, toggleKey, effectivePointCost, skillMaxCharges, blockedDamage, skillHasAffordablePurchase,
   describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
   FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
   objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
@@ -199,12 +199,16 @@ test('every skill defines the full data-object shape', () => {
       continue;
     }
 
-    for (const field of ['cooldown', 'triggerAt']) {
-      assert.ok(skill[field] !== undefined, `${skillId} is missing ${field}`);
-    }
-    assert.ok(skill.damage !== undefined || skill.healing !== undefined, `${skillId} does neither damage nor healing`);
+    assert.ok(['active', 'reactive'].includes(skill.type), `${skillId} has an unknown type`);
     assert.ok(skill.cooldown > 0, `${skillId} has a non-positive cooldown`);
-    assert.ok(skill.triggerAt >= 0 && skill.triggerAt <= 1, `${skillId} triggerAt is not a fraction of its cooldown`);
+    if (skill.type === 'reactive') {
+      // Fires when hit rather than partway through its cooldown.
+      assert.ok(skill.blocking > 0, `${skillId} is reactive but blocks nothing`);
+    } else {
+      assert.ok(skill.triggerAt !== undefined, `${skillId} is missing triggerAt`);
+      assert.ok(skill.damage !== undefined || skill.healing !== undefined, `${skillId} does neither damage nor healing`);
+      assert.ok(skill.triggerAt >= 0 && skill.triggerAt <= 1, `${skillId} triggerAt is not a fraction of its cooldown`);
+    }
 
     assert.ok(Array.isArray(skill.upgrades) && skill.upgrades.length > 0, `${skillId} has no upgrades`);
     for (const upgrade of skill.upgrades) {
@@ -231,6 +235,44 @@ test('Strong Attack triggers immediately, Heal triggers halfway, others at the e
   assert.strictEqual(SKILLS.strongAttack.triggerAt, 0);
   assert.strictEqual(SKILLS.heal.triggerAt, 0.5);
   assert.strictEqual(SKILLS.basicAttack.triggerAt, 1);
+});
+
+test('Block matches its spec (#119)', () => {
+  const { block } = SKILLS;
+  assert.strictEqual(block.type, 'reactive');
+  assert.strictEqual(block.unlockCost, 20);
+  assert.strictEqual(block.pointCost, 2);
+  assert.strictEqual(skillPower('block', 0), 3);
+  assert.strictEqual(skillPower('block', 2), 5);
+  assert.strictEqual(skillCooldown('block', 0), 5);
+  assert.ok(Math.abs(skillCooldown('block', 1) - 4.5) < 1e-9);
+  assert.ok(Math.abs(skillCooldown('block', 2) - 4.05) < 1e-9);
+
+  assert.deepStrictEqual([0, 1, 2].map((level) => skillUpgradeCost('block', 'power', level)), [20, 40, 80]);
+  assert.deepStrictEqual([0, 1, 2].map((level) => skillUpgradeCost('block', 'speed', level)), [20, 30, 45]);
+
+  const twoCharges = findToggle('block', 'twoCharges');
+  assert.strictEqual(twoCharges.unlockCost, 50);
+  assert.strictEqual(twoCharges.pointSurcharge, 2);
+  assert.strictEqual(effectivePointCost('block', [toggleKey('block', 'twoCharges')]), 4);
+});
+
+test('skillMaxCharges is 1 unless a charges toggle is on', () => {
+  assert.strictEqual(skillMaxCharges('block', []), 1);
+  assert.strictEqual(skillMaxCharges('block', [toggleKey('block', 'twoCharges')]), 2);
+  // Another skill's toggle with the same id never counts.
+  assert.strictEqual(skillMaxCharges('basicAttack', [toggleKey('block', 'twoCharges')]), 1);
+});
+
+test('blockedDamage takes the block off the hit, never below 0', () => {
+  assert.strictEqual(blockedDamage(5, 3), 2);
+  assert.strictEqual(blockedDamage(3, 3), 0);
+  assert.strictEqual(blockedDamage(1, 3), 0);
+});
+
+test('describeSkill describes a block', () => {
+  assert.strictEqual(describeSkill('block'), 'Blocks 3 damage from the next hit, 5.0s cooldown');
+  assert.strictEqual(describeSkill('block', { power: 1, speed: 1 }), 'Blocks 4 damage from the next hit, 4.5s cooldown');
 });
 
 test('starting skills are real skills and cost nothing', () => {

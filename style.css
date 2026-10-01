@@ -351,6 +351,32 @@ body {
   color: #666;
 }
 
+/* A reactive skill's ready charges (see Block), where an active skill's
+   hotkey hint sits. */
+.charge-count {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #666;
+}
+
+.cooldown-button.charged .charge-count {
+  color: #1b5e20;
+}
+
+/* Flashes a reactive skill's button the moment it blocks a hit. */
+.cooldown-button.blocked {
+  animation: block-flash 0.4s ease-out;
+}
+
+@keyframes block-flash {
+  from {
+    box-shadow: inset 0 0 0 4px #1565c0;
+  }
+}
+
 #result-message {
   font-size: 1.5rem;
   font-weight: bold;
