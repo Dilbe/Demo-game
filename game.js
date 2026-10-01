@@ -86,6 +86,10 @@ let monsterCards = [];
 let playerHp = null;
 let fightActive = false;
 const skillTimeouts = new Map();
+// Uses a reactive skill (see SKILLS.block) has ready right now, by skillId.
+// Filled to the max at fight start; its recharge timer lives in
+// skillTimeouts like any other skill's cooldown.
+const skillCharges = new Map();
 // One interval per monster in activeMonsters — each attacks the player on
 // its own cooldown, independently of the others.
 let monsterAttackIntervals = [];
@@ -630,10 +634,6 @@ function renderSkillBar() {
     // edge reaches a given point at a fixed, known moment regardless of the
     // cooldown's actual length — this marks exactly where that edge will be
     // when the effect lands, a static line at (1 - triggerAt) from the top.
-    const triggerMarker = document.createElement('span');
-    triggerMarker.className = 'trigger-marker';
-    triggerMarker.style.top = `${(1 - skill.triggerAt) * 100}%`;
-
     const icon = buildSprite(skill.icon, 'skill-icon');
 
     const label = document.createElement('span');
@@ -644,7 +644,24 @@ function renderSkillBar() {
     button.className = 'cooldown-button';
     button.dataset.skill = skillId;
     button.disabled = true;
-    button.append(fill, triggerMarker, icon, label);
+    button.append(fill);
+
+    // A reactive skill fires when it's hit rather than at a point in its
+    // cooldown, so it has no trigger marker — it shows how many charges it
+    // holds instead, and is never clicked.
+    if (skill.type === 'reactive') {
+      const chargeCount = document.createElement('span');
+      chargeCount.className = 'charge-count';
+      chargeCount.title = 'Charges ready';
+      button.append(icon, label, chargeCount);
+      skillBarEl.append(button);
+      return;
+    }
+
+    const triggerMarker = document.createElement('span');
+    triggerMarker.className = 'trigger-marker';
+    triggerMarker.style.top = `${(1 - skill.triggerAt) * 100}%`;
+    button.append(triggerMarker, icon, label);
 
     if (!isAutoTriggering(skillId)) {
       button.addEventListener('click', () => useSkill(skillId));
@@ -699,6 +716,58 @@ function useSkill(skillId) {
   }, cooldown * 1000);
 
   skillTimeouts.set(skillId, [effectTimeout, cooldownTimeout]);
+}
+
+// Shows how many charges a reactive skill has ready on its skill-bar button.
+function updateChargeCount(skillId) {
+  const button = skillBarEl.querySelector(`[data-skill="${skillId}"]`);
+  const charges = skillCharges.get(skillId);
+  button.querySelector('.charge-count').textContent = charges;
+  button.classList.toggle('charged', charges > 0);
+}
+
+// The first equipped reactive skill with a charge ready absorbs an incoming
+// hit: it spends the charge and returns the damage left after its block.
+// Spending one starts the recharge if it isn't already running — with two
+// charges, using the second while the first recharges doesn't speed it up.
+function blockAttack(damage) {
+  const skillId = equippedSkillIds().find((id) => SKILLS[id].type === 'reactive' && skillCharges.get(id) > 0);
+  if (!skillId) return damage;
+
+  skillCharges.set(skillId, skillCharges.get(skillId) - 1);
+  updateChargeCount(skillId);
+  flashBlock(skillId);
+  if (!skillTimeouts.has(skillId)) startRecharge(skillId);
+
+  return blockedDamage(damage, skillPower(skillId, skillLevels[skillId].power));
+}
+
+// Gains one charge per cooldown, one after the other, until the skill is
+// back to its max (see skillMaxCharges).
+function startRecharge(skillId) {
+  const cooldown = skillCooldown(skillId, skillLevels[skillId].speed);
+  const button = skillBarEl.querySelector(`[data-skill="${skillId}"]`);
+  animateCooldownFill(button.querySelector('.cooldown-fill'), cooldown);
+
+  const rechargeTimeout = setTimeout(() => {
+    skillTimeouts.delete(skillId);
+    if (!fightActive) return;
+
+    const maxCharges = skillMaxCharges(skillId, activeToggleIds);
+    skillCharges.set(skillId, Math.min(maxCharges, skillCharges.get(skillId) + 1));
+    updateChargeCount(skillId);
+    if (skillCharges.get(skillId) < maxCharges) startRecharge(skillId);
+  }, cooldown * 1000);
+
+  skillTimeouts.set(skillId, [rechargeTimeout]);
+}
+
+// A short flash on the button, so a block that just happened is visible.
+function flashBlock(skillId) {
+  const button = skillBarEl.querySelector(`[data-skill="${skillId}"]`);
+  button.classList.remove('blocked');
+  void button.offsetWidth; // restart the animation if it's still running
+  button.classList.add('blocked');
 }
 
 function isToggleActive(skillId, toggleId) {
@@ -964,7 +1033,7 @@ function regenTick() {
 // card, independently of every other monster's cooldown.
 function monsterAttackTick(index) {
   const monster = MONSTERS[activeMonsters[index].monsterId];
-  playerHp = Math.max(0, playerHp - monster.damage);
+  playerHp = Math.max(0, playerHp - blockAttack(monster.damage));
   updateHealthBar();
   saveProgress();
 
@@ -989,6 +1058,7 @@ function stopFightTimers() {
   // still land after the fight is already over.
   for (const timeouts of skillTimeouts.values()) timeouts.forEach(clearTimeout);
   skillTimeouts.clear();
+  skillCharges.clear();
   hotIntervals.forEach(clearInterval);
   hotIntervals = [];
 }
@@ -1116,6 +1186,11 @@ function beginFight() {
   for (const skillId of equippedSkillIds()) {
     const skill = SKILLS[skillId];
     if (skill.type === 'passive') continue;
+    if (skill.type === 'reactive') {
+      skillCharges.set(skillId, skillMaxCharges(skillId, activeToggleIds));
+      updateChargeCount(skillId);
+      continue;
+    }
     if (isAutoTriggering(skillId)) useSkill(skillId);
     else skillBarEl.querySelector(`[data-skill="${skillId}"]`).disabled = false;
   }

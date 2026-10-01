@@ -558,6 +558,15 @@ Passive HP regen now keeps running while the game is closed. Coming back after a
 - **Current rate:** the time away heals at the Fortitude rate in effect when the game is opened, which is the same as the rate it was saved with, since nothing changes it while closed.
 - **Old saves:** a save from before this has no timestamp, so it heals nothing for the time already away and starts the clock on load. A clock that has since moved backwards also counts as no time away (`offlineRegenSeconds`).
 
+## Block skill ([#119](https://github.com/Dilbe/Demo-game/issues/119))
+
+A new skill, **Block**: while equipped and ready, it takes 3 damage off the next monster attack that lands, then recharges over 5 seconds. Unlocks for 20 Upgrade Points and costs 2 Focus to equip.
+
+- **New skill type `reactive`:** it has a cooldown and upgrade/toggle tracks like an active skill, but no button to press — it fires itself when hit (`blockAttack` in `monsterAttackTick`). Its skill-bar button shows how many charges are ready and flashes when it blocks. An attack never drops below 0 damage (`blockedDamage`).
+- **Upgrades:** Block +1 per level (20 UP, cost ×2 per level); Speed +10% per level (20 UP, cost ×1.5), using the same formula as every other skill's Speed track — cooldown ÷ (1 + speed), so +100% speed halves it.
+- **Two Charges toggle:** 50 UP, +2 Focus while on. Holds 2 blocks at once. Using one starts the recharge; using the second while it runs doesn't speed it up. Each recharge gains one charge, and a second recharge only starts once the first has finished. A toggle grants this through a `charges` field (`skillMaxCharges`), so another skill could reuse it.
+- **Per fight:** charges fill up at the start of each fight and carry over between the fights of a dungeon, like any other skill's cooldown.
+
 ## Future ideas (parking lot — not yet planned)
 
 Ideas worth remembering but not yet worth breaking into milestones — needs more thought before design work starts.

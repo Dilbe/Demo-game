@@ -478,6 +478,12 @@ function xpClaimsFromFightWins(fightWinCounts) {
 // instead a `boost` applies for as long as the skill stays equipped.
 // Every other skill is `type: 'active'` and keeps the shape described above.
 //
+// `type: 'reactive'` (see Block below) has a cooldown and upgrade/toggle
+// tracks like an active skill, but no button to press: it fires itself when
+// a monster attack lands (see game.js's monsterAttackTick), then recharges.
+// A toggle with `charges` lets it hold more than one use at a time (see
+// skillMaxCharges).
+//
 // `icon` is a small inline SVG string, same reasoning as MONSTERS' `sprite`
 // — simple geometric shapes, drawn with `currentColor` so an icon matches
 // whatever text color the button/square/slot it's rendered into already
@@ -649,6 +655,50 @@ const SKILLS = {
     boost: { stat: 'damage', percent: 25, label: 'damage' },
     upgrades: [],
     toggles: [],
+  },
+
+  // Takes `blocking` off the next monster attack that lands while it's
+  // ready, then recharges over its cooldown (#119).
+  block: {
+    label: 'Block',
+    icon: '<svg viewBox="0 0 24 24"><path d="M12 2 L20 5 V11 C20 16.5 16.5 20.5 12 22 C7.5 20.5 4 16.5 4 11 V5 Z" fill="currentColor"/></svg>',
+    blocking: 3,
+    cooldown: 5,
+    unlockCost: 20,
+    pointCost: 2,
+    type: 'reactive',
+    upgrades: [
+      {
+        id: 'power',
+        label: 'Block',
+        perLevel: 1,
+        baseCost: 20,
+        costGrowth: 2,
+        value(skill, level) { return skill.blocking + level * this.perLevel; },
+        format(value) { return `Blocks ${value}`; },
+      },
+      {
+        id: 'speed',
+        label: 'Speed',
+        // +10% speed per level, same divide-not-subtract formula as every
+        // other skill's Speed track: +100% speed halves the cooldown.
+        perLevel: 0.1,
+        baseCost: 20,
+        costGrowth: 1.5,
+        value(skill, level) { return skill.cooldown / (1 + level * this.perLevel); },
+        format(value) { return `${value.toFixed(1)}s cooldown`; },
+      },
+    ],
+    toggles: [
+      {
+        id: 'twoCharges',
+        label: 'Two Charges',
+        description: 'Holds 2 blocks at once; each one recharges on its own cooldown, one after the other',
+        unlockCost: 50,
+        pointSurcharge: 2,
+        charges: 2,
+      },
+    ],
   },
 };
 
@@ -983,6 +1033,20 @@ function effectivePointCost(skillId, activeToggleIds) {
   return skill.pointCost + surcharge;
 }
 
+// How many uses a reactive skill can hold at once (see SKILLS.block): 1,
+// unless one of its switched-on toggles grants more `charges`.
+function skillMaxCharges(skillId, activeToggleIds) {
+  return SKILLS[skillId].toggles.reduce((max, toggle) => {
+    const active = toggle.charges && activeToggleIds.includes(toggleKey(skillId, toggle.id));
+    return active ? Math.max(max, toggle.charges) : max;
+  }, 1);
+}
+
+// An attack's damage after a block takes `blocking` off it — never below 0.
+function blockedDamage(damage, blocking) {
+  return Math.max(0, damage - blocking);
+}
+
 // Whether anything for this skill can be bought with Upgrade Points right
 // now (#99): unlocking it (objective-gated skills have no price), one of its
 // upgrade tracks, or one of its toggles once toggles are unlocked. Switching
@@ -1009,9 +1073,13 @@ function describeSkill(skillId, levels = { power: 0, speed: 0 }, perkDamageBonus
     return `+${boost.percent}% ${boost.label} while equipped`;
   }
 
+  const cooldown = skillCooldown(skillId, levels.speed).toFixed(1);
+  if (skill.type === 'reactive') {
+    return `Blocks ${skillPower(skillId, levels.power)} damage from the next hit, ${cooldown}s cooldown`;
+  }
+
   const power = skillPower(skillId, levels.power) + (skill.healing ? 0 : perkDamageBonus);
   const effect = skill.healing ? `Heals ${power}` : `${power} damage`;
-  const cooldown = skillCooldown(skillId, levels.speed).toFixed(1);
   return `${effect}, ${cooldown}s cooldown`;
 }
 
@@ -1122,7 +1190,7 @@ if (typeof module !== 'undefined') {
     VERSION, BUILD_SHA, STATS, SKILLS, STARTING_SKILLS, MONSTERS, MONSTER_GROUPS, DUNGEONS, OBJECTIVES, PERKS,
     statValue, statCost, statBonuses, statTotal, statEffect,
     skillPower, skillCooldown, skillUpgradeCost, describeSkill, passiveMultiplier,
-    findToggle, toggleKey, effectivePointCost, skillHasAffordablePurchase,
+    findToggle, toggleKey, effectivePointCost, skillMaxCharges, blockedDamage, skillHasAffordablePurchase,
     describeMonster, describeMonsterGroup, describeDungeon, advanceRegen, offlineRegenSeconds,
     FIGHT_UNLOCKED_BY, fightUnlocked, describeFightUnlock, wonFightIdsFromUnlockCount,
     objectiveMatches, objectiveAvailable, describeObjectiveProgress, describeReward,
